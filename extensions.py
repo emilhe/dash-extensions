@@ -89,7 +89,7 @@ def _combine_callbacks(callbacks):
         if all([item == dash.no_update for item in output_values]):
             raise PreventUpdate
         # Return the combined output.
-        return output_values
+        return output_values if len(output_values) > 1 else output_values[0]
 
     return {"outputs": outputs, "inputs": inputs, "func": wrapper, "states": states}
 
