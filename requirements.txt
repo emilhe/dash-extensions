@@ -1,0 +1,7 @@
+./libs/dash_renderer-1.2.4.tar.gz
+./libs/dash_core_components-1.8.1.tar.gz
+
+flask
+dash
+numpy
+more_itertools
