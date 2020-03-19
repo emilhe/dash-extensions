@@ -61,10 +61,10 @@ def alternative_syntax():
     # Create a blue print for storing the callback operations.
     dcb = DashCallbackBlueprint()
     # Callback to populate country dd on region selection.
-    dcb.callback(outputs=[("country2", "options")], inputs=[("region2", "value")], func=lambda x: [country_options(x)])
+    dcb.callback(outputs=[("country2", "options")], inputs=[("region2", "value")], func=lambda x: country_options(x))
     # Callback to copy region selection.
     dcb.callback(outputs=[("region2", "value")], inputs=[("copy", "n_clicks")], states=[("region1", "value")],
-                 func=lambda x, y: [y])
+                 func=lambda x, y: y)
     # Callback to copy country selection.
     dcb.callback(outputs=[("country2", "options"), ("country2", "value")], inputs=[("copy", "n_clicks")],
                  states=[("country1", "options"), ("country1", "value")], func=lambda x, y, z: [y, z])

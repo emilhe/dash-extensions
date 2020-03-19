@@ -81,6 +81,8 @@ def _combine_callbacks(callbacks):
                 else:
                     states_i = [local_states[j] for j in state_mappings[i]]
                     outputs_i = callbacks[i]["func"](*inputs_i, *states_i)
+                if len(callbacks[i]["outputs"]) == 1:
+                    outputs_i = [outputs_i]
                 for j, item in enumerate(outputs_i):
                     output_values[output_mappings[i][j]] = outputs_i[j]
             except PreventUpdate:
