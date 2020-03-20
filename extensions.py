@@ -1,17 +1,22 @@
 import dash
 import itertools
-from dash.dependencies import Output, Input, State
+
 from dash.exceptions import PreventUpdate
 from more_itertools import unique_everseen
 
 
 class DashCallbackBlueprint:
-    def __init__(self, callbacks=None):
-        self.callbacks = [] if callbacks is None else callbacks
+    def __init__(self):
+        self.callbacks = []
 
-    def callback(self, outputs, inputs, func, states=None):
+    def callback(self, outputs, inputs=None, states=None):
         outputs, inputs, states = _as_list(outputs), _as_list(inputs), _as_list(states)
-        self.callbacks.append(dict(outputs=outputs, inputs=inputs, func=func, states=states))
+        self.callbacks.append(dict(outputs=outputs, inputs=inputs, states=states))
+
+        def cache_func(func):
+            self.callbacks[-1]["callback"] = func
+
+        return cache_func
 
     def register(self, dash_app):
         detangled_callbacks = self._untangle_callbacks()
@@ -20,7 +25,7 @@ class DashCallbackBlueprint:
 
     def _untangle_callbacks(self):
         # Divide callback into groups based on output overlaps.
-        output_key_map = [[".".join(item) for item in callback["outputs"]] for callback in self.callbacks]
+        output_key_map = [[_create_callback_id(item) for item in callback["outputs"]] for callback in self.callbacks]
         groups = _group_callbacks(output_key_map)
         # Create a single callback for each group.
         untangled_callbacks = []
@@ -33,33 +38,9 @@ class DashCallbackBlueprint:
 
 # NOTE: No performance considerations what so ever. Just an initial proof-of-concept implementation.
 def _combine_callbacks(callbacks):
-    # Setup inputs/outputs/states lists.
-    outputs, inputs, states = [], [], None
-    for callback in callbacks:
-        outputs.extend(callback["outputs"])
-        inputs.extend(callback["inputs"])
-        if callback["states"] is not None:
-            states = [] if states is None else states
-            states.extend(callback["states"])
-    # Remove duplicates.
-    outputs = list(unique_everseen(outputs))
-    inputs = list(unique_everseen(inputs))
-    states = list(unique_everseen(states))
-    # Create input prop mappings.
-    input_props = [".".join(item) for item in inputs]
-    input_prop_lists = [[".".join(item) for item in callback["inputs"]] for callback in callbacks]
-    input_mappings = [[input_props.index(item) for item in l] for l in input_prop_lists]
-    # Create state prop mappings.
-    state_props = [".".join(item) if item is not None else None for item in states]
-    state_prop_lists = [
-        [".".join(item) for item in callback["states"]] if callback["states"] is not None else None for callback
-        in callbacks]
-    state_mappings = [[state_props.index(item) for item in l] if l is not None else None for l in
-                      state_prop_lists]
-    # Create output prop mappings.
-    output_props = [".".join(item) for item in outputs]
-    output_prop_lists = [[".".join(item) for item in callback["outputs"]] for callback in callbacks]
-    output_mappings = [[output_props.index(item) for item in l] for l in output_prop_lists]
+    inputs, input_props, input_prop_lists, input_mappings = _prep_props(callbacks, "inputs")
+    states, state_props, state_prop_lists, state_mappings = _prep_props(callbacks, "states")
+    outputs, output_props, output_prop_lists, output_mappings = _prep_props(callbacks, "outputs")
 
     # TODO: There might be a scope issue here
     def wrapper(*args):
@@ -76,11 +57,8 @@ def _combine_callbacks(callbacks):
             # Trigger the callback function.
             try:
                 inputs_i = [local_inputs[j] for j in input_mappings[i]]
-                if state_mappings[i] is None:
-                    outputs_i = callbacks[i]["func"](*inputs_i)
-                else:
-                    states_i = [local_states[j] for j in state_mappings[i]]
-                    outputs_i = callbacks[i]["func"](*inputs_i, *states_i)
+                states_i = [local_states[j] for j in state_mappings[i]]
+                outputs_i = callbacks[i]["callback"](*inputs_i, *states_i)
                 if len(callbacks[i]["outputs"]) == 1:
                     outputs_i = [outputs_i]
                 for j, item in enumerate(outputs_i):
@@ -93,7 +71,7 @@ def _combine_callbacks(callbacks):
         # Return the combined output.
         return output_values if len(output_values) > 1 else output_values[0]
 
-    return {"outputs": outputs, "inputs": inputs, "func": wrapper, "states": states}
+    return {"outputs": outputs, "inputs": inputs, "callback": wrapper, "states": states}
 
 
 # NOTE: No performance considerations what so ever. Just an initial proof-of-concept implementation.
@@ -123,20 +101,26 @@ def _group_callbacks(output_ids, groups=None):
 
 
 def _register_callback(dash_app, callback):
-    # Setup outputs and inputs.
-    outputs = Output(*callback["outputs"][0]) if len(callback["outputs"]) == 1 else \
-        [Output(*item) for item in callback["outputs"]]
-    inputs = [Input(*item) for item in callback["inputs"]]
-    # Register callbacks without state.
-    if callback["states"] is None:
-        dash_app.callback(outputs, inputs)(callback["func"])
-        return
-    # Register callbacks with state.
-    states = [State(*item) for item in callback["states"]]
-    dash_app.callback(outputs, inputs, states)(callback["func"])
+    outputs = callback["outputs"][0] if len(callback["outputs"]) == 1 else callback["outputs"]
+    dash_app.callback(outputs, callback["inputs"], callback["states"])(callback["callback"])
+
+
+def _prep_props(callbacks, key):
+    all = []
+    for callback in callbacks:
+        all.extend(callback[key])
+    all = list(unique_everseen(all))
+    props = [_create_callback_id(item) for item in all]
+    prop_lists = [[_create_callback_id(item) for item in callback[key]] for callback in callbacks]
+    mappings = [[props.index(item) for item in l] for l in prop_lists]
+    return all, props, prop_lists, mappings
 
 
 def _as_list(item):
     if item is None:
-        return None
+        return []
     return item if isinstance(item, list) else [item]
+
+
+def _create_callback_id(output):
+    return "{}.{}".format(output.component_id, output.component_property)
