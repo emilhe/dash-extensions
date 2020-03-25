@@ -33,7 +33,7 @@ def setup_callbacks_for_right_controller(app):
 
 # setup_callbacks_for_right_controller(app)  # throws dash.exceptions.DuplicateCallbackOutput
 
-# Proposed solution,
+# Proposed solution.
 dcb = DashCallbackBlueprint()
 setup_callbacks_for_right_controller(dcb)
 dcb.register(app)

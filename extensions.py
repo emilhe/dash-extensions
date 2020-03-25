@@ -44,8 +44,8 @@ def _combine_callbacks(callbacks):
 
     # TODO: There might be a scope issue here
     def wrapper(*args):
-        local_inputs = list(args)[:len(input_prop_lists)]
-        local_states = list(args)[len(input_prop_lists):]
+        local_inputs = list(args)[:len(inputs)]
+        local_states = list(args)[len(inputs):]
         if len(dash.callback_context.triggered) == 0:
             raise PreventUpdate
         prop_id = dash.callback_context.triggered[0]['prop_id']
