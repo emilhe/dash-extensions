@@ -3,9 +3,10 @@ import dash_core_components as dcc
 import dash_html_components as html
 
 from dash.dependencies import Output, Input, State
-from extensions import DashCallbackBlueprint
 
 # Some dummy data.
+from dash_extensions.callback import DashCallbackBlueprint
+
 data_map = {"Nordics": ["Sweden", "Norway", "Denmark"], "Europe": ["Germany", "France", "Spain"]}
 region_options = [{"value": item, "label": item} for item in list(data_map.keys())]
 country_options = lambda x: [{"value": item, "label": item} for item in data_map[x]] if x is not None else []
