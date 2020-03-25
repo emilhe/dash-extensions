@@ -1,10 +1,10 @@
 # dash-extensions
 
-The purpose of the package is to provide various extensions to the Plotly Dash framework. It is essentially a collection of code snippets that i have been reusing across multiple projects.
+The purpose of this package is to provide various extensions to the Plotly Dash framework. It is essentially a collection of code snippets that i have been reusing across multiple projects.
 
 ### DashCallbackBlueprint
 
-A known limitation of Dash is the inability to multiple callbacks to the same output. Hence the following code will **not** work,
+A known limitation of Dash is the inability to assign multiple callbacks to the same output. Hence the following code will **not** work,
 
     import dash
     import dash_html_components as html
@@ -57,4 +57,4 @@ To address this problem, this package provides the `DashCallbackBlueprint` class
     if __name__ == '__main__':
         app.run_server()
 
-Under the hood, the `DashCallbackBlueprint` class will merge the two callbacks into one and call invoke the appropriate function handler depending on the input trigger. In this simple case, the two callbacks could easily have been merged by hand. However, in more complex cases, the callback merging and control flow delegation can be cumbersome to implement by hand.
+Under the hood, the two callbacks are merged into one with the appropriate function handler invoked depending on the input trigger. In this simple case, the two callbacks could easily have been merged by hand. However, in more complex cases, the callback merging and control flow delegation can be cumbersome to implement by hand.
