@@ -1,3 +1,4 @@
+import json
 import dash
 import itertools
 
@@ -124,3 +125,39 @@ def _as_list(item):
 
 def _create_callback_id(output):
     return "{}.{}".format(output.component_id, output.component_property)
+
+
+# region Other callback utils
+
+
+class Trigger(object):
+    def __init__(self, id, **kwargs):
+        self.id = id
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
+
+
+def get_trigger():
+    triggered = dash.callback_context.triggered
+    if not triggered:
+        return Trigger(None)
+    # Collect trigger ids and values.
+    trigger_id = None
+    trigger_values = {}
+    for entry in triggered:
+        tmp = entry['prop_id'].split(".")
+        # Determine the trigger object.
+        if trigger_id is None:
+            trigger_id = tmp[0]
+        # TODO: Should all properties of the trigger be registered, or only one?
+        if trigger_id != tmp[0]:
+            continue
+        trigger_values[tmp[1]] = entry['value']
+    # Now, create an object.
+    try:
+        trigger_id = json.loads(trigger_id)
+    except ValueError:
+        pass
+    return Trigger(trigger_id, **trigger_values)
+
+# endregion
