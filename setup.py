@@ -1,5 +1,12 @@
+import json
 import pathlib
+
 from setuptools import setup
+
+with open('package.json') as f:
+    package = json.load(f)
+
+package_name = package["name"].replace(" ", "_").replace("-", "_")
 
 # The directory containing this file
 HERE = pathlib.Path(__file__).parent
@@ -7,21 +14,20 @@ HERE = pathlib.Path(__file__).parent
 # The text of the README file
 README = (HERE / "README.md").read_text()
 
-# This call to setup() does all the work
 setup(
-    name="dash-extensions",
-    version="0.0.5",
-    description="Various extensions for the Plotly Dash framework",
+    name=package["name"],
+    version=package["version"],
+    author=package['author'],
+    packages=[package_name],
+    url="https://github.com/thedirtyfew/dash-extensions/",
+    include_package_data=True,
+    license=package['license'],
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/thedirtyfew/dash-extensions/",
-    author="Emil Haldrup Eriksen",
-    author_email="emil.h.eriksen@gmail.com",
-    license="MIT",
+    description=package.get('description', package_name),
+    install_requires=["dash", "more_itertools"],
     classifiers=[
         "Programming Language :: Python :: 3",
+        'Framework :: Dash',
     ],
-    packages=["dash_extensions"],
-    include_package_data=True,
-    install_requires=["dash", "more_itertools"],
 )
