@@ -40,7 +40,7 @@ export default class Download extends Component {
 }
 
 Download.defaultProps = {
-    type: "text/plain",
+    mime_type: "text/plain",
     base64: false,
 };
 
