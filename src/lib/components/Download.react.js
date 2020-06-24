@@ -1,5 +1,6 @@
 import React, {Component} from 'react';
 import PropTypes from 'prop-types';
+import {toByteArray} from 'base64-js';
 
 /**
  * The Download component opens a download dialog when the data property (dict of filename, content, and type) changes.
@@ -9,13 +10,11 @@ export default class Download extends Component {
     componentDidUpdate(prevProps) {
         const {data} = this.props;
         if(data && data !== prevProps.data){
-            let content = data.content;
-            // If data is supplied as an array, interpret is as bytes.
-            if(content.constructor === Array){
-                content = new Uint8Array(data.content);
-            }
+            const mime_type = data.mime_type? data.mime_type : this.props.mime_type;
+            const base64 = data.base64? data.base64 : this.props.base64;
+            const content = base64? toByteArray(data.content) : data.content;
             // Construct the blob.
-            const blob = new Blob([content], {type: data.type});
+            const blob = new Blob([content], {type: mime_type});
             const filename = data.filename;
             // Save file function, from https://stackoverflow.com/questions/19327749/javascript-blob-filename-without-link
             if (window.navigator.msSaveOrOpenBlob) {
@@ -40,7 +39,10 @@ export default class Download extends Component {
     }
 }
 
-Download.defaultProps = {};
+Download.defaultProps = {
+    type: "text/plain",
+    base64: false,
+};
 
 Download.propTypes = {
     /**
@@ -54,8 +56,19 @@ Download.propTypes = {
     data: PropTypes.shape({
         filename: PropTypes.string.isRequired,
         content: PropTypes.any.isRequired,
-        type: PropTypes.string.isRequired,
+        base64: PropTypes.bool,
+        mime_type: PropTypes.string,
     }),
+
+    /**
+     * Default value for base64.
+     */
+    base64: PropTypes.bool,
+
+    /**
+     * Default value for mime_type.
+     */
+    mime_type: PropTypes.bool,
 
     /**
      * Dash-assigned callback that should be called to report property changes
