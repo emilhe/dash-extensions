@@ -4,7 +4,7 @@ The purpose of this package is to provide various extensions to the Plotly Dash 
 
 ### Download
 
-The `Download` provides an easy way to download data from a Dash application. Simply add the `Download` component to the app layout, and add a callback which targets its `data` property. Here is a small example,
+The `Download` component provides an easy way to download data from a Dash application. Simply add the `Download` component to the app layout, and add a callback which targets its `data` property. Here is a small example,
 
     import dash
     import dash_html_components as html
