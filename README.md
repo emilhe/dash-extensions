@@ -27,7 +27,7 @@ To ease downloading files, a `send_file` utility method is included,
     import dash_html_components as html  
     from dash.dependencies import Output, Input
     from dash_extensions import Download
-    from dash_extensions.download import send_file
+    from dash_extensions.snippets import send_file
     
     app = dash.Dash(prevent_initial_callbacks=True)
     app.layout = html.Div([html.Button("Download", id="btn"), Download(id="download")])
@@ -47,7 +47,7 @@ To ease downloading data frames (which seems to be a common use case for Dash us
     
     from dash.dependencies import Output, Input
     from dash_extensions import Download
-    from dash_extensions.download import send_data_frame
+    from dash_extensions.snippets import send_data_frame
     
     # Example data.
     df = pd.DataFrame({'a': [1, 2, 3, 4], 'b': [2, 1, 5, 6], 'c': ['x', 'x', 'y', 'y']})
