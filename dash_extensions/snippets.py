@@ -68,7 +68,7 @@ def send_string(writer, filename, mime_type=None, **kwargs):
     return dict(content=content, filename=filename, mime_type=mime_type, base64=True)
 
 
-_pandas_writer_binary_map = {
+known_pandas_writers = {
     "to_csv": False,
     "to_json": False,
     "to_html": False,
@@ -101,16 +101,16 @@ def send_data_frame(writer, filename, mime_type=None, **kwargs):
     >>> send_data_frame(df.to_pkl, "mydf.pkl") # download as pickle
 
     """
-    name = df_writer.__name__
+    name = writer.__name__
     # Check if the provided writer is known.
-    if name not in _writer_binary_map.keys():
+    if name not in known_pandas_writers.keys():
         raise ValueError("The provided writer ({}) is not supported, "
                          "try calling send_string or send_bytes directly.".format(name))
     # If binary, use send_bytes.
-    if _writer_binary_map[name]:
+    if known_pandas_writers[name]:
         return send_bytes(writer, filename, mime_type, **kwargs)
     # Otherwise, use send_string.
-    send_string(writer, filename, mime_type, **kwargs)
+    return send_string(writer, filename, mime_type, **kwargs)
 
 
 
