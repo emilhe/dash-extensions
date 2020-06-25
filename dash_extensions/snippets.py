@@ -26,7 +26,49 @@ def send_file(path, filename=None, mime_type=None):
     return dict(content=content, filename=filename, mime_type=mime_type, base64=True)
 
 
-_writer_binary_map = {
+def send_bytes(writer, filename, mime_type=None, **kwargs):
+    """
+    Convert data written to BytesIO into the format expected by the Download component.
+    :param writer: a writer that can write to BytesIO
+    :param filename: the name of the file
+    :param mime_type: mime type of the file (optional, passed to Blob in the javascript layer)
+    :return: dict of data frame content (base64 encoded) and meta data used by the Download component
+    """
+    data_io = io.BytesIO()
+    # Some pandas writers try to close the IO, we do not want that.
+    data_io_close = data_io.close
+    data_io.close = lambda: None
+    # Write data content to base64 string.
+    writer(data_io, **kwargs)
+    data_value = data_io.getvalue()
+    data_io_close()
+    content = base64.b64encode(data_value).decode()
+    # Wrap in dict.
+    return dict(content=content, filename=filename, mime_type=mime_type, base64=True)
+
+
+def send_string(writer, filename, mime_type=None, **kwargs):
+    """
+    Convert data written to StringIO into the format expected by the Download component.
+    :param writer: a writer that can write to StringIO
+    :param filename: the name of the file
+    :param mime_type: mime type of the file (optional, passed to Blob in the javascript layer)
+    :return: dict of data frame content (base64 encoded) and meta data used by the Download component
+    """
+    data_io = io.StringIO()
+    # Some pandas writers try to close the IO, we do not want that.
+    data_io_close = data_io.close
+    data_io.close = lambda: None
+    # Write data content to base64 string.
+    writer(data_io, **kwargs)
+    data_value = data_io.getvalue().encode()
+    data_io_close()
+    content = base64.b64encode(data_value).decode()
+    # Wrap in dict.
+    return dict(content=content, filename=filename, mime_type=mime_type, base64=True)
+
+
+_pandas_writer_binary_map = {
     "to_csv": False,
     "to_json": False,
     "to_html": False,
@@ -40,13 +82,11 @@ _writer_binary_map = {
 }
 
 
-def send_data_frame(df_writer, filename, binary=None, mime_type=None):
+def send_data_frame(writer, filename, mime_type=None, **kwargs):
     """
-    Convert a pandas data frame into the format expected by the Download component.
-    :param df_writer: a writer that can write the df to a StringIO (if binary=False) or a BytesIO (if binary=True)
+    Convert data frame into the format expected by the Download component.
+    :param writer: a data frame writer
     :param filename: the name of the file
-    :param binary: if False, the writer is provided with StringIO, if True a BytesIO. Per default, pandas writers are
-    handles automatically, for custom writers the default is False
     :param mime_type: mime type of the file (optional, passed to Blob in the javascript layer)
     :return: dict of data frame content (base64 encoded) and meta data used by the Download component
 
@@ -57,27 +97,20 @@ def send_data_frame(df_writer, filename, binary=None, mime_type=None):
     ...
     >>> send_data_frame(df.to_csv, "mydf.csv")  # download as csv
     >>> send_data_frame(df.to_json, "mydf.json")  # download as json
-    >>> send_data_frame(df.to_excel, "mydf.xls", binary=True) # download as excel
-    >>> send_data_frame(df.to_pkl, "mydf.pkl", binary=True) # download as pickle
+    >>> send_data_frame(df.to_excel, "mydf.xls", index=False) # download as excel
+    >>> send_data_frame(df.to_pkl, "mydf.pkl") # download as pickle
 
     """
-    # Try to guess what IO is needed (will work for standard pandas writers).
-    if binary is None:
-        name = df_writer.__name__
-        if name in _writer_binary_map.keys():
-            binary = _writer_binary_map[name]
-    # Create data IO.
-    data_io = io.BytesIO() if binary else io.StringIO()
-    # Some pandas writers try to close the IO, we do not want that.
-    data_io_close = data_io.close
-    data_io.close = lambda: None
-    # Write data frame content to base64 string.
-    df_writer(data_io)
-    data_value = data_io.getvalue() if binary else data_io.getvalue().encode()
-    data_io_close()
-    content = base64.b64encode(data_value).decode()
-    # Wrap in dict.
-    return dict(content=content, filename=filename, mime_type=mime_type, base64=True)
+    name = df_writer.__name__
+    # Check if the provided writer is known.
+    if name not in _writer_binary_map.keys():
+        raise ValueError("The provided writer ({}) is not supported, "
+                         "try calling send_string or send_bytes directly.".format(name))
+    # If binary, use send_bytes.
+    if _writer_binary_map[name]:
+        return send_bytes(writer, filename, mime_type, **kwargs)
+    # Otherwise, use send_string.
+    send_string(writer, filename, mime_type, **kwargs)
 
 
 
