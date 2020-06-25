@@ -32,6 +32,6 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         npm install | echo "Ignore npm install error"
-        npm run build:all
+        npm run build
         python setup.py sdist bdist_wheel
         twine upload dist/*
