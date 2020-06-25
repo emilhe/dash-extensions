@@ -12,7 +12,7 @@
     "build:py": "dash-generate-components ./src/lib/components dash_extensions",
     "build:py_and_r-activated": "(. venv/bin/activate || venv\\scripts\\activate && npm run build:py_and_r)",
     "build": "npm run build:js && npm run build:py_and_r",
-    "build_no_r": "npm run build:js && npm run build:py_and_r",
+    "build_no_r": "npm run build:js && npm run build:py",
     "build:activated": "npm run build:js && npm run build:py_and_r-activated"
   },
   "author": "Emil Eriksen <emil.h.eriksen@gmail.com>",
