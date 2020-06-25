@@ -9,8 +9,10 @@
     "prepublishOnly": "npm run validate-init",
     "build:js": "webpack --mode production",
     "build:py_and_r": "dash-generate-components ./src/lib/components dash_extensions -p package-info.json --r-prefix ''",
+    "build:py": "dash-generate-components ./src/lib/components dash_extensions",
     "build:py_and_r-activated": "(. venv/bin/activate || venv\\scripts\\activate && npm run build:py_and_r)",
     "build": "npm run build:js && npm run build:py_and_r",
+    "build_no_r": "npm run build:js && npm run build:py_and_r",
     "build:activated": "npm run build:js && npm run build:py_and_r-activated"
   },
   "author": "Emil Eriksen <emil.h.eriksen@gmail.com>",
