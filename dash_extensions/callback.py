@@ -1,4 +1,8 @@
+import hashlib
+import os
 import json
+import pickle
+
 import dash
 import itertools
 
@@ -35,6 +39,35 @@ class DashCallbackBlueprint:
             untangled_callbacks.append(untangled_callback)
 
         return untangled_callbacks
+
+
+class DashCallbackDiskCache:
+    def __init__(self, app, wd, refresh_always=None):
+        self.wd = wd
+        self.app = app
+        self.refresh_always = refresh_always
+        os.makedirs(wd, exist_ok=True)
+
+    def callback(self, *args):
+        def cache_func(func):
+            self.app.callback(*args)(lambda *args, x=func: self._update(func, *args))
+
+        return cache_func
+
+    def _update(self, func, *args):
+        unique_id = hashlib.md5(json.dumps([func.__name__] + list(args)).encode()).hexdigest()
+        target = os.path.join(self.wd, unique_id)
+        # Check if query is present in cache.
+        if self.refresh_always or not os.path.isfile(target):
+            data = func(*args)
+            with open(target, 'wb') as f:
+                pickle.dump(data, f)
+        return unique_id
+
+    def query(self, key):
+        target = os.path.join(self.wd, key)
+        with open(target, 'rb') as f:
+            return pickle.load(f)
 
 
 # NOTE: No performance considerations what so ever. Just an initial proof-of-concept implementation.
