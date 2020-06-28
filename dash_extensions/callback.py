@@ -2,6 +2,7 @@ import hashlib
 import os
 import json
 import pickle
+import datetime
 
 import dash
 import itertools
@@ -51,10 +52,10 @@ def _as_list(item):
 
 class DashDiskCache(CallbackDecorator):
 
-    def __init__(self, cache_dir, refresh_always=None, makedirs=None):
+    def __init__(self, cache_dir, expire_after=None, makedirs=None):
         super().__init__()
         self.cache_dir = cache_dir
-        self.refresh_always = refresh_always  # TODO: Maybe change to a time, like cached session
+        self.expire_after = expire_after if expire_after is not None else -1
         self.cached_callbacks = []
         if makedirs or makedirs is None:
             os.makedirs(self.cache_dir, exist_ok=True)
@@ -103,8 +104,17 @@ class DashDiskCache(CallbackDecorator):
             # Get file cache path.
             unique_id = _get_id(func, output, args)
             target = self._get_path(unique_id)
-            # Check if query is present in cache.
-            if self.refresh_always or not os.path.isfile(target):
+            # Check if cache refresh is needed.
+            refresh_needed = True
+            if self.expire_after != 0:  # zero means ALWAYS refresh
+                if os.path.isfile(target):
+                    refresh_needed = self.expire_after > 0  # minus means NEVER expire
+                    if refresh_needed:
+                        age = (datetime.datetime.now() -
+                               datetime.datetime.fromtimestamp(os.path.getmtime(target))).total_seconds()
+                        refresh_needed = age > self.expire_after
+            # Refresh the data.
+            if refresh_needed:
                 data = func(*args) if data is None else data  # load data only once
                 with open(target, 'wb') as f:
                     pickle.dump(data[i] if multi_output else data, f)
