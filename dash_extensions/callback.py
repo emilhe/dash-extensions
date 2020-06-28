@@ -10,11 +10,13 @@ from dash.exceptions import PreventUpdate
 from more_itertools import unique_everseen
 
 
-class DashCallbackBlueprint:
+# region Callback decorator
+
+class CallbackDecorator:
     def __init__(self):
         self.callbacks = []
 
-    def callback(self, outputs, inputs=None, states=None):
+    def callback(self, outputs, inputs, states=None):
         outputs, inputs, states = _as_list(outputs), _as_list(inputs), _as_list(states)
         self.callbacks.append(dict(outputs=outputs, inputs=inputs, states=states))
 
@@ -24,11 +26,119 @@ class DashCallbackBlueprint:
         return cache_func
 
     def register(self, dash_app):
-        detangled_callbacks = self._untangle_callbacks()
-        for callback in detangled_callbacks:
+        callbacks = self._resolve_callbacks()
+        for callback in callbacks:
             _register_callback(dash_app, callback)
 
-    def _untangle_callbacks(self):
+    def _resolve_callbacks(self):
+        pass
+
+
+def _register_callback(dash_app, callback):
+    outputs = callback["outputs"][0] if len(callback["outputs"]) == 1 else callback["outputs"]
+    dash_app.callback(outputs, callback["inputs"], callback["states"])(callback["callback"])
+
+
+def _as_list(item):
+    if item is None:
+        return []
+    return item if isinstance(item, list) else [item]
+
+
+# endregion
+
+# region Disk cache
+
+class DashDiskCache(CallbackDecorator):
+
+    def __init__(self, cache_dir, refresh_always=None, makedirs=None):
+        super().__init__()
+        self.cache_dir = cache_dir
+        self.refresh_always = refresh_always  # TODO: Maybe change to a time, like cached session
+        self.cached_callbacks = []
+        if makedirs or makedirs is None:
+            os.makedirs(self.cache_dir, exist_ok=True)
+
+    def cached_callback(self, outputs, inputs, states=None):
+        # Save index to keep tract of which callback to cache.
+        self.cached_callbacks.append(len(self.callbacks))
+        # Save the callback itself.
+        return self.callback(outputs, inputs, states)
+
+    def _resolve_callbacks(self):
+        cached_ids = []
+        # Step one, wrap the cached_callbacks.
+        for idx in self.cached_callbacks:
+            callback = self.callbacks[idx]
+            # Collect the ids of components, which are cached server side.
+            cached_ids.extend([_create_callback_id(item) for item in callback["outputs"]])
+            # Modify the callback to return md5 hash.
+            original_callback = callback["callback"]
+            callback["callback"] = lambda *args, x=original_callback, y=callback["outputs"]: \
+                self._dump_callback(x, y, *args)
+        # Step two, wrap all of the other callbacks.
+        for i, callback in enumerate(self.callbacks):
+            # Figure out which args need loading.
+            items = callback["inputs"] + callback["states"]
+            item_ids = [_create_callback_id(item) for item in items]
+            item_is_cached = [item_id in cached_ids for item_id in item_ids]
+            # Nothing to load, just proceed.
+            if not any(item_is_cached):
+                continue
+            # Do magic.
+            original_callback = callback["callback"]
+            callback["callback"] = lambda *args, x=original_callback, y=item_is_cached: \
+                self._load_callback(x, y, *args)
+        # Return the update callback.
+        return self.callbacks
+
+    def _get_path(self, unique_id):
+        return os.path.join(self.cache_dir, unique_id)
+
+    def _dump_callback(self, func, outputs, *args):
+        data = None
+        multi_output = len(outputs) > 1
+        unique_ids = []
+        for i, output in enumerate(outputs):
+            # Get file cache path.
+            unique_id = _get_id(func, output, args)
+            target = self._get_path(unique_id)
+            # Check if query is present in cache.
+            if self.refresh_always or not os.path.isfile(target):
+                data = func(*args) if data is None else data  # load data only once
+                with open(target, 'wb') as f:
+                    pickle.dump(data[i] if multi_output else data, f)
+            # Collect output id(s).
+            unique_ids.append(unique_id)
+        # Return the id rather than the function data.
+        return unique_ids if multi_output else unique_ids[0]
+
+    def _load_callback(self, func, item_is_cached, *args):
+        args = list(args)
+        for i, is_cached in enumerate(item_is_cached):
+            # Just skip elements that are not cached.
+            if not is_cached:
+                continue
+            # Replace content of cached element(s).
+            target = self._get_path(args[i])
+            with open(target, 'rb') as f:
+                args[i] = pickle.load(f)
+        return func(*args)
+
+
+def _get_id(func, output, args):
+    return hashlib.md5(json.dumps([func.__name__, _create_callback_id(output)] + list(args)).encode()).hexdigest()
+
+
+# endregion
+
+# region Callback blueprint
+
+class DashCallbackBlueprint(CallbackDecorator):
+    def __init__(self):
+        super().__init__()
+
+    def _resolve_callbacks(self):
         # Divide callback into groups based on output overlaps.
         output_key_map = [[_create_callback_id(item) for item in callback["outputs"]] for callback in self.callbacks]
         groups = _group_callbacks(output_key_map)
@@ -39,35 +149,6 @@ class DashCallbackBlueprint:
             untangled_callbacks.append(untangled_callback)
 
         return untangled_callbacks
-
-
-class DashCallbackDiskCache:
-    def __init__(self, app, wd, refresh_always=None):
-        self.wd = wd
-        self.app = app
-        self.refresh_always = refresh_always
-        os.makedirs(wd, exist_ok=True)
-
-    def callback(self, *args):
-        def cache_func(func):
-            self.app.callback(*args)(lambda *args, x=func: self._update(func, *args))
-
-        return cache_func
-
-    def _update(self, func, *args):
-        unique_id = hashlib.md5(json.dumps([func.__name__] + list(args)).encode()).hexdigest()
-        target = os.path.join(self.wd, unique_id)
-        # Check if query is present in cache.
-        if self.refresh_always or not os.path.isfile(target):
-            data = func(*args)
-            with open(target, 'wb') as f:
-                pickle.dump(data, f)
-        return unique_id
-
-    def query(self, key):
-        target = os.path.join(self.wd, key)
-        with open(target, 'rb') as f:
-            return pickle.load(f)
 
 
 # NOTE: No performance considerations what so ever. Just an initial proof-of-concept implementation.
@@ -134,11 +215,6 @@ def _group_callbacks(output_ids, groups=None):
     return new_groups
 
 
-def _register_callback(dash_app, callback):
-    outputs = callback["outputs"][0] if len(callback["outputs"]) == 1 else callback["outputs"]
-    dash_app.callback(outputs, callback["inputs"], callback["states"])(callback["callback"])
-
-
 def _prep_props(callbacks, key):
     all = []
     for callback in callbacks:
@@ -150,17 +226,13 @@ def _prep_props(callbacks, key):
     return all, props, prop_lists, mappings
 
 
-def _as_list(item):
-    if item is None:
-        return []
-    return item if isinstance(item, list) else [item]
+def _create_callback_id(item):
+    return "{}.{}".format(item.component_id, item.component_property)
 
 
-def _create_callback_id(output):
-    return "{}.{}".format(output.component_id, output.component_property)
+# endregion
 
-
-# region Other callback utils
+# region Get trigger
 
 
 class Trigger(object):
