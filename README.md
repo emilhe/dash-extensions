@@ -82,7 +82,7 @@ The `Lottie` component makes it possible to run Lottie animations in Dash. Here 
         app.run_server()
 
 
-### DashCallbackBlueprint
+### CallbackGrouper
 
 A known limitation of Dash is the inability to assign multiple callbacks to the same output. Hence the following code will **not** work,
 
@@ -109,30 +109,30 @@ A known limitation of Dash is the inability to assign multiple callbacks to the 
 
 Specifically, a dash.exceptions.DuplicateCallbackOutput exception will be raised as an attempt is made to assign the output `Output("div", "children")` a second time. 
 
-To address this problem, this package provides the `DashCallbackBlueprint` class. It acts as a proxy for the Dash application during callback registration, but unlike the Dash application, it supports assignment of multiple callbacks to the same output. When all callbacks have been assigned, the blueprint is registered on the Dash application,
+To address this problem, this package provides the `CallbackGrouper` class. It acts as a proxy for the Dash application during callback registration, but unlike the Dash application, it supports assignment of multiple callbacks to the same output. When all callbacks have been assigned, the callback grouper is registered on the Dash application,
 
     import dash
     import dash_html_components as html
     from dash.dependencies import Output, Input
-    from dash_extensions.callback import DashCallbackBlueprint
+    from dash_extensions.callback import CallbackGrouper
     
         
     app = dash.Dash()
     app.layout = html.Div([html.Button("Button 1", id="btn1"), html.Button("Button 2", id="btn2"), html.Div(id="div")])
-    dcb = DashCallbackBlueprint() 
+    cg = CallbackGrouper() 
     
     
-    @dcb.callback(Output("div", "children"), [Input("btn1", "n_clicks")])
+    @cg.callback(Output("div", "children"), [Input("btn1", "n_clicks")])
     def click_btn1(n_clicks):
         return "You clicked btn1"
     
     
-    @dcb.callback(Output("div", "children"), [Input("btn2", "n_clicks")]) 
+    @cg.callback(Output("div", "children"), [Input("btn2", "n_clicks")]) 
     def click_btn2(n_clicks):
         return "You clicked btn2"
     
     
-    dcb.register(app)  
+    cg.register(app)  
     
     if __name__ == '__main__':
         app.run_server()

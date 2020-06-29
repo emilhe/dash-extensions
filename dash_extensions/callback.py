@@ -11,13 +11,21 @@ from dash.exceptions import PreventUpdate
 from more_itertools import unique_everseen
 
 
-# region Callback decorator
+# region Callback blueprint
 
-class CallbackDecorator:
+class CallbackBlueprint:
+    """
+    The CallbackBlueprint (CB) class acts as a proxy for the Dash app object in the context of callback registration.
+    To bind the callbacks registered on a CB to a Dash app, the "register" function must be called.
+    """
+
     def __init__(self):
         self.callbacks = []
 
     def callback(self, outputs, inputs, states=None):
+        """
+        This method mirrors the callback decorator of the Dash app object, but simply caches the inputs.
+        """
         outputs, inputs, states = _as_list(outputs), _as_list(inputs), _as_list(states)
         self.callbacks.append(dict(outputs=outputs, inputs=inputs, states=states))
 
@@ -27,12 +35,19 @@ class CallbackDecorator:
         return cache_func
 
     def register(self, dash_app):
+        """
+        This method registers the cached callbacks on the Dash app object.
+        """
         callbacks = self._resolve_callbacks()
         for callback in callbacks:
             _register_callback(dash_app, callback)
 
     def _resolve_callbacks(self):
-        pass
+        """
+         This method resolves the callbacks. While no modifications are performed in the base class, this is the method
+         that subclasses should target inject callback modifications.
+        """
+        return self.callbacks
 
 
 def _register_callback(dash_app, callback):
@@ -46,19 +61,46 @@ def _as_list(item):
     return item if isinstance(item, list) else [item]
 
 
+def _create_callback_id(item):
+    return "{}.{}".format(item.component_id, item.component_property)
+
+
 # endregion
 
-# region Disk cache
+# region Callback cache
 
-class DashDiskCache(CallbackDecorator):
-
-    def __init__(self, cache_dir, expire_after=None, makedirs=None):
-        super().__init__()
+class DiskCache:
+    def __init__(self, cache_dir, makedirs=None):
         self.cache_dir = cache_dir
-        self.expire_after = expire_after if expire_after is not None else -1
-        self.cached_callbacks = []
         if makedirs or makedirs is None:
             os.makedirs(self.cache_dir, exist_ok=True)
+
+    def load(self, unique_id):
+        with open(self._get_path(unique_id), 'rb') as f:
+            data = pickle.load(f)
+        return data
+
+    def dump(self, data, unique_id):
+        with open(self._get_path(unique_id), 'wb') as f:
+            pickle.dump(data, f)
+
+    def contains(self, unique_id):
+        return os.path.isfile(self._get_path(unique_id))
+
+    def modified(self, unique_id):
+        return datetime.datetime.fromtimestamp(os.path.getmtime(self._get_path(unique_id)))
+
+    def _get_path(self, unique_id):
+        return os.path.join(self.cache_dir, unique_id)
+
+
+class CallbackCache(CallbackBlueprint):
+
+    def __init__(self, cache, expire_after=None):
+        super().__init__()
+        self.cache = cache
+        self.expire_after = expire_after if expire_after is not None else -1
+        self.cached_callbacks = []
 
     def cached_callback(self, outputs, inputs, states=None):
         # Save index to keep tract of which callback to cache.
@@ -93,31 +135,24 @@ class DashDiskCache(CallbackDecorator):
         # Return the update callback.
         return self.callbacks
 
-    def _get_path(self, unique_id):
-        return os.path.join(self.cache_dir, unique_id)
-
     def _dump_callback(self, func, outputs, *args):
         data = None
         multi_output = len(outputs) > 1
         unique_ids = []
         for i, output in enumerate(outputs):
-            # Get file cache path.
             unique_id = _get_id(func, output, args)
-            target = self._get_path(unique_id)
             # Check if cache refresh is needed.
             refresh_needed = True
             if self.expire_after != 0:  # zero means ALWAYS refresh
-                if os.path.isfile(target):
+                if self.cache.contains(unique_id):
                     refresh_needed = self.expire_after > 0  # minus means NEVER expire
                     if refresh_needed:
-                        age = (datetime.datetime.now() -
-                               datetime.datetime.fromtimestamp(os.path.getmtime(target))).total_seconds()
+                        age = (datetime.datetime.now() - self.cache.modified(unique_id)).total_seconds()
                         refresh_needed = age > self.expire_after
             # Refresh the data.
             if refresh_needed:
                 data = func(*args) if data is None else data  # load data only once
-                with open(target, 'wb') as f:
-                    pickle.dump(data[i] if multi_output else data, f)
+                self.cache.dump(data[i] if multi_output else data, unique_id)
             # Collect output id(s).
             unique_ids.append(unique_id)
         # Return the id rather than the function data.
@@ -130,9 +165,7 @@ class DashDiskCache(CallbackDecorator):
             if not is_cached:
                 continue
             # Replace content of cached element(s).
-            target = self._get_path(args[i])
-            with open(target, 'rb') as f:
-                args[i] = pickle.load(f)
+            args[i] = self.cache.load(args[i])
         return func(*args)
 
 
@@ -142,9 +175,9 @@ def _get_id(func, output, args):
 
 # endregion
 
-# region Callback blueprint
+# region Callback grouper
 
-class DashCallbackBlueprint(CallbackDecorator):
+class CallbackGrouper(CallbackBlueprint):
     def __init__(self):
         super().__init__()
 
@@ -234,10 +267,6 @@ def _prep_props(callbacks, key):
     prop_lists = [[_create_callback_id(item) for item in callback[key]] for callback in callbacks]
     mappings = [[props.index(item) for item in l] for l in prop_lists]
     return all, props, prop_lists, mappings
-
-
-def _create_callback_id(item):
-    return "{}.{}".format(item.component_id, item.component_property)
 
 
 # endregion
