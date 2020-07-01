@@ -9,6 +9,7 @@ import datetime
 import dash
 import itertools
 
+from dash.dependencies import Input
 from dash.exceptions import PreventUpdate
 from more_itertools import unique_everseen
 
@@ -71,6 +72,11 @@ def _create_callback_id(item):
 
 # region Callback cache
 
+class Trigger(Input):
+    def __init__(self, component_id, component_property):
+        super().__init__(component_id, component_property)
+
+
 class DiskCache:
     def __init__(self, cache_dir, makedirs=None):
         self.cache_dir = cache_dir
@@ -101,12 +107,14 @@ class CallbackCache(CallbackBlueprint):
     def __init__(self, cache, expire_after=None):
         super().__init__()
         self.cache = cache
-        self.expire_after = expire_after if expire_after is not None else -1
+        self.expire_after = expire_after if expire_after is not None else 0
         self.cached_callbacks = []
+        self.cached_callbacks_input_fltr = []
 
     def cached_callback(self, outputs, inputs, states=None):
         # Save index to keep tract of which callback to cache.
         self.cached_callbacks.append(len(self.callbacks))
+        self.cached_callbacks_input_fltr.append([isinstance(item, Trigger) for item in inputs])
         # Save the callback itself.
         return self.callback(outputs, inputs, states)
 
@@ -132,9 +140,13 @@ class CallbackCache(CallbackBlueprint):
                 callback["callback"] = lambda *args, x=original_callback, y=item_is_cached: \
                     x(*self._load_args(y, *args))
                 continue
+            # Check inputs to be ignored. TODO: Could be implemented for normal callbacks also?
+            arg_fltr = self.cached_callbacks_input_fltr[self.cached_callbacks.index(i)]
+            if len(callback["states"]) > 0:
+                arg_fltr += [False] * len(callback["states"])
             # If caching is needed, do it.
-            callback["callback"] = lambda *args, x=original_callback, y=callback["outputs"], z=item_is_cached: \
-                self._dump_callback(x, y, z, *args)
+            callback["callback"] = lambda *args, x=original_callback, y=callback["outputs"], z=item_is_cached, t=arg_fltr: \
+                self._dump_callback(x, y, z, *[arg for j, arg in enumerate(args) if not t[j]])
         # Return the update callback.
         return self.callbacks
 
@@ -278,37 +290,40 @@ def _prep_props(callbacks, key):
 
 # endregion
 
-# region Get trigger
+# region Get triggered
 
 
-class Trigger(object):
+class Triggered(object):
     def __init__(self, id, **kwargs):
         self.id = id
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
 
-def get_trigger():
+def get_triggered():
     triggered = dash.callback_context.triggered
     if not triggered:
-        return Trigger(None)
+        return Triggered(None)
     # Collect trigger ids and values.
-    trigger_id = None
-    trigger_values = {}
+    triggered_id = None
+    triggered_values = {}
     for entry in triggered:
-        tmp = entry['prop_id'].split(".")
+        # TODO: Test this part.
+        elements = entry['prop_id'].split(".")
+        current_id = ".".join(elements[:-1])
+        current_prop = elements[-1]
         # Determine the trigger object.
-        if trigger_id is None:
-            trigger_id = tmp[0]
+        if triggered_id is None:
+            triggered_id = current_id
         # TODO: Should all properties of the trigger be registered, or only one?
-        if trigger_id != tmp[0]:
+        if triggered_id != current_id:
             continue
-        trigger_values[tmp[1]] = entry['value']
+        triggered_values[current_prop] = entry['value']
     # Now, create an object.
     try:
-        trigger_id = json.loads(trigger_id)
+        triggered_id = json.loads(triggered_id)
     except ValueError:
         pass
-    return Trigger(trigger_id, **trigger_values)
+    return Triggered(triggered_id, **triggered_values)
 
 # endregion
