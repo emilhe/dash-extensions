@@ -1,4 +1,6 @@
+import functools
 import hashlib
+import operator
 import os
 import json
 import pickle
@@ -109,33 +111,34 @@ class CallbackCache(CallbackBlueprint):
         return self.callback(outputs, inputs, states)
 
     def _resolve_callbacks(self):
-        cached_ids = []
-        # Step one, wrap the cached_callbacks.
-        for idx in self.cached_callbacks:
-            callback = self.callbacks[idx]
-            # Collect the ids of components, which are cached server side.
-            cached_ids.extend([_create_callback_id(item) for item in callback["outputs"]])
-            # Modify the callback to return md5 hash.
-            original_callback = callback["callback"]
-            callback["callback"] = lambda *args, x=original_callback, y=callback["outputs"]: \
-                self._dump_callback(x, y, *args)
-        # Step two, wrap all of the other callbacks.
+        # Figure out which IDs are cached.
+        cached_ids = [[_create_callback_id(i) for i in self.callbacks[j]["outputs"]] for j in self.cached_callbacks]
+        cached_ids = functools.reduce(operator.iconcat, cached_ids, [])
+        # Modify the callbacks.
         for i, callback in enumerate(self.callbacks):
+            # Check if caching is needed.
+            caching_needed = i in self.cached_callbacks
             # Figure out which args need loading.
             items = callback["inputs"] + callback["states"]
             item_ids = [_create_callback_id(item) for item in items]
             item_is_cached = [item_id in cached_ids for item_id in item_ids]
-            # Nothing to load, just proceed.
-            if not any(item_is_cached):
+            # Nothing modifications needed, just proceed.
+            if not caching_needed and not any(item_is_cached):
                 continue
-            # Do magic.
+            # Create reference to original callback.
             original_callback = callback["callback"]
-            callback["callback"] = lambda *args, x=original_callback, y=item_is_cached: \
-                self._load_callback(x, y, *args)
+            # If caching of outputs is not needed, just load the args.
+            if not caching_needed:
+                callback["callback"] = lambda *args, x=original_callback, y=item_is_cached: \
+                    x(*self._load_args(y, *args))
+                continue
+            # If caching is needed, do it.
+            callback["callback"] = lambda *args, x=original_callback, y=callback["outputs"], z=item_is_cached: \
+                self._dump_callback(x, y, z, *args)
         # Return the update callback.
         return self.callbacks
 
-    def _dump_callback(self, func, outputs, *args):
+    def _dump_callback(self, func, outputs, item_is_cached, *args):
         data = None
         multi_output = len(outputs) > 1
         unique_ids = []
@@ -151,6 +154,8 @@ class CallbackCache(CallbackBlueprint):
                         refresh_needed = age > self.expire_after
             # Refresh the data.
             if refresh_needed:
+                # Modify the inputs.
+                args = self._load_args(item_is_cached, *args)
                 data = func(*args) if data is None else data  # load data only once
                 self.cache.dump(data[i] if multi_output else data, unique_id)
             # Collect output id(s).
@@ -158,7 +163,9 @@ class CallbackCache(CallbackBlueprint):
         # Return the id rather than the function data.
         return unique_ids if multi_output else unique_ids[0]
 
-    def _load_callback(self, func, item_is_cached, *args):
+    def _load_args(self, item_is_cached, *args):
+        if not any(item_is_cached):
+            return args
         args = list(args)
         for i, is_cached in enumerate(item_is_cached):
             # Just skip elements that are not cached.
@@ -166,7 +173,7 @@ class CallbackCache(CallbackBlueprint):
                 continue
             # Replace content of cached element(s).
             args[i] = self.cache.load(args[i])
-        return func(*args)
+        return args
 
 
 def _get_id(func, output, args):
