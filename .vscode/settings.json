@@ -1,0 +1,4 @@
+{
+    "python.linting.pylintEnabled": true,
+    "python.pythonPath": "/home/emher/dash/dash-extensions/venv/bin/python3"
+}
