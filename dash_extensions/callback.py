@@ -5,14 +5,16 @@ import os
 import json
 import pickle
 import datetime
-
+import shutil
 import dash
 import itertools
+import contextlib
+import secrets
 
 from dash.dependencies import Input
 from dash.exceptions import PreventUpdate
 from more_itertools import unique_everseen
-
+from flask import session
 
 # region Callback blueprint
 
@@ -84,19 +86,30 @@ class DiskCache:
             os.makedirs(self.cache_dir, exist_ok=True)
 
     def load(self, unique_id):
-        with open(self._get_path(unique_id), 'rb') as f:
-            data = pickle.load(f)
-        return data
+        try:
+            with open(self._get_path(unique_id), 'rb') as f:
+                data = pickle.load(f)
+            return data
+        except FileNotFoundError:
+            return None
 
     def dump(self, data, unique_id):
         with open(self._get_path(unique_id), 'wb') as f:
             pickle.dump(data, f)
+
+    def drop(self, unique_id):
+        if self.contains(unique_id):
+            os.remove(self._get_path(unique_id))
 
     def contains(self, unique_id):
         return os.path.isfile(self._get_path(unique_id))
 
     def modified(self, unique_id):
         return datetime.datetime.fromtimestamp(os.path.getmtime(self._get_path(unique_id)))
+
+    def nuke(self):
+        if not self.nuked():
+            shutil.rmtree(self.cache_dir)
 
     def _get_path(self, unique_id):
         return os.path.join(self.cache_dir, unique_id)
@@ -190,6 +203,103 @@ class CallbackCache(CallbackBlueprint):
 
 def _get_id(func, output, args):
     return hashlib.md5(json.dumps([func.__name__, _create_callback_id(output)] + list(args)).encode()).hexdigest()
+
+
+# endregion
+
+# region Callback plumber
+
+class DiskPipe():
+    def __init__(self, *args, **kwargs):
+        self.disk_cache = DiskCache(*args, **kwargs)
+
+    def send(self, key, value):
+        return self.disk_cache.dump(value, key)
+
+    def receive(self, key):
+        return self.disk_cache.load(key)
+
+    def close(self):
+        return self.disk_cache.nuke()
+
+
+class DiskPipeFactory():
+    def __init__(self, root_dir):
+        self.root_dir = root_dir
+
+    def get_pipe(self, *args):
+        return DiskPipe(os.path.join(self.root_dir, *args), makedirs=False)
+
+    def open_pipe(self, *args, **kwargs):
+        return DiskPipe(os.path.join(self.root_dir, *args), makedirs=True)
+
+
+class CallbackPlumber(CallbackBlueprint):
+
+    def __init__(self, pipe_factory, session_key=None):
+        super().__init__()
+        self.pipe_factory = pipe_factory
+        self.piped_callbacks = []
+        self.session_key = "plumber_id" if session_key is None else session_key
+
+    def _get_session_id(self):
+        # Create unique session id.
+        if not session.get(self.session_key):
+            session[self.session_key] = secrets.token_urlsafe(16)
+        return session.get(self.session_key)
+
+    def _get_pipe(self, func):
+        return self.pipe_factory.get_pipe(self._get_session_id(), func)
+
+    def _open_pipe(self, func):
+        return self.pipe_factory.open_pipe(self._get_session_id(), func)
+
+    def receive(self, func, key):
+        # TODO: Add error handling?
+        return self._get_pipe(func).receive(key)
+
+    def send(self, func, key, value):
+        # TODO: Add error handling?
+        self._get_pipe(func).send(key, value)
+
+
+    @contextlib.contextmanager
+    def open(self, name):
+        pipe = self._open_pipe(name)
+        yield pipe
+        pipe.close()  # or whatever you need to do at exit
+
+
+    def piped_callback(self, outputs, inputs, states=None):
+        # Save index to keep tract of which callback to cache.
+        self.piped_callbacks.append(len(self.callbacks))
+        # Save the callback itself.
+        return self.callback(outputs, inputs, states)
+
+    def _resolve_callbacks(self):
+        # Modify the callbacks.
+        for i, callback in enumerate(self.callbacks):
+            # Check if piping is needed.
+            piping_needed = i in self.piped_callbacks
+            if not piping_needed:
+                continue
+            # Do piping if needed.
+            original_callback = callback["callback"]
+            callback["callback"] = lambda *args, x=original_callback: self._inject_pipe(x, *args)
+        # Return the update callback.
+        return self.callbacks
+
+    def _inject_pipe(self, func, *args):
+        with self.open(func.__name__) as pipe:
+            return func(pipe, *args)
+
+
+    def register(self, app):
+        super().register(app)
+        # Inject secret key to enable session variables.
+        if not app.server.secret_key:
+            app.server.secret_key = secrets.token_urlsafe(16) 
+
 
 
 # endregion

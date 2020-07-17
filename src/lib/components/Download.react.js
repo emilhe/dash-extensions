@@ -68,7 +68,7 @@ Download.propTypes = {
     /**
      * Default value for mime_type.
      */
-    mime_type: PropTypes.bool,
+    mime_type: PropTypes.string,
 
     /**
      * Dash-assigned callback that should be called to report property changes
