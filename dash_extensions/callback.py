@@ -108,7 +108,7 @@ class DiskCache:
         return datetime.datetime.fromtimestamp(os.path.getmtime(self._get_path(unique_id)))
 
     def nuke(self):
-        if not self.nuked():
+        if os.path.exists(self.cache_dir):
             shutil.rmtree(self.cache_dir)
 
     def _get_path(self, unique_id):
