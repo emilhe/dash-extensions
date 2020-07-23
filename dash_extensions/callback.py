@@ -1,20 +1,17 @@
 import functools
 import hashlib
-import operator
-import os
-import json
-import pickle
-import datetime
-import shutil
-import dash
 import itertools
-import contextlib
+import json
+import operator
 import secrets
+import dash
 
 from dash.dependencies import Input
 from dash.exceptions import PreventUpdate
-from more_itertools import unique_everseen
 from flask import session
+from flask_caching.backends import FileSystemCache
+from more_itertools import unique_everseen
+
 
 # region Callback blueprint
 
@@ -46,6 +43,9 @@ class CallbackBlueprint:
         callbacks = self._resolve_callbacks()
         for callback in callbacks:
             _register_callback(dash_app, callback)
+        # Set session secret. Used by some subclasses.
+        if not dash_app.server.secret_key:
+            dash_app.server.secret_key = secrets.token_urlsafe(16)
 
     def _resolve_callbacks(self):
         """
@@ -53,6 +53,14 @@ class CallbackBlueprint:
          that subclasses should target inject callback modifications.
         """
         return self.callbacks
+
+
+def _get_session_id(session_key=None):
+    session_key = "session_id" if session_key is None else session_key
+    # Create unique session id.
+    if not session.get(session_key):
+        session[session_key] = secrets.token_urlsafe(16)
+    return session.get(session_key)
 
 
 def _register_callback(dash_app, callback):
@@ -75,231 +83,137 @@ def _create_callback_id(item):
 # region Callback cache
 
 class Trigger(Input):
+    """
+     Like an Input, a trigger can trigger a callback, but it's values it not included in the resulting function call.
+    """
+
     def __init__(self, component_id, component_property):
         super().__init__(component_id, component_property)
 
 
-class DiskCache:
-    def __init__(self, cache_dir, makedirs=None):
-        self.cache_dir = cache_dir
-        if makedirs or makedirs is None:
-            os.makedirs(self.cache_dir, exist_ok=True)
-
-    def load(self, unique_id):
-        try:
-            with open(self._get_path(unique_id), 'rb') as f:
-                data = pickle.load(f)
-            return data
-        except FileNotFoundError:
-            return None
-
-    def dump(self, data, unique_id):
-        with open(self._get_path(unique_id), 'wb') as f:
-            pickle.dump(data, f)
-
-    def drop(self, unique_id):
-        if self.contains(unique_id):
-            os.remove(self._get_path(unique_id))
-
-    def contains(self, unique_id):
-        return os.path.isfile(self._get_path(unique_id))
-
-    def modified(self, unique_id):
-        return datetime.datetime.fromtimestamp(os.path.getmtime(self._get_path(unique_id)))
-
-    def nuke(self):
-        if os.path.exists(self.cache_dir):
-            shutil.rmtree(self.cache_dir)
-
-    def _get_path(self, unique_id):
-        return os.path.join(self.cache_dir, unique_id)
-
-
 class CallbackCache(CallbackBlueprint):
+    """
+    The CallbackCache (CB) class acts as a proxy for the Dash app object in the context of callback registration. It
+    exposes a "memoize" decorator, which stores the value returned by the callback in a (key, value) cache and returns
+    only the key to the client. For large values, this strategy can drastically reduce network overhead. Furthermore,
+    since the values are typically stored as pickles, they do not need to be serialized to/from JSON.
 
-    def __init__(self, cache, expire_after=None):
+    :param cache: cache backend, see https://flask-caching.readthedocs.io/en/latest/#built-in-cache-backends.
+    :param session_check: if True, the values will be stored uniquely per session
+    :param instant_refresh: if True, callbacks will be evaluated every time, otherwise only when args change
+
+    """
+
+    def __init__(self, cache=None, session_check=None, instant_refresh=None):
         super().__init__()
-        self.cache = cache
-        self.expire_after = expire_after if expire_after is not None else 0
+        if cache is not None:
+            cache.default_timeout = 0  # the default_timeout of the inner cache is ignore
+        self.cache = cache if cache is not None else FileSystemCache("cache", default_timeout=0)
         self.cached_callbacks = []
-        self.cached_callbacks_input_fltr = []
+        self.callback_input_fltr = []
+        self.callback_instant_refresh = []
+        self.session_check = session_check if session_check is not None else True
+        self.instant_refresh = instant_refresh if session_check is not None else True
 
-    def cached_callback(self, outputs, inputs, states=None):
+    def cached_callback(self, outputs, inputs, states=None, instant_refresh=None):
         # Save index to keep tract of which callback to cache.
         self.cached_callbacks.append(len(self.callbacks))
-        self.cached_callbacks_input_fltr.append([isinstance(item, Trigger) for item in inputs])
+        self.callback_input_fltr.append([isinstance(item, Trigger) for item in inputs])
+        self.callback_instant_refresh.append(instant_refresh)
         # Save the callback itself.
         return self.callback(outputs, inputs, states)
 
     def _resolve_callbacks(self):
-        # Figure out which IDs are cached.
+        # Figure out which IDs are to be cached.
         cached_ids = [[_create_callback_id(i) for i in self.callbacks[j]["outputs"]] for j in self.cached_callbacks]
         cached_ids = functools.reduce(operator.iconcat, cached_ids, [])
         # Modify the callbacks.
         for i, callback in enumerate(self.callbacks):
-            # Check if caching is needed.
-            caching_needed = i in self.cached_callbacks
             # Figure out which args need loading.
             items = callback["inputs"] + callback["states"]
             item_ids = [_create_callback_id(item) for item in items]
-            item_is_cached = [item_id in cached_ids for item_id in item_ids]
-            # Nothing modifications needed, just proceed.
-            if not caching_needed and not any(item_is_cached):
-                continue
-            # Create reference to original callback.
-            original_callback = callback["callback"]
-            # If caching of outputs is not needed, just load the args.
+            item_is_packed = [item_id in cached_ids for item_id in item_ids]
+            # If any arguments are packed, unpack them.
+            if any(item_is_packed):
+                original_callback = callback["callback"]
+                callback["callback"] = self._unpack_outputs(item_is_packed)(original_callback)
+            # Check if caching is needed for the current callback.
+            caching_needed = i in self.cached_callbacks
             if not caching_needed:
-                callback["callback"] = lambda *args, x=original_callback, y=item_is_cached: \
-                    x(*self._load_args(y, *args))
                 continue
             # Check inputs to be ignored. TODO: Could be implemented for normal callbacks also?
-            arg_fltr = self.cached_callbacks_input_fltr[self.cached_callbacks.index(i)]
+            args_filter = self.callback_input_fltr[self.cached_callbacks.index(i)]
             if len(callback["states"]) > 0:
-                arg_fltr += [False] * len(callback["states"])
-            # If caching is needed, do it.
-            callback["callback"] = lambda *args, x=original_callback, y=callback["outputs"], z=item_is_cached, t=arg_fltr: \
-                self._dump_callback(x, y, z, *[arg for j, arg in enumerate(args) if not t[j]])
-        # Return the update callback.
-        return self.callbacks
-
-    def _dump_callback(self, func, outputs, item_is_cached, *args):
-        data = None
-        multi_output = len(outputs) > 1
-        unique_ids = []
-        for i, output in enumerate(outputs):
-            unique_id = _get_id(func, output, args)
-            # Check if cache refresh is needed.
-            refresh_needed = True
-            if self.expire_after != 0:  # zero means ALWAYS refresh
-                if self.cache.contains(unique_id):
-                    refresh_needed = self.expire_after > 0  # minus means NEVER expire
-                    if refresh_needed:
-                        age = (datetime.datetime.now() - self.cache.modified(unique_id)).total_seconds()
-                        refresh_needed = age > self.expire_after
-            # Refresh the data.
-            if refresh_needed:
-                # Modify the inputs.
-                args = self._load_args(item_is_cached, *args)
-                data = func(*args) if data is None else data  # load data only once
-                self.cache.dump(data[i] if multi_output else data, unique_id)
-            # Collect output id(s).
-            unique_ids.append(unique_id)
-        # Return the id rather than the function data.
-        return unique_ids if multi_output else unique_ids[0]
-
-    def _load_args(self, item_is_cached, *args):
-        if not any(item_is_cached):
-            return args
-        args = list(args)
-        for i, is_cached in enumerate(item_is_cached):
-            # Just skip elements that are not cached.
-            if not is_cached:
-                continue
-            # Replace content of cached element(s).
-            args[i] = self.cache.load(args[i])
-        return args
-
-
-def _get_id(func, output, args):
-    return hashlib.md5(json.dumps([func.__name__, _create_callback_id(output)] + list(args)).encode()).hexdigest()
-
-
-# endregion
-
-# region Callback plumber
-
-class DiskPipe():
-    def __init__(self, *args, **kwargs):
-        self.disk_cache = DiskCache(*args, **kwargs)
-
-    def send(self, key, value):
-        return self.disk_cache.dump(value, key)
-
-    def receive(self, key):
-        return self.disk_cache.load(key)
-
-    def close(self):
-        return self.disk_cache.nuke()
-
-
-class DiskPipeFactory():
-    def __init__(self, root_dir):
-        self.root_dir = root_dir
-
-    def get_pipe(self, *args):
-        return DiskPipe(os.path.join(self.root_dir, *args), makedirs=False)
-
-    def open_pipe(self, *args, **kwargs):
-        return DiskPipe(os.path.join(self.root_dir, *args), makedirs=True)
-
-
-class CallbackPlumber(CallbackBlueprint):
-
-    def __init__(self, pipe_factory, session_key=None):
-        super().__init__()
-        self.pipe_factory = pipe_factory
-        self.piped_callbacks = []
-        self.session_key = "plumber_id" if session_key is None else session_key
-
-    def _get_session_id(self):
-        # Create unique session id.
-        if not session.get(self.session_key):
-            session[self.session_key] = secrets.token_urlsafe(16)
-        return session.get(self.session_key)
-
-    def _get_pipe(self, func):
-        return self.pipe_factory.get_pipe(self._get_session_id(), func)
-
-    def _open_pipe(self, func):
-        return self.pipe_factory.open_pipe(self._get_session_id(), func)
-
-    def receive(self, func, key):
-        # TODO: Add error handling?
-        return self._get_pipe(func).receive(key)
-
-    def send(self, func, key, value):
-        # TODO: Add error handling?
-        self._get_pipe(func).send(key, value)
-
-
-    @contextlib.contextmanager
-    def open(self, name):
-        pipe = self._open_pipe(name)
-        yield pipe
-        pipe.close()  # or whatever you need to do at exit
-
-
-    def piped_callback(self, outputs, inputs, states=None):
-        # Save index to keep tract of which callback to cache.
-        self.piped_callbacks.append(len(self.callbacks))
-        # Save the callback itself.
-        return self.callback(outputs, inputs, states)
-
-    def _resolve_callbacks(self):
-        # Modify the callbacks.
-        for i, callback in enumerate(self.callbacks):
-            # Check if piping is needed.
-            piping_needed = i in self.piped_callbacks
-            if not piping_needed:
-                continue
-            # Do piping if needed.
+                args_filter += [False] * len(callback["states"])
+            if any(args_filter):
+                original_callback = callback["callback"]
+                callback["callback"] = filter_args(args_filter)(original_callback)
+            # Do the caching magic.
             original_callback = callback["callback"]
-            callback["callback"] = lambda *args, x=original_callback: self._inject_pipe(x, *args)
+            instant_refresh = self.callback_instant_refresh[self.cached_callbacks.index(i)]
+            instant_refresh = instant_refresh if instant_refresh is not None else self.instant_refresh
+            callback["callback"] = self._pack_outputs(callback["outputs"], instant_refresh)(original_callback)
         # Return the update callback.
         return self.callbacks
 
-    def _inject_pipe(self, func, *args):
-        with self.open(func.__name__) as pipe:
-            return func(pipe, *args)
+    def _unpack_outputs(self, item_is_packed):
+        def unpack(f):
+            @functools.wraps(f)
+            def decorated_function(*args):
+                if not any(item_is_packed):
+                    return f(*args)
+                args = list(args)
+                for i, packed in enumerate(item_is_packed):
+                    # Just skip elements that are not cached.
+                    if not packed:
+                        continue
+                    # Replace content of cached element(s).
+                    args[i] = self.cache.get(args[i])
+                return f(*args)
+
+            return decorated_function
+
+        return unpack
+
+    def _pack_outputs(self, outputs, instant_refresh):
+        def packed_callback(f):
+            @functools.wraps(f)
+            def decorated_function(*args):
+                # Check if the data is there.
+                multi_output = len(outputs) > 1
+                unique_ids = [_get_cache_id(f, output, list(args), self.session_check) for output in outputs]
+                update_needed = [not self.cache.has(uid) for uid in unique_ids]
+                # If it's not, calculate it.
+                if any(update_needed) or instant_refresh:
+                    data = f(*args)
+                    data = data if multi_output else [data]
+                    for i, uid in enumerate(unique_ids):
+                        self.cache.set(uid, data[i])
+                # Return the id(s).
+                return unique_ids if multi_output else unique_ids[0]
+
+            return decorated_function
+
+        return packed_callback
 
 
-    def register(self, app):
-        super().register(app)
-        # Inject secret key to enable session variables.
-        if not app.server.secret_key:
-            app.server.secret_key = secrets.token_urlsafe(16) 
+def filter_args(args_filter):
+    def filter_args(f):
+        @functools.wraps(f)
+        def decorated_function(*args):
+            filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]]
+            return f(*filtered_args)
 
+        return decorated_function
+
+    return filter_args
+
+
+def _get_cache_id(func, output, args, session_check=None):
+    all_args = [func.__name__, _create_callback_id(output)] + list(args)
+    if session_check:
+        all_args += [_get_session_id()]
+    return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
 
 
 # endregion
