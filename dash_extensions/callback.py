@@ -71,7 +71,7 @@ def _register_callback(dash_app, callback):
 def _as_list(item):
     if item is None:
         return []
-    return item if isinstance(item, list) else [item]
+    return item if isinstance(item, list) else list(item)
 
 
 def _create_callback_id(item):
