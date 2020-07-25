@@ -104,7 +104,7 @@ class CallbackCache(CallbackBlueprint):
 
     """
 
-    def __init__(self, cache=None, session_check=None, instant_refresh=None):
+    def __init__(self, cache=None, session_check=True, instant_refresh=True):
         super().__init__()
         if cache is not None:
             cache.default_timeout = 0  # the default_timeout of the inner cache is ignore
