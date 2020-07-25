@@ -99,6 +99,7 @@ class CallbackCache(CallbackBlueprint):
     since the values are typically stored as pickles, they do not need to be serialized to/from JSON.
 
     :param cache: cache backend, see https://flask-caching.readthedocs.io/en/latest/#built-in-cache-backends.
+            If None, uses FileSystemCache("cache", default_timeout=0).
     :param session_check: if True, the values will be stored uniquely per session
     :param instant_refresh: if True, callbacks will be evaluated every time, otherwise only when args change
 
