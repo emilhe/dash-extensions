@@ -1,40 +1,17 @@
 import functools
 import hashlib
-import itertools
 import json
-import operator
 import secrets
-import dash
 import uuid
-
-import dash.dependencies as dd
+import dash
 import dash_html_components as html
+
+from dash.dependencies import Output, Input, State
 from dash.exceptions import PreventUpdate
 from flask import session
+from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen
 
-
-# region Make it possible for Output, Input, State to accept kwargs
-
-class Input(dd.Input):
-    def __init__(self, component_id, component_property, **kwargs):
-        super().__init__(component_id, component_property)
-        self.kwargs = kwargs
-
-
-class State(dd.State):
-    def __init__(self, component_id, component_property, **kwargs):
-        super().__init__(component_id, component_property)
-        self.kwargs = kwargs
-
-
-class Output(dd.Output):
-    def __init__(self, component_id, component_property, **kwargs):
-        super().__init__(component_id, component_property)
-        self.kwargs = kwargs
-
-
-# endregion
 
 # region Dash transformer
 
@@ -174,28 +151,103 @@ def filter_args(args_filter):
 
 # endregion
 
-# # region Group transform
-#
-# class GroupTransform(DashTransform):
-#
-#     def apply(self, callbacks):
-#         # Create callback groups.
-#         groups = {}
-#         for callback in callbacks:
-#             if callback.kwargs and "group" in callback.kwargs:
-#
-#
-#         # TODO: Implement
-#         return callbacks
-#
-# # endregion
+# region Group transform
 
-# region Cache transform
+class GroupTransform(DashTransform):
 
-class CacheTransform(DashTransform):
+    def apply(self, callbacks):
+        groups = {}
+        # Figure out which callbacks to group together.
+        grouped_callbacks = []
+        for i in range(len(callbacks)):
+            key = callbacks[i]["kwargs"].pop("group", None)
+            if key:
+                if key not in groups:
+                    groups[key] = []
+                groups[key].append(i)
+            else:
+                grouped_callbacks.append(callbacks[i])
+        # Do the grouping.
+        for key in groups:
+            grouped_callback = _combine_callbacks([callbacks[i] for i in groups[key]])
+            grouped_callbacks.append(grouped_callback)
 
-    def __init__(self, cache=None, instant_refresh=True, session_check=True):
-        self.default_args = dict(cache=cache, instant_refresh=instant_refresh, session_check=session_check)
+        return grouped_callbacks
+
+
+# NOTE: No performance considerations what so ever. Just an initial proof-of-concept implementation.
+def _combine_callbacks(callbacks):
+    inputs, input_props, input_prop_lists, input_mappings = _prep_props(callbacks, Input)
+    states, state_props, state_prop_lists, state_mappings = _prep_props(callbacks, State)
+    outputs, output_props, output_prop_lists, output_mappings = _prep_props(callbacks, Output)
+    # TODO: What kwargs to use?
+    kwargs = callbacks[0]["kwargs"]
+
+    # TODO: There might be a scope issue here
+    def wrapper(*args):
+        local_inputs = list(args)[:len(inputs)]
+        local_states = list(args)[len(inputs):]
+        if len(dash.callback_context.triggered) == 0:
+            raise PreventUpdate
+        prop_id = dash.callback_context.triggered[0]['prop_id']
+        output_values = [dash.no_update] * len(outputs)
+        for i, entry in enumerate(input_prop_lists):
+            # Check if the trigger is an input of the callback.
+            if prop_id not in entry:
+                continue
+            # Trigger the callback function.
+            try:
+                inputs_i = [local_inputs[j] for j in input_mappings[i]]
+                states_i = [local_states[j] for j in state_mappings[i]]
+                outputs_i = callbacks[i]["f"](*inputs_i, *states_i)
+                if len(callbacks[i][Output]) == 1:
+                    outputs_i = [outputs_i]
+                for j, item in enumerate(outputs_i):
+                    output_values[output_mappings[i][j]] = outputs_i[j]
+            except PreventUpdate:
+                continue
+        # Check if an update is needed.
+        if all([item == dash.no_update for item in output_values]):
+            raise PreventUpdate
+        # Return the combined output.
+        return output_values if len(output_values) > 1 else output_values[0]
+
+    return {Output: outputs, Input: inputs, "f": wrapper, State: states, "kwargs": kwargs}
+
+
+def _prep_props(callbacks, key):
+    all = []
+    for callback in callbacks:
+        all.extend(callback[key])
+    all = list(unique_everseen(all))
+    props = [_create_callback_id(item) for item in all]
+    prop_lists = [[_create_callback_id(item) for item in callback[key]] for callback in callbacks]
+    mappings = [[props.index(item) for item in l] for l in prop_lists]
+    return all, props, prop_lists, mappings
+
+
+# endregion
+
+# region Server side output transform
+
+class ServersideOutput(Output):
+    """
+     Like a normal Output, but with the content stored only server side. Needs a backend for storing the data.
+    """
+
+    def __init__(self, component_id, component_property, backend=None, cache=None, session_check=None):
+        super().__init__(component_id, component_property)
+        if backend is None:
+            backend = FileSystemStore()
+        self.cache = cache
+        self.backend = backend
+        self.session_check = session_check
+
+
+class ServersideOutputTransform(DashTransform):
+
+    def __init__(self, backend=None, cache=False, session_check=True):
+        self.default_args = dict(cache=cache, backend=backend, session_check=session_check)
 
     def init(self, dt):
         # Set session secret (if not already set).
@@ -203,64 +255,52 @@ class CacheTransform(DashTransform):
             dt.server.secret_key = secrets.token_urlsafe(16)
 
     def apply(self, callbacks):
-        # 1) Creat index what is to be cached.
-        cached_callbacks = []
-        callbacks_kwargs = []
-        cached_output_ids = []
-        output_kwargs = {}
+        # 1) Creat index.
+        serverside_callbacks = []
+        serverside_output_map = {}
         for callback in callbacks:
-            callback_kwargs = []
-            # Keep track of cached outputs.
+            has_serverside_output = False
+            # Keep tract of which outputs are server side outputs.
             for output in callback[Output]:
-                kwargs = output.kwargs
-                # Check if caching is needed or not.
-                if "cache" not in kwargs and not self.default_args["cache"]:
-                    callback_kwargs.append(None)
-                # Inject default args.
-                for key in self.default_args:
-                    kwargs[key] = kwargs[key] if key in kwargs else self.default_args[key]
-                # Save stuff.
-                output_id = _create_callback_id(output)
-                cached_output_ids.append(output_id)
-                output_kwargs[output_id] = kwargs
-                callback_kwargs.append(kwargs)
-            # Keep track of cached callbacks.
-            if any(callback_kwargs):
-                cached_callbacks.append(callback)
-                callbacks_kwargs.append(callback_kwargs)
+                if not isinstance(output, ServersideOutput):
+                    continue
+                serverside_output_map[_create_callback_id(output)] = output
+                has_serverside_output = True
+            # Keep tract of which callbacks has server side outputs.
+            if has_serverside_output:
+                serverside_callbacks.append(callback)
         # 2) Inject cached data into callbacks.
         for callback in callbacks:
             # Figure out which args need loading.
             items = callback[Input] + callback[State]
             item_ids = [_create_callback_id(item) for item in items]
-            item_is_packed = [output_kwargs[item_id] if item_id in cached_output_ids else None for item_id in item_ids]
+            serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
-            if any(item_is_packed):
+            if any(serverside_outputs):
                 f = callback["f"]
-                callback["f"] = _unpack_outputs(item_is_packed)(f)
+                callback["f"] = _unpack_outputs(serverside_outputs)(f)
         # 3) Apply the caching itself.
-        for i, callback in enumerate(cached_callbacks):
+        for i, callback in enumerate(serverside_callbacks):
             f = callback["f"]
-            callback_kwargs = callbacks_kwargs[i]
-            callback["f"] = _pack_outputs(callback[Output], callback_kwargs)(f)
+            callback["f"] = _pack_outputs(callback)(f)
         return callbacks
 
 
-def _unpack_outputs(item_is_packed):
+def _unpack_outputs(serverside_outputs):
     def unpack(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            if not any(item_is_packed):
+            if not any(serverside_outputs):
                 return f(*args)
             args = list(args)
-            for i, item in enumerate(item_is_packed):
-                # Just skip elements that are not cached.
-                if not item:
+            for i, serverside_output in enumerate(serverside_outputs):
+                # Just skip elements that are not stored server side.
+                if not serverside_output:
                     continue
-                # Replace content of cached element(s).
+                # Replace content of element(s).
                 try:
-                    args[i] = item["cache"].get(args[i])
-                except TypeError:
+                    args[i] = serverside_output.backend.get(args[i])
+                except TypeError as ex:
                     args[i] = None
             return f(*args)
 
@@ -269,38 +309,39 @@ def _unpack_outputs(item_is_packed):
     return unpack
 
 
-def _pack_outputs(outputs, output_kwargs):
+def _pack_outputs(callback):
     def packed_callback(f):
         @functools.wraps(f)
         def decorated_function(*args):
             update_needed = False
-            multi_output = len(outputs) > 1
+            multi_output = len(callback[Output]) > 1
             unique_ids = []
             # Figure out if an update is necessary.
-            for i, output in enumerate(outputs):
-                kwargs = output_kwargs[i]
-                # If any ouf the outputs are not cached (or needs instant refresh), we must reevaluate.
-                if not kwargs or kwargs["instant_refresh"]:
+            for i, output in enumerate(callback[Output]):
+                # If any of the outputs are not cached (or needs instant refresh), we must reevaluate.
+                if not isinstance(output, ServersideOutput) or not output.cache:
                     update_needed = True
                     break
-                # Check if item is already in the cache.
-                unique_id = _get_cache_id(f, output, list(args), kwargs["session_check"])
+                # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
+                args = [arg for i, arg in enumerate(args) if i > len(callback[Input]) or
+                        not isinstance(callback[Input][i], Trigger)]
+                # Generate unique ID.
+                unique_id = _get_cache_id(f, output, list(args), output.session_check)
                 unique_ids.append(unique_id)
-                if not kwargs["cache"].has(unique_id):
+                if not output.backend.has(unique_id):
                     update_needed = True
                     break
             # If not update is needed, just return the ids.
             if not update_needed:
-                return unique_ids
+                return unique_ids if multi_output else unique_ids[0]
             # Do the update.
             data = f(*args)
             data = list(data) if multi_output else [data]
-            for i, output in enumerate(outputs):
-                kwargs = output_kwargs[i]
-                if not kwargs:
+            for i, output in enumerate(callback[Output]):
+                if not isinstance(output, ServersideOutput):
                     continue
-                unique_id = _get_cache_id(f, output, list(args), kwargs["session_check"])
-                kwargs["cache"].set(unique_id, data[i])
+                unique_id = _get_cache_id(f, output, list(args), output.session_check)
+                output.backend.set(unique_id, data[i])
                 data[i] = unique_id
             return data if multi_output else data[0]
 
@@ -314,6 +355,37 @@ def _get_cache_id(func, output, args, session_check=None):
     if session_check:
         all_args += [_get_session_id()]
     return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
+
+
+class ServerStore:
+
+    def get(self, key):
+        raise NotImplementedError()
+
+    def set(self, key, value):
+        raise NotImplementedError()
+
+    def has(self, key):
+        raise NotImplementedError()
+
+
+# Place store implementations here.
+
+class FileSystemStore(ServerStore):
+
+    def __init__(self, cache_dir="file_system_store", **kwargs):
+        kwargs["cache_dir"] = cache_dir
+        kwargs["default_timeout"] = 922337203685477580  # set to infinity
+        self.fsc = FileSystemCache(**kwargs)
+
+    def get(self, key):
+        return self.fsc.get(key)
+
+    def set(self, key, value):
+        return self.fsc.set(key, value)
+
+    def has(self, key):
+        return self.fsc.has(key)
 
 
 # endregion
@@ -349,8 +421,8 @@ class NoOutputTransform(DashTransform):
 
 class Dash(DashTransformer):
     def __init__(self, *args, cache=None, instant_refresh=True, session_check=True, **kwargs):
-        transforms = [TriggerTransform(), NoOutputTransform(),
-                      CacheTransform(cache, instant_refresh, session_check)]  # optimus prime includes ALL transforms
+        transforms = [TriggerTransform(), NoOutputTransform(), GroupTransform(),
+                      ServersideOutputTransform(cache, instant_refresh, session_check)]
         super().__init__(*args, transforms=transforms, **kwargs)
 
 # endregion
