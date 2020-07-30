@@ -1,17 +1,40 @@
 import functools
 import hashlib
 import json
+import pickle
 import secrets
 import uuid
 import dash
 import dash_html_components as html
+import dash.dependencies as dd
 
-from dash.dependencies import Output, Input, State
 from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen
 
+
+# region Make it possible for Output, Input, State to accept kwargs
+
+class Input(dd.Input):
+    def __init__(self, component_id, component_property, **kwargs):
+        super().__init__(component_id, component_property)
+        self.kwargs = kwargs
+
+
+class State(dd.State):
+    def __init__(self, component_id, component_property, **kwargs):
+        super().__init__(component_id, component_property)
+        self.kwargs = kwargs
+
+
+class Output(dd.Output):
+    def __init__(self, component_id, component_property, **kwargs):
+        super().__init__(component_id, component_property)
+        self.kwargs = kwargs
+
+
+# endregion
 
 # region Dash transformer
 
@@ -246,8 +269,8 @@ class ServersideOutput(Output):
 
 class ServersideOutputTransform(DashTransform):
 
-    def __init__(self, backend=None, cache=False, session_check=True):
-        self.default_args = dict(cache=cache, backend=backend, session_check=session_check)
+    def __init__(self, backend=None, session_check=True):
+        self.default_kwargs = dict(backend=backend, session_check=session_check)
 
     def init(self, dt):
         # Set session secret (if not already set).
@@ -257,18 +280,30 @@ class ServersideOutputTransform(DashTransform):
     def apply(self, callbacks):
         # 1) Creat index.
         serverside_callbacks = []
+        serverside_callback_kwargs = []
         serverside_output_map = {}
         for callback in callbacks:
-            has_serverside_output = False
+            # Check if the callback targets server side outputs.
+            serverside_output_kwargs = callback["kwargs"].pop("serverside_output", None)
+            if not serverside_output_kwargs:
+                continue
             # Keep tract of which outputs are server side outputs.
+            serverside_outputs = []
             for output in callback[Output]:
-                if not isinstance(output, ServersideOutput):
-                    continue
-                serverside_output_map[_create_callback_id(output)] = output
-                has_serverside_output = True
-            # Keep tract of which callbacks has server side outputs.
-            if has_serverside_output:
-                serverside_callbacks.append(callback)
+                # Inject default kwargs.
+                kwargs = output.kwargs
+                for key in self.default_kwargs:
+                    if key not in kwargs:
+                        kwargs[key] = self.default_kwargs[key]
+                # Convert to server side output.
+                serverside_output = ServersideOutput(output.component_id, output.component_property, **kwargs)
+                serverside_outputs.append(serverside_output)
+                # Create map.
+                serverside_output_map[_create_callback_id(output)] = serverside_output
+            callback[Output] = serverside_outputs
+            serverside_callbacks.append(callback)
+            serverside_callback_kwargs.append(serverside_output_kwargs
+                                              if isinstance(serverside_output_kwargs, dict) else {})
         # 2) Inject cached data into callbacks.
         for callback in callbacks:
             # Figure out which args need loading.
@@ -282,7 +317,7 @@ class ServersideOutputTransform(DashTransform):
         # 3) Apply the caching itself.
         for i, callback in enumerate(serverside_callbacks):
             f = callback["f"]
-            callback["f"] = _pack_outputs(callback)(f)
+            callback["f"] = _pack_outputs(callback, **serverside_callback_kwargs[i])(f)
         return callbacks
 
 
@@ -299,8 +334,9 @@ def _unpack_outputs(serverside_outputs):
                     continue
                 # Replace content of element(s).
                 try:
-                    args[i] = serverside_output.backend.get(args[i])
+                    args[i] = serverside_output.backend.get(args[i], ignore_expired=True)
                 except TypeError as ex:
+                    # TODO: Should we do anything about this?
                     args[i] = None
             return f(*args)
 
@@ -309,37 +345,33 @@ def _unpack_outputs(serverside_outputs):
     return unpack
 
 
-def _pack_outputs(callback):
+def _pack_outputs(callback, memoize=False):
     def packed_callback(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            update_needed = False
             multi_output = len(callback[Output]) > 1
-            unique_ids = []
-            # Figure out if an update is necessary.
-            for i, output in enumerate(callback[Output]):
-                # If any of the outputs are not cached (or needs instant refresh), we must reevaluate.
-                if not isinstance(output, ServersideOutput) or not output.cache:
-                    update_needed = True
-                    break
-                # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                args = [arg for i, arg in enumerate(args) if i > len(callback[Input]) or
-                        not isinstance(callback[Input][i], Trigger)]
-                # Generate unique ID.
-                unique_id = _get_cache_id(f, output, list(args), output.session_check)
-                unique_ids.append(unique_id)
-                if not output.backend.has(unique_id):
-                    update_needed = True
-                    break
-            # If not update is needed, just return the ids.
-            if not update_needed:
-                return unique_ids if multi_output else unique_ids[0]
+            # If memoize is enabled, we check if the cache already has a valid value.
+            if memoize:
+                # Figure out if an update is necessary.
+                unique_ids = []
+                update_needed = False
+                for i, output in enumerate(callback[Output]):
+                    # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
+                    args = [arg for i, arg in enumerate(args) if i > len(callback[Input]) or
+                            not isinstance(callback[Input][i], Trigger)]
+                    # Generate unique ID.
+                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
+                    unique_ids.append(unique_id)
+                    if not output.backend.has(unique_id):
+                        update_needed = True
+                        break
+                # If not update is needed, just return the ids.
+                if not update_needed:
+                    return unique_ids if multi_output else unique_ids[0]
             # Do the update.
             data = f(*args)
             data = list(data) if multi_output else [data]
             for i, output in enumerate(callback[Output]):
-                if not isinstance(output, ServersideOutput):
-                    continue
                 unique_id = _get_cache_id(f, output, list(args), output.session_check)
                 output.backend.set(unique_id, data[i])
                 data[i] = unique_id
@@ -357,9 +389,11 @@ def _get_cache_id(func, output, args, session_check=None):
     return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
 
 
+# Interface definition for server stores.
+
 class ServerStore:
 
-    def get(self, key):
+    def get(self, key, ignore_expired=False):
         raise NotImplementedError()
 
     def set(self, key, value):
@@ -371,21 +405,22 @@ class ServerStore:
 
 # Place store implementations here.
 
-class FileSystemStore(ServerStore):
+class FileSystemStore(FileSystemCache):
 
     def __init__(self, cache_dir="file_system_store", **kwargs):
-        kwargs["cache_dir"] = cache_dir
-        kwargs["default_timeout"] = 922337203685477580  # set to infinity
-        self.fsc = FileSystemCache(**kwargs)
+        super().__init__(cache_dir, **kwargs)
 
-    def get(self, key):
-        return self.fsc.get(key)
-
-    def set(self, key, value):
-        return self.fsc.set(key, value)
-
-    def has(self, key):
-        return self.fsc.has(key)
+    def get(self, key, ignore_expired=False):
+        if not ignore_expired:
+            return super().get(key)
+        # TODO: This part must be implemented for each type of cache.
+        filename = self._get_filename(key)
+        try:
+            with open(filename, "rb") as f:
+                pickle_time = pickle.load(f)  # ignore time
+                return pickle.load(f)
+        except (IOError, OSError, pickle.PickleError):
+            return None
 
 
 # endregion
@@ -420,9 +455,9 @@ class NoOutputTransform(DashTransform):
 # region Transformer implementations
 
 class Dash(DashTransformer):
-    def __init__(self, *args, cache=None, instant_refresh=True, session_check=True, **kwargs):
+    def __init__(self, *args, serverside_output_backend=None, session_check=True, **kwargs):
         transforms = [TriggerTransform(), NoOutputTransform(), GroupTransform(),
-                      ServersideOutputTransform(cache, instant_refresh, session_check)]
+                      ServersideOutputTransform(serverside_output_backend, session_check)]
         super().__init__(*args, transforms=transforms, **kwargs)
 
 # endregion
