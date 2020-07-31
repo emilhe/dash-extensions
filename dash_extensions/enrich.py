@@ -8,33 +8,12 @@ import dash
 import dash_html_components as html
 import dash.dependencies as dd
 
+from dash.dependencies import Input, State
 from dash.exceptions import PreventUpdate
 from flask import session
-from flask_caching.backends import FileSystemCache
+from flask_caching.backends import FileSystemCache, SimpleCache, RedisCache
 from more_itertools import unique_everseen
 
-
-# region Make it possible for Output, Input, State to accept kwargs
-
-class Input(dd.Input):
-    def __init__(self, component_id, component_property, **kwargs):
-        super().__init__(component_id, component_property)
-        self.kwargs = kwargs
-
-
-class State(dd.State):
-    def __init__(self, component_id, component_property, **kwargs):
-        super().__init__(component_id, component_property)
-        self.kwargs = kwargs
-
-
-class Output(dd.Output):
-    def __init__(self, component_id, component_property, **kwargs):
-        super().__init__(component_id, component_property)
-        self.kwargs = kwargs
-
-
-# endregion
 
 # region Dash transformer
 
@@ -253,24 +232,28 @@ def _prep_props(callbacks, key):
 
 # region Server side output transform
 
-class ServersideOutput(Output):
+class Output(dd.Output):
     """
-     Like a normal Output, but with the content stored only server side. Needs a backend for storing the data.
+     Like a normal Output, includes additional properties related to storing the data.
     """
 
-    def __init__(self, component_id, component_property, backend=None, cache=None, session_check=None):
+    def __init__(self, component_id, component_property, backend=None, session_check=None):
         super().__init__(component_id, component_property)
-        if backend is None:
-            backend = FileSystemStore()
-        self.cache = cache
         self.backend = backend
         self.session_check = session_check
+
+
+class ServersideOutput(Output):
+    """
+     Like a normal Output, but with the content stored only server side.
+    """
 
 
 class ServersideOutputTransform(DashTransform):
 
     def __init__(self, backend=None, session_check=True):
-        self.default_kwargs = dict(backend=backend, session_check=session_check)
+        self.backend = backend if backend is not None else FileSystemStore()
+        self.session_check = session_check
 
     def init(self, dt):
         # Set session secret (if not already set).
@@ -280,30 +263,24 @@ class ServersideOutputTransform(DashTransform):
     def apply(self, callbacks):
         # 1) Creat index.
         serverside_callbacks = []
-        serverside_callback_kwargs = []
         serverside_output_map = {}
         for callback in callbacks:
-            # Check if the callback targets server side outputs.
-            serverside_output_kwargs = callback["kwargs"].pop("serverside_output", None)
-            if not serverside_output_kwargs:
-                continue
+            # If memoize keyword is used, serverside caching is needed.
+            memoize = callback["kwargs"].get("memoize", None)
+            serverside = False
             # Keep tract of which outputs are server side outputs.
-            serverside_outputs = []
             for output in callback[Output]:
-                # Inject default kwargs.
-                kwargs = output.kwargs
-                for key in self.default_kwargs:
-                    if key not in kwargs:
-                        kwargs[key] = self.default_kwargs[key]
-                # Convert to server side output.
-                serverside_output = ServersideOutput(output.component_id, output.component_property, **kwargs)
-                serverside_outputs.append(serverside_output)
-                # Create map.
-                serverside_output_map[_create_callback_id(output)] = serverside_output
-            callback[Output] = serverside_outputs
-            serverside_callbacks.append(callback)
-            serverside_callback_kwargs.append(serverside_output_kwargs
-                                              if isinstance(serverside_output_kwargs, dict) else {})
+                if isinstance(output, ServersideOutput):
+                    serverside_output_map[_create_callback_id(output)] = output
+                    serverside = True
+                # Set default values.
+                if not isinstance(output, ServersideOutput) and not memoize:
+                    continue
+                output.backend = output.backend if output.backend is not None else self.backend
+                output.session_check = output.session_check if output.session_check is not None else self.session_check
+            # Keep track of server side callbacks.
+            if serverside or memoize:
+                serverside_callbacks.append(callback)
         # 2) Inject cached data into callbacks.
         for callback in callbacks:
             # Figure out which args need loading.
@@ -317,7 +294,7 @@ class ServersideOutputTransform(DashTransform):
         # 3) Apply the caching itself.
         for i, callback in enumerate(serverside_callbacks):
             f = callback["f"]
-            callback["f"] = _pack_outputs(callback, **serverside_callback_kwargs[i])(f)
+            callback["f"] = _pack_outputs(callback)(f)
         return callbacks
 
 
@@ -345,7 +322,10 @@ def _unpack_outputs(serverside_outputs):
     return unpack
 
 
-def _pack_outputs(callback, memoize=False):
+def _pack_outputs(callback):
+
+    memoize = callback["kwargs"].pop("memoize", None)
+
     def packed_callback(f):
         @functools.wraps(f)
         def decorated_function(*args):
@@ -365,16 +345,23 @@ def _pack_outputs(callback, memoize=False):
                     if not output.backend.has(unique_id):
                         update_needed = True
                         break
-                # If not update is needed, just return the ids.
+                # If not update is needed, just return the ids (or values, if not serverside output).
                 if not update_needed:
-                    return unique_ids if multi_output else unique_ids[0]
+                    results = [uid if isinstance(callback[Output][i], ServersideOutput) else
+                               callback[Output][i].backend.get(uid) for i, uid in enumerate(unique_ids)]
+                    return results if multi_output else results[0]
             # Do the update.
             data = f(*args)
             data = list(data) if multi_output else [data]
             for i, output in enumerate(callback[Output]):
-                unique_id = _get_cache_id(f, output, list(args), output.session_check)
-                output.backend.set(unique_id, data[i])
-                data[i] = unique_id
+                serverside_output = isinstance(callback[Output][i], ServersideOutput)
+                # Replace only for server side outputs.
+                if serverside_output or memoize:
+                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
+                    output.backend.set(unique_id, data[i])
+                    # Replace only for server side outputs.
+                    if serverside_output:
+                        data[i] = unique_id
             return data if multi_output else data[0]
 
         return decorated_function
@@ -455,9 +442,10 @@ class NoOutputTransform(DashTransform):
 # region Transformer implementations
 
 class Dash(DashTransformer):
-    def __init__(self, *args, serverside_output_backend=None, session_check=True, **kwargs):
+    def __init__(self, *args, output_defaults=None, **kwargs):
+        output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
         transforms = [TriggerTransform(), NoOutputTransform(), GroupTransform(),
-                      ServersideOutputTransform(serverside_output_backend, session_check)]
+                      ServersideOutputTransform(**output_defaults)]
         super().__init__(*args, transforms=transforms, **kwargs)
 
 # endregion
