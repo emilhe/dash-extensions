@@ -129,7 +129,7 @@ class TriggerTransform(DashTransform):
 
     def apply(self, callbacks):
         for callback in callbacks:
-            is_trigger = [isinstance(item, Trigger) for item in callback[Input]]
+            is_trigger = [isinstance(item, Trigger) for item in callback[Input]] + [False]*len(callback[State])
             # Check if any triggers are there.
             if not any(is_trigger):
                 continue
@@ -323,7 +323,6 @@ def _unpack_outputs(serverside_outputs):
 
 
 def _pack_outputs(callback):
-
     memoize = callback["kwargs"].pop("memoize", None)
 
     def packed_callback(f):
@@ -393,6 +392,24 @@ class ServerStore:
 # Place store implementations here.
 
 class FileSystemStore(FileSystemCache):
+
+    def __init__(self, cache_dir="file_system_store", **kwargs):
+        super().__init__(cache_dir, **kwargs)
+
+    def get(self, key, ignore_expired=False):
+        if not ignore_expired:
+            return super().get(key)
+        # TODO: This part must be implemented for each type of cache.
+        filename = self._get_filename(key)
+        try:
+            with open(filename, "rb") as f:
+                pickle_time = pickle.load(f)  # ignore time
+                return pickle.load(f)
+        except (IOError, OSError, pickle.PickleError):
+            return None
+
+
+class RedisStore(RedisCache):
 
     def __init__(self, cache_dir="file_system_store", **kwargs):
         super().__init__(cache_dir, **kwargs)
