@@ -1,11 +1,16 @@
 import io
+import json
 import ntpath
 import base64
 import uuid
-import dash_core_components as dcc
+
+import dash
 import dash_html_components as html
 
 from dash.dependencies import Output, Input
+
+
+# region Utils for Download component
 
 
 def send_file(path, filename=None, mime_type=None):
@@ -113,6 +118,46 @@ def send_data_frame(writer, filename, mime_type=None, **kwargs):
     return send_string(writer, filename, mime_type, **kwargs)
 
 
+# endregion
+
+# region Get triggered
+
+
+class Triggered(object):
+    def __init__(self, id, **kwargs):
+        self.id = id
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
+
+
+def get_triggered():
+    triggered = dash.callback_context.triggered
+    if not triggered:
+        return Triggered(None)
+    # Collect trigger ids and values.
+    triggered_id = None
+    triggered_values = {}
+    for entry in triggered:
+        # TODO: Test this part.
+        elements = entry['prop_id'].split(".")
+        current_id = ".".join(elements[:-1])
+        current_prop = elements[-1]
+        # Determine the trigger object.
+        if triggered_id is None:
+            triggered_id = current_id
+        # TODO: Should all properties of the trigger be registered, or only one?
+        if triggered_id != current_id:
+            continue
+        triggered_values[current_prop] = entry['value']
+    # Now, create an object.
+    try:
+        triggered_id = json.loads(triggered_id)
+    except ValueError:
+        pass
+    return Triggered(triggered_id, **triggered_values)
+
+
+# endregion
 
 def fix_page_load_anchor_issue(app, delay=None):
     """

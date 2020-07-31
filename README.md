@@ -1,6 +1,69 @@
 # dash-extensions
 
-The purpose of this package is to provide various extensions to the Plotly Dash framework. It is essentially a collection of code snippets that i have been reusing across multiple projects.
+The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into three main blocks, 
+
+* The `snippets` module, which contains a collection of utility functions
+* The `enrich` module, which contains various enriched versions of Dash components
+* A number of custom components, e.g. the `Download` component
+
+While the `snippets` module documentation will be limited to source code comments, the `enrich` module and the custom components are documented below.
+
+## Enrichments
+
+At the time of writing, the following enrichments (as compared to Dash 0.0.14) have been implemented,
+
+* Ordering and form (single element versus list) of (`Output`, `Input`, `State`) does not matter. Hence, you could do this,
+
+        @app.callback(Input("input_id", "input_prop"), Output("output_id", "output_prop"))
+
+* A new `Trigger` component has been added. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
+
+        @app.callback(Output("output_id", "output_prop"), Trigger("button", "n_clicks"))
+        def func():  # note that "n_clicks" is not included as an argument 
+
+* It is now possible to have callbacks without an `Output`,
+
+        @app.callback(Trigger("button", "n_clicks"))  # note that the callback has no output
+
+* A new `group` keyword makes it possible to bundle callbacks together. This feature serves as a work around for Dash not being able to target an output multiple times. Here is a small example,
+
+        @app.callback(Output("log", "children"), Trigger("left", "n_clicks"), group="my_group") 
+        def left():
+            return "left"
+            
+        @app.callback(Output("log", "children"), Trigger("right", "n_clicks"), group="my_group") 
+        def right():
+            return "right"
+
+* A new `ServersideOutput` component has been added. It works like a normal `Output`, but _keeps the data on the server_. By skipping the data transfer between server/client, the network overhead is reduced drastically, and the serialization to JSON can be avoided. Hence, you can now return complex objects, such as a pandas data frame, directly,
+
+        @app.callback(ServersideOutput("store", "data"), Trigger("left", "n_clicks")) 
+        def query():
+            return pd.DataFrame(data=list(range(10)), columns=["value"])
+            
+        @app.callback(Output("log", "children"), Trigger("right", "n_clicks")) 
+        def right(df):
+            return df["value"].mean()
+  
+  The reduced network overhead along with the avoided serialization to/from JSON can yield significant performance improvements, in particular for large data. Note that content of a `ServersideOutput` cannot be accessed by clientside callbacks. 
+  
+* A new `memoize` keyword makes it possible to memoize the output of a callback. That is, the callback output is cached, and the cached result is returned when the same inputs occur again.
+
+        @app.callback(ServersideOutput("store", "data"), Trigger("left", "n_clicks"), memoize=True) 
+        def query():
+            return pd.DataFrame(data=list(range(10)), columns=["value"])
+
+    Used with a normal `Output`, this keyword is essentially equivalent to the `@flask_caching.memoize` decorator. For a `ServersideOutput`, the backend to do server side storage will also be used for memoization. Hence you avoid saving each object two times, which would happen if the `@flask_caching.memoize` decorator was used with a `ServersideOutput`.
+            
+To enable the enrichments, simply replace the imports of the `Dash` object and the (`Output`, `Input`, `State`) objects with their enriched counterparts,
+
+    from dash_extensions.enrich import Dash, Output, Input, State
+
+The syntax in the `enrich` module should be considered alpha stage. It might change without notice.
+
+## Components
+
+The components listed here can be used in the `layout` of you Dash app. 
 
 ### Download
 
@@ -82,59 +145,25 @@ The `Lottie` component makes it possible to run Lottie animations in Dash. Here 
         app.run_server()
 
 
-### CallbackGrouper
+### Keyboard
 
-A known limitation of Dash is the inability to assign multiple callbacks to the same output. Hence the following code will **not** work,
+The `Keyboard` component makes it capture keyboard events at the document level. Here is a small example,
 
     import dash
     import dash_html_components as html
+    import json
+    
     from dash.dependencies import Output, Input
+    from dash_extensions import Keyboard
     
     app = dash.Dash()
-    app.layout = html.Div([html.Button("Button 1", id="btn1"), html.Button("Button 2", id="btn2"), html.Div(id="div")])
+    app.layout = html.Div([Keyboard(id="keyboard"), html.Div(id="output")])
     
     
-    @app.callback(Output("div", "children"), [Input("btn1", "n_clicks")])
-    def click_btn1(n_clicks):
-        return "You clicked btn1"
-    
-    
-    @app.callback(Output("div", "children"), [Input("btn2", "n_clicks")])
-    def click_btn2(n_clicks):
-        return "You clicked btn2"
+    @app.callback(Output("output", "children"), [Input("keyboard", "keydown")])
+    def keydown(event):
+        return json.dumps(event)
     
     
     if __name__ == '__main__':
         app.run_server()
-
-Specifically, a dash.exceptions.DuplicateCallbackOutput exception will be raised as an attempt is made to assign the output `Output("div", "children")` a second time. 
-
-To address this problem, this package provides the `CallbackGrouper` class. It acts as a proxy for the Dash application during callback registration, but unlike the Dash application, it supports assignment of multiple callbacks to the same output. When all callbacks have been assigned, the callback grouper is registered on the Dash application,
-
-    import dash
-    import dash_html_components as html
-    from dash.dependencies import Output, Input
-    from dash_extensions.callback import CallbackGrouper
-    
-        
-    app = dash.Dash()
-    app.layout = html.Div([html.Button("Button 1", id="btn1"), html.Button("Button 2", id="btn2"), html.Div(id="div")])
-    cg = CallbackGrouper() 
-    
-    
-    @cg.callback(Output("div", "children"), [Input("btn1", "n_clicks")])
-    def click_btn1(n_clicks):
-        return "You clicked btn1"
-    
-    
-    @cg.callback(Output("div", "children"), [Input("btn2", "n_clicks")]) 
-    def click_btn2(n_clicks):
-        return "You clicked btn2"
-    
-    
-    cg.register(app)  
-    
-    if __name__ == '__main__':
-        app.run_server()
-
-Under the hood, the two callbacks are merged into one with the appropriate function handler invoked depending on the input trigger. In this simple case, the two callbacks could easily have been merged by hand. However, in more complex cases, the callback merging and control flow delegation can be cumbersome to implement by hand.
