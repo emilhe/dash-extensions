@@ -41,7 +41,7 @@ At the time of writing, the following enrichments (as compared to Dash 0.0.14) h
         def query():
             return pd.DataFrame(data=list(range(10)), columns=["value"])
             
-        @app.callback(Output("log", "children"), Trigger("right", "n_clicks")) 
+        @app.callback(Output("log", "children"), Input("store", "data")) 
         def right(df):
             return df["value"].mean()
   
