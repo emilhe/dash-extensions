@@ -147,7 +147,7 @@ The `Lottie` component makes it possible to run Lottie animations in Dash. Here 
 
 ### Keyboard
 
-The `Keyboard` component makes it capture keyboard events at the document level. Here is a small example,
+The `Keyboard` component makes it possible to capture keyboard events at the document level. Here is a small example,
 
     import dash
     import dash_html_components as html
