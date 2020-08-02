@@ -63,7 +63,7 @@ The syntax in the `enrich` module should be considered alpha stage. It might cha
 
 ## Components
 
-The components listed here can be used in the `layout` of you Dash app. 
+The components listed here can be used in the `layout` of your Dash app. 
 
 ### Download
 
