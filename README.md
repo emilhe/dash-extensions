@@ -41,7 +41,7 @@ At the time of writing, the following enrichments (as compared to Dash 0.0.14) h
         def query():
             return pd.DataFrame(data=list(range(10)), columns=["value"])
             
-        @app.callback(Output("log", "children"), Trigger("right", "n_clicks")) 
+        @app.callback(Output("log", "children"), Input("store", "data")) 
         def right(df):
             return df["value"].mean()
   
@@ -63,7 +63,7 @@ The syntax in the `enrich` module should be considered alpha stage. It might cha
 
 ## Components
 
-The components listed here can be used in the `layout` of you Dash app. 
+The components listed here can be used in the `layout` of your Dash app. 
 
 ### Download
 
@@ -147,7 +147,7 @@ The `Lottie` component makes it possible to run Lottie animations in Dash. Here 
 
 ### Keyboard
 
-The `Keyboard` component makes it capture keyboard events at the document level. Here is a small example,
+The `Keyboard` component makes it possible to capture keyboard events at the document level. Here is a small example,
 
     import dash
     import dash_html_components as html
