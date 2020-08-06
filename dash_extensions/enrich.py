@@ -34,15 +34,27 @@ class DashTransformer(dash.Dash):
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         # Parse Output/Input/State (could be made simpler by enforcing input structure)
+        multi_output = False
         callback = {arg_type: [] for arg_type in self.arg_types}
+        arg_order = []
         for arg in args:
             elements = _as_list(arg)
             for element in elements:
                 for key in callback:
                     if isinstance(element, key):
+                        # Check if this is a wild card output.
+                        if not multi_output and isinstance(element, Output):
+                            component_id = element.component_id
+                            if isinstance(component_id, dict):
+                                multi_output = any([component_id[k] in [dd.ALLSMALLER, dd.ALL] for k in component_id])
                         callback[key].append(element)
+                        arg_order.append(element)
+        if not multi_output:
+            multi_output = len(callback[Output]) > 1
         # Save the kwargs for later.
         callback["kwargs"] = kwargs
+        callback["sorted_args"] = arg_order
+        callback["multi_output"] = multi_output
         # Save the callback for later.
         self.callbacks.append(callback)
 
@@ -129,7 +141,7 @@ class TriggerTransform(DashTransform):
 
     def apply(self, callbacks):
         for callback in callbacks:
-            is_trigger = [isinstance(item, Trigger) for item in callback[Input]] + [False]*len(callback[State])
+            is_trigger = trigger_filter(callback["sorted_args"])
             # Check if any triggers are there.
             if not any(is_trigger):
                 continue
@@ -149,6 +161,12 @@ def filter_args(args_filter):
         return decorated_function
 
     return wrapper
+
+
+def trigger_filter(args):
+    inputs_args = [item for item in args if isinstance(item, Input) or isinstance(item, State)]
+    is_trigger = [isinstance(item, Trigger) for item in inputs_args]
+    return is_trigger
 
 
 # endregion
@@ -184,6 +202,12 @@ def _combine_callbacks(callbacks):
     outputs, output_props, output_prop_lists, output_mappings = _prep_props(callbacks, Output)
     # TODO: What kwargs to use?
     kwargs = callbacks[0]["kwargs"]
+    multi_output = any([callback["multi_output"] for callback in callbacks])
+    if not multi_output:
+        all_outputs = []
+        for callback in callbacks:
+            all_outputs += callback[Output]
+        multi_output = len(list(set(all_outputs))) > 1
 
     # TODO: There might be a scope issue here
     def wrapper(*args):
@@ -202,7 +226,7 @@ def _combine_callbacks(callbacks):
                 inputs_i = [local_inputs[j] for j in input_mappings[i]]
                 states_i = [local_states[j] for j in state_mappings[i]]
                 outputs_i = callbacks[i]["f"](*inputs_i, *states_i)
-                if len(callbacks[i][Output]) == 1:
+                if not callbacks[i]["multi_output"]: # len(callbacks[i][Output]) == 1:  TODO: Is this right?
                     outputs_i = [outputs_i]
                 for j, item in enumerate(outputs_i):
                     output_values[output_mappings[i][j]] = outputs_i[j]
@@ -212,9 +236,9 @@ def _combine_callbacks(callbacks):
         if all([item == dash.no_update for item in output_values]):
             raise PreventUpdate
         # Return the combined output.
-        return output_values if len(output_values) > 1 else output_values[0]
+        return output_values if multi_output else output_values[0]  # TODO: Check for multi output here?
 
-    return {Output: outputs, Input: inputs, "f": wrapper, State: states, "kwargs": kwargs}
+    return {Output: outputs, Input: inputs, "f": wrapper, State: states, "kwargs": kwargs, "multi_output": multi_output}
 
 
 def _prep_props(callbacks, key):
@@ -328,7 +352,7 @@ def _pack_outputs(callback):
     def packed_callback(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            multi_output = len(callback[Output]) > 1
+            multi_output = callback["multi_output"]
             # If memoize is enabled, we check if the cache already has a valid value.
             if memoize:
                 # Figure out if an update is necessary.
@@ -336,8 +360,8 @@ def _pack_outputs(callback):
                 update_needed = False
                 for i, output in enumerate(callback[Output]):
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    args = [arg for i, arg in enumerate(args) if i > len(callback[Input]) or
-                            not isinstance(callback[Input][i], Trigger)]
+                    is_trigger = trigger_filter(callback["sorted_args"])
+                    args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     # Generate unique ID.
                     unique_id = _get_cache_id(f, output, list(args), output.session_check)
                     unique_ids.append(unique_id)

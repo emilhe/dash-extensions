@@ -15,7 +15,7 @@ app.layout = html.Div([
 def query_data():
     time.sleep(1)
     return px.data.gapminder()
-ææ
+
 
 @app.callback(Input("store", "data"), Output("dd", "options"))
 def update_dd(df):
@@ -29,4 +29,4 @@ def update_graph(df, value):
 
 
 if __name__ == '__main__':
-    app.run_server()
+    app.run_server(port=8877)
