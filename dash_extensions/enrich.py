@@ -361,9 +361,9 @@ def _pack_outputs(callback):
                 for i, output in enumerate(callback[Output]):
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
                     is_trigger = trigger_filter(callback["sorted_args"])
-                    args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
+                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     # Generate unique ID.
-                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
+                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
                     unique_ids.append(unique_id)
                     if not output.backend.has(unique_id):
                         update_needed = True
