@@ -380,7 +380,10 @@ def _pack_outputs(callback):
                 serverside_output = isinstance(callback[Output][i], ServersideOutput)
                 # Replace only for server side outputs.
                 if serverside_output or memoize:
-                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
+                    # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
+                    is_trigger = trigger_filter(callback["sorted_args"])
+                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
+                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
                     output.backend.set(unique_id, data[i])
                     # Replace only for server side outputs.
                     if serverside_output:
