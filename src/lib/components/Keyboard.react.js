@@ -15,6 +15,7 @@ export default class Keyboard extends Component {
         if(!this.props.captureKeys || this.props.captureKeys.indexOf(event.key) > -1){
             this.props.setProps({keydown: this.props.eventProps.reduce(
                 function(o, k) { o[k] = event[k]; return o; }, {})})
+            this.props.setProps({n_keydowns: this.props.n_keydowns + 1})
         }
     }
 
@@ -32,7 +33,8 @@ export default class Keyboard extends Component {
 };
 
 Keyboard.defaultProps = {
-    eventProps: ["key", "altKey", "ctrlKey", "shiftKey","metaKey", "repeat"]
+    eventProps: ["key", "altKey", "ctrlKey", "shiftKey","metaKey", "repeat"],
+    n_keydowns: 0
 };
 
 
@@ -62,5 +64,10 @@ Keyboard.propTypes = {
      * The ID used to identify this component in Dash callbacks.
      */
     keydown: PropTypes.object,
+
+     /**
+     * A counter, which is incremented on each key down event, similar to n_clicks for buttons.
+     */
+    n_keydowns: PropTypes.number
 
 };

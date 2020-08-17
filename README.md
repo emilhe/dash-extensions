@@ -10,7 +10,7 @@ While the `snippets` module documentation will be limited to source code comment
 
 ## Enrichments
 
-At the time of writing, the following enrichments (as compared to Dash 0.0.14) have been implemented,
+At the time of writing, the following enrichments (as compared to Dash 1.14.0) have been implemented,
 
 * Ordering and form (single element versus list) of (`Output`, `Input`, `State`) does not matter. Hence, you could do this,
 

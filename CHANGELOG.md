@@ -2,9 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.28] - 2020-12-08
+## [0.0.29] - XXX
 
 ### Added
+
+- A new n_keydowns props to the Keyboard component to make it possible to capture all keyboard events.
+
+## [0.0.28] - 2020-12-08
+
+### Changed
 
 - A few bug fixes.
 
