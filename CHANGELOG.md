@@ -2,9 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.29] - XXX
+
+## [0.0.29] - 21-08-20
 
 ### Added
+
+- A new module for transpiling Python code to javascript.
 
 - A new n_keydowns props to the Keyboard component to make it possible to capture all keyboard events.
 

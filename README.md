@@ -1,12 +1,54 @@
 # dash-extensions
 
-The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into three main blocks, 
+The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into four main blocks, 
 
 * The `snippets` module, which contains a collection of utility functions
+* The `transpile` module, which contains convenience wrappers for transpiling Python code to javascript
 * The `enrich` module, which contains various enriched versions of Dash components
 * A number of custom components, e.g. the `Download` component
 
-While the `snippets` module documentation will be limited to source code comments, the `enrich` module and the custom components are documented below.
+While the `snippets` module documentation will be limited to source code comments, the `enrich` module, the `transpile` module and the custom components are documented below.
+
+## Transpiling
+
+The `transpile` module translates Python code into javascript using the [transcrypt](https://www.transcrypt.org/) library. As it's pretty big, it is not included in the requirement, but it can be installed via pip
+
+    pip install transcrypt
+
+One of the main use cases for transpiling is clientside callbacks (which are usually written in javascript). The functions to be transpiled must be placed in a separate module (file), say `logic.py`. In this example, we will consider a simple `add` function,
+
+    def add(a, b):
+        return a + b
+        
+Before the `add` can be used in a clientside callback, the `logic` module must be passed through the `to_clientside_functions` function. In addition to transpiling the module into javascript, it replaces the functional attributes of the module with appropriate `ClientsideFunction` objects so that they can be used in clientside callback,
+
+    from dash_extensions.transpile import to_clientside_functions, inject_js
+    ...
+    inject_js(app, to_clientside_functions(logic))
+    app.clientside_callback(logic.add, ...)
+
+The `to_clientside_functions` returns the path to a javascript index file, which must be injected into the app (that's what `inject_js` does). And for completeness, here is the full example app,
+
+    import dash
+    import dash_core_components as dcc
+    import dash_html_components as html
+    import logic
+    
+    from dash.dependencies import Output, Input
+    from dash_extensions.transpile import to_clientside_functions, inject_js
+    
+    # Create example app.
+    app = dash.Dash()
+    app.layout = html.Div([
+        dcc.Input(id="a", value=2, type="number"), html.Div("+"),
+        dcc.Input(id="b", value=2, type="number"), html.Div("="), html.Div(id="c"),
+    ])
+    # Create clientside callback.
+    inject_js(app, to_clientside_functions(logic))
+    app.clientside_callback(logic.add, Output("c", "children"), [Input("a", "value"), Input("b", "value")])
+    
+    if __name__ == '__main__':
+        app.run_server()
 
 ## Enrichments
 
