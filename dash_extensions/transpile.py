@@ -1,20 +1,31 @@
 import hashlib
 import os
+import subprocess
 
 from string import Template
+
+from dash.dependencies import ClientsideFunction
 from flask import send_from_directory
 
-_main_template = """import {$funcs} from './$namespace.js'
+_main_template = """import {$funcs} from './$module.js'
 
-window.dash_clientside = Object.assign({}, window.dash_clientside, {
-    $namespace: {
+window.$namespace = Object.assign({}, window.$namespace, {
+    $module: {
         $funcs
     }
 });
 """
 
 
-def transcrypt_module(module):
+def to_clientside_functions(module):
+    return module2js(module, namespace="dash_clientside", func_mapper=lambda x, y, z: ClientsideFunction(y, z))
+
+
+def to_js_functions(module, namespace="dash_functions"):
+    return module2js(module, namespace=namespace, func_mapper=lambda x, y, z: f"window.{x}.{y}.{z}")
+
+
+def module2js(module, namespace, func_mapper=None):
     dst_dir = "__target__"
     # Locate all functions.
     module_name, _ = os.path.splitext(os.path.basename(module.__file__))
@@ -23,8 +34,9 @@ def transcrypt_module(module):
         if hasattr(getattr(module, member), "__call__"):
             funcs.append(member)
     # Decorate all module functions.
-    for func in funcs:
-        setattr(module, func, f"window.dash_clientside.{module_name}.{func}")
+    if func_mapper is not None:
+        for func in funcs:
+            setattr(module, func, func_mapper(namespace, module_name, func))
     # Setup index.
     index_file = f"{module_name}_index.js"
     index_path = f"{dst_dir}/{index_file}"
@@ -37,11 +49,11 @@ def transcrypt_module(module):
             new_md5 = hashlib.md5(f.read()).hexdigest()
         if old_md5 == new_md5:
             return index_path
-    # Do the transcrypt.
-    os.system("transcrypt -b {}".format(module.__file__))
+    # Do the transcrypt. TODO: Check output?
+    output = subprocess.check_output(['transcrypt', '-b', module.__file__])
     # Write index.
     with open(f"{dst_dir}/{index_file}", 'w') as f:
-        f.write(Template(_main_template).substitute(funcs=",".join(funcs), namespace=module_name))
+        f.write(Template(_main_template).substitute(funcs=",".join(funcs), module=module_name, namespace=namespace))
     # Write hash.
     with open(hash_path, 'w') as f:
         with open(module.__file__, 'rb') as inner:
@@ -55,7 +67,7 @@ def inject_js(dash_app, index_path):
 
     @dash_app.server.route(f'/{js_dir}/<path:path>', methods=['GET'])
     def send_js(path):  # pragma: no cover
-        return send_from_directory(js_dir, path)
+        return send_from_directory(os.path.join(os.getcwd(), js_dir), path)
 
     script_tag = f"<script type='module' src='/{js_dir}/{js_fn}'></script>\n            {{%scripts%}}"
     dash_app.index_string = dash_app.index_string.replace("{%scripts%}", script_tag)
