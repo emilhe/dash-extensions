@@ -3,7 +3,6 @@ import os
 import subprocess
 
 from string import Template
-
 from dash.dependencies import ClientsideFunction
 from flask import send_from_directory
 
@@ -17,15 +16,23 @@ window.$namespace = Object.assign({}, window.$namespace, {
 """
 
 
-def to_clientside_functions(module):
-    return module2js(module, namespace="dash_clientside", func_mapper=lambda x, y, z: ClientsideFunction(y, z))
+def module_to_clientside_functions(module):
+    return module_to_javascript(module, namespace="dash_clientside", func_mapper=_clientside_function_mapper)
 
 
-def to_js_functions(module, namespace="dash_functions"):
-    return module2js(module, namespace=namespace, func_mapper=lambda x, y, z: f"window.{x}.{y}.{z}")
+def _clientside_function_mapper(x, y, z):
+    return ClientsideFunction(y, z)
 
 
-def module2js(module, namespace, func_mapper=None):
+def module_to_props(module, namespace="dash_props"):
+    return module_to_javascript(module, namespace=namespace, func_mapper=_prop_mapper)
+
+
+def _prop_mapper(x, y, z):
+    return f"window.{x}.{y}.{z}"
+
+
+def module_to_javascript(module, namespace, func_mapper=None):
     dst_dir = "__target__"
     # Locate all functions.
     module_name, _ = os.path.splitext(os.path.basename(module.__file__))
