@@ -11,23 +11,23 @@ While the `snippets` module documentation will be limited to source code comment
 
 ## Transpiling
 
-The `transpile` module translates Python code into javascript using the [transcrypt](https://www.transcrypt.org/) library. Since transcrypt is a rather large library, it is not included in the requirements, but it can be installed via pip
+The `transpile` module translates Python code into JavaScript using the [transcrypt](https://www.transcrypt.org/) library. Since transcrypt is a rather large library, it is not included in the requirements, but it can be installed via pip
 
     pip install transcrypt
 
-One of the main use cases for transpiling is clientside callbacks (which are usually written in javascript). The functions to be transpiled must be placed in a separate module (file), say `logic.py`. In this example, we will consider a simple `add` function,
+One of the main use cases for transpiling is clientside callbacks (which are usually written in JavaScript). The functions to be transpiled must be placed in a separate module (file), say `logic.py`. In this example, we will consider a simple `add` function,
 
     def add(a, b):
         return a + b
         
-Before the `add` function can be used as a clientside callback, the `logic` module must be passed through the `to_clientside_functions` function. In addition to transpiling the module into javascript, it replaces the functional attributes of the module with appropriate `ClientsideFunction` objects so that they can be used in clientside callbacks,
+Before the `add` function can be used as a clientside callback, the `logic` module must be passed through the `to_clientside_functions` function. In addition to transpiling the module into JavaScript, it replaces the functional attributes of the module with appropriate `ClientsideFunction` objects so that they can be used in clientside callbacks,
 
     from dash_extensions.transpile import to_clientside_functions, inject_js
     ...
     inject_js(app, to_clientside_functions(logic))  # this is where the magic happens
     app.clientside_callback(logic.add, ...)
 
-The `to_clientside_functions` returns the path to a javascript index file, which must be made available by the app (that's what `inject_js` does). For completeness, here is the full example app,
+The `to_clientside_functions` returns the path to a JavaScript index file, which must be made available by the app (that's what `inject_js` does). For completeness, here is the full example app,
 
     import dash
     import dash_core_components as dcc
@@ -65,7 +65,7 @@ The other main use case for the `transpile` module is for passing function handl
     def hover_style(feature):
         return dict(weight=5, color='#666', dashArray='')
 
-The style function above was designed to match the signature of the `style` option of the [Leaflet GeoJSON object](https://leafletjs.com/reference-0.7.7.html#geojson-style). Before the functions can be used as properties, the module must be passed through the `to_js_functions` function. In addition to transpiling the module into javascript, it replaces the functional attributes of the module with strings that are translated into functions in the javascript layer,
+The style function above was designed to match the signature of the `style` option of the [Leaflet GeoJSON object](https://leafletjs.com/reference-0.7.7.html#geojson-style). Before the functions can be used as properties, the module must be passed through the `to_js_functions` function. In addition to transpiling the module into JavaScript, it replaces the functional attributes of the module with strings that are translated into functions in the JavaScript layer,
 
     from dash_extensions.transpile import to_js_functions, inject_js
     ...
@@ -93,7 +93,7 @@ For completeness, here is the full example app (tested with dash-leaflet==0.0.23
     app = dash.Dash(prevent_initial_callbacks=True)
     app.layout = html.Div([dl.Map(children=[dl.TileLayer(), geojson], center=[39, -98], zoom=4, id="map")],
                           style={'width': '100%', 'height': '50vh', 'margin': "auto", "display": "block"})
-    # Inject transcrypted javascript.
+    # Inject transcrypted JavaScript.
     inject_js(app, index)
     
     
