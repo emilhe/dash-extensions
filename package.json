@@ -1,6 +1,6 @@
 {
   "name": "dash-extensions",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "description": "Extensions for Plotly Dash.",
   "main": "build/index.js",
   "scripts": {
