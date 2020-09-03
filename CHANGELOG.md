@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.31] - 23-08-20
+
+### Removed
+
+- The module for transpiling Python code to javascript has been moved to a separate package, dash-transcrypt.
 
 ## [0.0.30] - 23-08-20
 

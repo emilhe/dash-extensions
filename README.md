@@ -1,5 +1,3 @@
-# dash-extensions
-
 The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into three main blocks, 
 
 * The `snippets` module, which contains a collection of utility functions
