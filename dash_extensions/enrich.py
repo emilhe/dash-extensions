@@ -29,12 +29,28 @@ class DashTransformer(dash.Dash):
         for transform in self.transforms:
             transform.init(self)
 
+    @staticmethod
+    def extract_list_from_kwargs(kwargs: dict, key: str) -> list:
+        if kwargs is not None and key in kwargs:
+            contents = kwargs.pop(key)
+            if contents is None:
+                return []
+            if isinstance(contents, list):
+                return contents
+            else:
+                return [contents]
+        else:
+            return []
+
     def callback(self, *args, **kwargs):
         """
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         # Parse Output/Input/State (could be made simpler by enforcing input structure)
         multi_output = False
+        args = list(args) + DashTransformer.extract_list_from_kwargs(kwargs, 'output') + \
+               DashTransformer.extract_list_from_kwargs(kwargs, 'inputs') + \
+               DashTransformer.extract_list_from_kwargs(kwargs, 'state')
         callback = {arg_type: [] for arg_type in self.arg_types}
         arg_order = []
         for arg in args:
