@@ -12,8 +12,7 @@ from dash.dependencies import Input, State
 from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
-from more_itertools import unique_everseen
-
+from more_itertools import unique_everseen, flatten
 
 # region Dash transformer
 
@@ -29,30 +28,16 @@ class DashTransformer(dash.Dash):
         for transform in self.transforms:
             transform.init(self)
 
-    @staticmethod
-    def extract_list_from_kwargs(kwargs: dict, key: str) -> list:
-        if kwargs is not None and key in kwargs:
-            contents = kwargs.pop(key)
-            if contents is None:
-                return []
-            if isinstance(contents, list):
-                return contents
-            else:
-                return [contents]
-        else:
-            return []
-
     def callback(self, *args, **kwargs):
         """
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         # Parse Output/Input/State (could be made simpler by enforcing input structure)
-        multi_output = False
-        args = list(args) + DashTransformer.extract_list_from_kwargs(kwargs, 'output') + \
-               DashTransformer.extract_list_from_kwargs(kwargs, 'inputs') + \
-               DashTransformer.extract_list_from_kwargs(kwargs, 'state')
+        keys = ['output', 'inputs', 'state']
+        args = list(args) + list(flatten([_extract_list_from_kwargs(kwargs, key) for key in keys]))
         callback = {arg_type: [] for arg_type in self.arg_types}
         arg_order = []
+        multi_output = False
         for arg in args:
             elements = _as_list(arg)
             for element in elements:
@@ -126,6 +111,19 @@ def _as_list(item):
 
 def _create_callback_id(item):
     return "{}.{}".format(item.component_id, item.component_property)
+
+
+def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
+    if kwargs is not None and key in kwargs:
+        contents = kwargs.pop(key)
+        if contents is None:
+            return []
+        if isinstance(contents, list):
+            return contents
+        else:
+            return [contents]
+    else:
+        return []
 
 
 class DashTransform:
@@ -242,7 +240,7 @@ def _combine_callbacks(callbacks):
                 inputs_i = [local_inputs[j] for j in input_mappings[i]]
                 states_i = [local_states[j] for j in state_mappings[i]]
                 outputs_i = callbacks[i]["f"](*inputs_i, *states_i)
-                if not callbacks[i]["multi_output"]: # len(callbacks[i][Output]) == 1:  TODO: Is this right?
+                if not callbacks[i]["multi_output"]:  # len(callbacks[i][Output]) == 1:  TODO: Is this right?
                     outputs_i = [outputs_i]
                 for j, item in enumerate(outputs_i):
                     output_values[output_mappings[i][j]] = outputs_i[j]
