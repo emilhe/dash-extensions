@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.32] - UNRELEASED
+
+### Changed
+
+- The speed of Lottie animations can now be adjusted dynamically.
+
 ## [0.0.31] - 23-08-20
 
 ### Removed
