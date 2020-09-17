@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Added support of kwargs (output, input, state) in callbacks [jfftonsic](https://github.com/thedirtyfew/dash-extensions/pull/15).
 - The speed of Lottie animations can now be adjusted dynamically.
+- Memoize keyword can now be a function. If it is, the data is transformed by the function before memoization.
 
 ## [0.0.31] - 23-08-20
 

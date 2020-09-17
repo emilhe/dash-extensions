@@ -7,12 +7,14 @@ import uuid
 import dash
 import dash_html_components as html
 import dash.dependencies as dd
+import plotly
 
 from dash.dependencies import Input, State
 from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen, flatten
+
 
 # region Dash transformer
 
@@ -124,6 +126,10 @@ def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
             return [contents]
     else:
         return []
+
+
+def plotly_jsonify(data):
+    return json.loads(json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder))
 
 
 class DashTransform:
@@ -333,6 +339,11 @@ class ServersideOutputTransform(DashTransform):
         for i, callback in enumerate(serverside_callbacks):
             f = callback["f"]
             callback["f"] = _pack_outputs(callback)(f)
+        # 4) Strip special args.
+        for callback in callbacks:
+            for key in ["memoize"]:
+                callback["kwargs"].pop(key, None)
+
         return callbacks
 
 
@@ -361,7 +372,7 @@ def _unpack_outputs(serverside_outputs):
 
 
 def _pack_outputs(callback):
-    memoize = callback["kwargs"].pop("memoize", None)
+    memoize = callback["kwargs"].get("memoize", None)
 
     def packed_callback(f):
         @functools.wraps(f)
@@ -390,6 +401,8 @@ def _pack_outputs(callback):
             # Do the update.
             data = f(*args)
             data = list(data) if multi_output else [data]
+            if callable(memoize):
+                data = memoize(data)
             for i, output in enumerate(callback[Output]):
                 serverside_output = isinstance(callback[Output][i], ServersideOutput)
                 # Replace only for server side outputs.
