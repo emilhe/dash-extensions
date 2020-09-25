@@ -61,7 +61,15 @@ Keyboard.propTypes = {
     setProps: PropTypes.func,
 
      /**
-     * The ID used to identify this component in Dash callbacks.
+     * keydown (dict)  The object that holds the result of the key down event.  It is a dictionary with the following keys:
+     *      "key", "altKey", "ctrlKey", "shiftKey","metaKey", "repeat".  Those keys have the  following values:
+     *
+     *    - key(str) which key is pressed
+     *    - altKey (bool) whether the  Alt key is pressed
+     *    - ctrlKey (bool) Ctrl key is pressed
+     *    - shiftKey (bool) Shift key is pressed
+     *    - metaKey (bool) Meta key is pressed (Mac: Command key or  PC: Windows key)
+     *    - repeat (bool) - whether the key is held down
      */
     keydown: PropTypes.object,
 
