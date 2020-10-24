@@ -9,7 +9,9 @@ import dash_html_components as html
 import dash.dependencies as dd
 
 from dash.dependencies import Input, State
+from dash.development.base_component import Component
 from dash.exceptions import PreventUpdate
+import dash_core_components as dcc
 from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen, flatten
@@ -184,6 +186,111 @@ def trigger_filter(args):
 
 
 # endregion
+
+
+# region ComposedComponent transform
+
+class ComposedComponentMixin:
+    """Mixin to add composability to a given Component (e.g. to an html.Div).
+
+    """
+    # list of property names to be created to store the state of this component
+    _properties = Component.UNDEFINED
+    # string with the type of the composed component (used to mangle the id of the subcomponents
+    _composed_type = Component.UNDEFINED
+
+    def __init__(self, id, **kwargs):
+        # create Store components for component properties (mangle name to avoid id conflicts)
+        prop_values = {k: kwargs.pop(k, None) for k in self._properties}
+        self._states = [dcc.Store(id=k, data=v) for k, v in prop_values.items()]
+
+        # get & normalise layout
+        layout = self.layout(**prop_values)
+        if not isinstance(layout, list):
+            layout = [layout]
+
+        # create component by combining layout and hidden states
+        super().__init__(id=id, children=layout + self._states, **kwargs)
+
+        # mangle ids of components to avoid clash and allow MATCHing
+        # TODO: using a dict for the id of the subcomponents may make it tricky to specify them in CSS
+        #       as in HTML their id appears like <... id="{"component_parent_id":"xx","component_type":"xx","subcomponent_id":"xx"}">
+        for comp_with_id in self._traverse_ids():
+            comp_with_id.id = dict(component_type=self._composed_type,
+                                   component_parent_id=id,
+                                   subcomponent_id=comp_with_id.id)
+
+    def layout(self, info, size):
+        """Return a layout that will be assigned to the 'children' property of the composed component."""
+        raise NotImplementedError
+
+    def declare_callbacks(self, app):
+        """Declare the callbacks on the component. Use 'self' as property_id to refer
+        to the component properties."""
+        raise NotImplementedError
+
+
+class ComposedComponentTransform(DashTransform):
+    """Rewrite callback dependencies for composed components"""
+
+    def __init__(self, app):
+        self._app = app
+
+    def apply(self, callbacks):
+        """add callbacks from composed elements"""
+        components_with_ids = list(self._app.layout._traverse_ids())
+
+        # store __class__ of composed components already declared
+        callbacks_declared = set()
+        # for each component of the layout with an id (a ComposedComponent should have an id)
+        for comp in components_with_ids:
+            if isinstance(comp, ComposedComponentMixin) and comp.__class__ not in callbacks_declared:
+                # mark the type as being already declared
+                callbacks_declared.add(comp.__class__)
+
+                # store the length of the callbacks list to be able to detect afterwards which callbacks have been added
+                ncallbacks = len(callbacks)
+                # call the ComposedComponent `declare_callbacks` that will add to the app its own callbacks
+                comp.declare_callbacks(self._app)
+
+                # process each new callback to mangle the arguments and transform 'self'
+                new_callbacks = callbacks[ncallbacks:]
+                for callback in new_callbacks:
+                    for prop in callback["sorted_args"]:
+                        if prop.component_id == "self":
+                            prop.component_id = dict(component_type=comp._composed_type,
+                                                     component_parent_id=dd.MATCH,
+                                                     subcomponent_id=prop.component_property)
+                            prop.component_property = "data"
+                        else:
+                            prop.component_id = dict(component_type=comp._composed_type,
+                                                     component_parent_id=dd.MATCH,
+                                                     subcomponent_id=prop.component_id)
+
+
+        # rewrite all arguments of callbacks that refers to properties of ComposedComponent
+
+        # get component that need translation to data store
+        id2comp = {(comp.id["component_parent_id"], comp.id["subcomponent_id"]): comp for comp in
+                   components_with_ids if isinstance(comp.id, dict)}
+
+        # convert properties linked to data stores
+        for callback in callbacks:
+            for prop in callback["sorted_args"]:
+                if isinstance(prop.component_id, dict):
+                    # composed property, do not transform
+                    # TODO: handle cases where the ComposedComponent property is a dict
+                    continue
+                proxy_prop_via_store = id2comp.get((prop.component_id, prop.component_property))
+                if proxy_prop_via_store is not None:
+                    prop.component_id = proxy_prop_via_store.id
+                    prop.component_property = "data"
+
+        return callbacks
+
+
+# endregion
+
 
 # region Group transform
 
@@ -484,7 +591,7 @@ class NoOutputTransform(DashTransform):
 class Dash(DashTransformer):
     def __init__(self, *args, output_defaults=None, **kwargs):
         output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
-        transforms = [TriggerTransform(), NoOutputTransform(), GroupTransform(),
+        transforms = [TriggerTransform(), ComposedComponentTransform(app=self), NoOutputTransform(), GroupTransform(),
                       ServersideOutputTransform(**output_defaults)]
         super().__init__(*args, transforms=transforms, **kwargs)
 

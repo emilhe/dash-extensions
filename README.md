@@ -59,6 +59,78 @@ To enable the enrichments, simply replace the imports of the `Dash` object and t
 
 The syntax in the `enrich` module should be considered alpha stage. It might change without notice.
 
+## Composed Components
+
+With the ComposedComponentMixin, it is possible to combine & encapsulate a set of components to create a new component, all in pure python.
+
+For example, here we make an EnhanceSlider, based on a Div, that will expose only two properties ('info' and 'size').
+
+```python
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.exceptions import PreventUpdate
+
+from dash_extensions.enrich import Output, Input, ComposedComponentMixin, Dash
+
+class EnhanceSlider(ComposedComponentMixin, html.Div):
+    """Example component enhancing a standard Slider. 
+    
+    It exposes two properties (hiding the others):
+    - size: the max size of its internal slider
+    - info: a string with the result of the slider
+    """
+
+    _properties = ["info", "size"]
+    _composed_type = "enhance-slider"
+
+    def layout(self, info, size):
+        return [
+            dcc.Slider(id="slider", min=0, max=size, value=0),
+            html.Label("Enter size", id="label2"),
+            dcc.Input(id="input_size", value=size),
+        ]
+
+    @classmethod
+    def declare_callbacks(cls, app):
+        """Declare the callbacks that will handle the update of the size and info properties."""
+
+        @app.callback(Input("self", "size"), Output("slider", "max"), Output("slider", "marks"))
+        def size_setter(size):
+            if size:
+                size = int(size)
+                return size, {i: f"{i}" for i in range(0, size + 1)}
+            raise PreventUpdate()
+
+        @app.callback(Input("input_size", "value"), Output("self", "size"))
+        def size_getter(size):
+            return size
+
+        @app.callback(
+            Input("slider", "value"), Input("input_size", "value"), Output("self", "info")
+        )
+        def info_getter(value, total):
+            return f"{value} / {total}"
+```
+
+This component can be used now as if it was a new Dash component with two properties:
+
+```python
+app = Dash(
+    __name__,
+    title="Composed Component app",
+    meta_tags=[{"name": "viewport", "content": "width=device-width"}],
+)
+
+app.layout = html.Div(
+    [EnhanceSlider(id="first", size=4), EnhanceSlider(id="second", size=10), html.Label(id="out")]
+)
+
+@app.callback(Input("first", "info"), Input("second", "info"), Output("out", "children"))
+def update_out(info1, info2):
+    return f"You have chosen '{info1}' and '{info2}'"
+```
+
+
 ## Components
 
 The components listed here can be used in the `layout` of your Dash app. 
