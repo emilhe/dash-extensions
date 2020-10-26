@@ -1,5 +1,6 @@
 import dash_core_components as dcc
 import dash_html_components as html
+from dash.dependencies import State
 from dash.exceptions import PreventUpdate
 
 from dash_extensions.enrich import Dash, Output, Input, ComposedComponentMixin
@@ -12,6 +13,7 @@ class EnhanceSlider(ComposedComponentMixin, html.Div):
     """
 
     _properties = ["info", "size"]
+    _aliases = {"proxy-value": ("slider", "value")}
     _composed_type = "enhance-slider"
 
     def layout(self, info, size):
@@ -37,7 +39,9 @@ class EnhanceSlider(ComposedComponentMixin, html.Div):
             return size
 
         @app.callback(
-            Input("slider", "value"), Input("input_size", "value"), Output("self", "info")
+            # Input("slider", "value"),
+            Input("self", "proxy-value"),
+            Input("input_size", "value"), Output("self", "info")
         )
         def info_getter(value, total):
             return f"{value} / {total}"
@@ -54,9 +58,19 @@ app.layout = html.Div(
 )
 
 
-@app.callback(Input("first", "info"), Input("second", "info"), Output("out", "children"))
-def update_out(info1, info2):
-    return f"You have chosen '{info1}' and '{info2}'"
+@app.callback(Input("first", "info"), Input("second", "info"), State("first", "proxy-value"), Output("out", "children"))
+def update_out(info1, info2, value):
+    return f"You have chosen '{info1}' and '{info2}' (proxy-value={value})"
+
+
+@app.callback(Input("second", "info"), Output("first", "proxy-value"))
+def update_out(info2):
+    return int(info2.split(" / ")[0])
+
+
+# @app.callback(Input("first", "info"), Input("second", "info"), Output("out", "children"))
+# def update_out(info1, info2):
+#     return f"You have chosen '{info1}' and '{info2}'"
 
 
 if __name__ == "__main__":

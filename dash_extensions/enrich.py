@@ -4,17 +4,18 @@ import json
 import pickle
 import secrets
 import uuid
-import dash
-import dash_html_components as html
-import dash.dependencies as dd
 
+import dash
+import dash.dependencies as dd
+import dash_core_components as dcc
+import dash_html_components as html
 from dash.dependencies import Input, State
 from dash.development.base_component import Component
 from dash.exceptions import PreventUpdate
-import dash_core_components as dcc
 from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen, flatten
+
 
 # region Dash transformer
 
@@ -196,10 +197,24 @@ class ComposedComponentMixin:
     """
     # list of property names to be created to store the state of this component
     _properties = Component.UNDEFINED
+    # dict of aliases (property name -> component_id.component_property)
+    # ie property names that are mapped to properties of internal components
+    _aliases = Component.UNDEFINED
     # string with the type of the composed component (used to mangle the id of the subcomponents
     _composed_type = Component.UNDEFINED
 
     def __init__(self, id, **kwargs):
+        # handle _properties
+        if self._properties is Component.UNDEFINED:
+            self._properties = []
+
+        # handle _aliases
+        if self._aliases is Component.UNDEFINED:
+            self._aliases = {}
+
+        if not isinstance(self._composed_type, str):
+            raise ValueError(f"The '_composed_type' of {self} should be a string, not {self._composed_type}")
+
         # create Store components for component properties (mangle name to avoid id conflicts)
         prop_values = {k: kwargs.pop(k, None) for k in self._properties}
         self._states = [dcc.Store(id=k, data=v) for k, v in prop_values.items()]
@@ -213,8 +228,6 @@ class ComposedComponentMixin:
         super().__init__(id=id, children=layout + self._states, **kwargs)
 
         # mangle ids of components to avoid clash and allow MATCHing
-        # TODO: using a dict for the id of the subcomponents may make it tricky to specify them in CSS
-        #       as in HTML their id appears like <... id="{"component_parent_id":"xx","component_type":"xx","subcomponent_id":"xx"}">
         for comp_with_id in self._traverse_ids():
             comp_with_id.id = dict(component_type=self._composed_type,
                                    component_parent_id=id,
@@ -257,22 +270,35 @@ class ComposedComponentTransform(DashTransform):
                 new_callbacks = callbacks[ncallbacks:]
                 for callback in new_callbacks:
                     for prop in callback["sorted_args"]:
-                        if prop.component_id == "self":
+                        if prop.component_id == "self" and prop.component_property not in comp._aliases:
+                            # manage self new properties
                             prop.component_id = dict(component_type=comp._composed_type,
                                                      component_parent_id=dd.MATCH,
                                                      subcomponent_id=prop.component_property)
                             prop.component_property = "data"
+                        elif prop.component_id == "self" and prop.component_property in comp._aliases:
+                            # manage aliases
+                            _id, _prop = comp._aliases[prop.component_property]
+                            prop.component_id = dict(component_type=comp._composed_type,
+                                                     component_parent_id=dd.MATCH,
+                                                     subcomponent_id=_id)
+                            prop.component_property = _prop
                         else:
+                            # manage mangling of subcomponents
                             prop.component_id = dict(component_type=comp._composed_type,
                                                      component_parent_id=dd.MATCH,
                                                      subcomponent_id=prop.component_id)
-
 
         # rewrite all arguments of callbacks that refers to properties of ComposedComponent
 
         # get component that need translation to data store
         id2comp = {(comp.id["component_parent_id"], comp.id["subcomponent_id"]): comp for comp in
-                   components_with_ids if isinstance(comp.id, dict)}
+                   components_with_ids if isinstance(comp.id, dict) and "subcomponent_id" in comp.id}
+        # get aliases
+        alias = {(comp.id, prop): (dict(component_type=comp._composed_type,
+                                        component_parent_id=comp.id,
+                                        subcomponent_id=subid), subprop) for comp in components_with_ids for
+                 prop, (subid, subprop) in getattr(comp, "_aliases", {}).items()}
 
         # convert properties linked to data stores
         for callback in callbacks:
@@ -281,10 +307,17 @@ class ComposedComponentTransform(DashTransform):
                     # composed property, do not transform
                     # TODO: handle cases where the ComposedComponent property is a dict
                     continue
+
+                # transform composed component own properties
                 proxy_prop_via_store = id2comp.get((prop.component_id, prop.component_property))
                 if proxy_prop_via_store is not None:
                     prop.component_id = proxy_prop_via_store.id
                     prop.component_property = "data"
+                else:
+                    # transform aliases
+                    proxy_prop_via_alias = alias.get((prop.component_id, prop.component_property))
+                    if proxy_prop_via_alias is not None:
+                        prop.component_id,prop.component_property = proxy_prop_via_alias
 
         return callbacks
 
