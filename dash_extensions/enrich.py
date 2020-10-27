@@ -3,6 +3,7 @@ import hashlib
 import json
 import pickle
 import secrets
+import threading
 import uuid
 
 import dash
@@ -21,7 +22,6 @@ from more_itertools import unique_everseen, flatten
 
 
 class DashTransformer(dash.Dash):
-
     def __init__(self, *args, transforms, **kwargs):
         super().__init__(*args, **kwargs)
         self.callbacks = []
@@ -36,7 +36,7 @@ class DashTransformer(dash.Dash):
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         # Parse Output/Input/State (could be made simpler by enforcing input structure)
-        keys = ['output', 'inputs', 'state']
+        keys = ["output", "inputs", "state"]
         args = list(args) + list(flatten([_extract_list_from_kwargs(kwargs, key) for key in keys]))
         callback = {arg_type: [] for arg_type in self.arg_types}
         arg_order = []
@@ -50,7 +50,12 @@ class DashTransformer(dash.Dash):
                         if not multi_output and isinstance(element, Output):
                             component_id = element.component_id
                             if isinstance(component_id, dict):
-                                multi_output = any([component_id[k] in [dd.ALLSMALLER, dd.ALL] for k in component_id])
+                                multi_output = any(
+                                    [
+                                        component_id[k] in [dd.ALLSMALLER, dd.ALL]
+                                        for k in component_id
+                                    ]
+                                )
                         callback[key].append(element)
                         arg_order.append(element)
         if not multi_output:
@@ -81,7 +86,9 @@ class DashTransformer(dash.Dash):
         callbacks = list(self._resolve_callbacks())
         for callback in callbacks:
             outputs = callback[Output][0] if len(callback[Output]) == 1 else callback[Output]
-            super().callback(outputs, callback[Input], callback[State], **callback["kwargs"])(callback["f"])
+            super().callback(outputs, callback[Input], callback[State], **callback["kwargs"])(
+                callback["f"]
+            )
         # Proceed as normally.
         super()._setup_server()
         # Set session secret. Used by some subclasses.
@@ -130,7 +137,6 @@ def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
 
 
 class DashTransform:
-
     def init(self, dt):
         pass
 
@@ -145,6 +151,7 @@ class DashTransform:
 
 # region Trigger transform (the only default transform)
 
+
 class Trigger(Input):
     """
      Like an Input, a trigger can trigger a callback, but it's values it not included in the resulting function call.
@@ -155,7 +162,6 @@ class Trigger(Input):
 
 
 class TriggerTransform(DashTransform):
-
     def apply(self, callbacks):
         for callback in callbacks:
             is_trigger = trigger_filter(callback["sorted_args"])
@@ -191,10 +197,50 @@ def trigger_filter(args):
 
 # region ComposedComponent transform
 
-class ComposedComponentMixin:
+class ComposedComponentMixin(Component):
     """Mixin to add composability to a given Component (e.g. to an html.Div).
 
+    The composed component declares:
+    - its own properties to keep its own state (modelled as dcc.Store subcomponents).
+    - its aliased properties that are linked to a property of one of its subcomponents
+    - its layout() that returns a 'children' structure with subcomponents having ids that will be mangled (to avoid clash)
+    - its declare_callbacks() that register callbacks to orchestrate its subcomponents
+
+    The simplest form of a composed component would be:
+    - id: simple-component
+      - children:
+        - id: my-subcomponent  -> another dash component
+        - id: my-state  -> dcc.Store
+      - properties:
+        - own property      ==> ("self", my-state)  -> (my-state, "data")
+          (declared as _properties = ["my-state"])
+        - aliased property  ==> ("self", my-alias)  -> (my-subcomponent, "value")
+          (declared as _aliases = {"my-alias": (id, property) ])
+
+
+    This requires the following rewrites regarding components ids (mangling):
+    - my-subcomponent => {"parent_id": simple-component, "type": "unique-class-type", "child_id": my-subcomponent }
+    - my-state        => {"parent_id": simple-component, "type": "unique-class-type", "child_id": my-state }
+
+    This requires the following rewrites regarding callbacks (handle mangling + alias + own properties):
+    internal callbacks: replace "self" by a generic MATCH
+    - ("self", my-state)  -> ({"parent_id": MATCH, "type": "unique-class-type", "child_id": my-state }, "data")
+    - ("self", my-alias)  -> ({"parent_id": MATCH, "type": "unique-class-type", "child_id": my-subcomponent }, "value")
+    all non internal callbacks:
+    - (simple-component, my-state)  -> ({"parent_id": simple-component, "type": "unique-class-type", "child_id": my-state }, "data")
+    - (simple-component, my-alias)  -> ({"parent_id": simple-component, "type": "unique-class-type", "child_id": my-subcomponent }, "value")
+
+    When the id of a component/sub-component is not a string but a dict, we should prepend to the keys of the dict the
+    "parent_" or "child_" prefix. For the {"parent_id": MATCH}, it should be extended to {"parent_key1": MATCH, "parent_key2": MATCH, ...}
+
+    Example of a more complex form of a composed component with non string ids would be
+    - id: {"index": "composedcomponent1"}
+      - id: {"index": "my-subcomposedcomponent1"}
+      - id: {"index": "my-subcomposedcomponent2"}
+      - id: {"index": "my-state"}
+
     """
+
     # list of property names to be created to store the state of this component
     _properties = Component.UNDEFINED
     # dict of aliases (property name -> component_id.component_property)
@@ -202,6 +248,13 @@ class ComposedComponentMixin:
     _aliases = Component.UNDEFINED
     # string with the type of the composed component (used to mangle the id of the subcomponents
     _composed_type = Component.UNDEFINED
+
+    def _mangle_component_property(self, child_id, parent_match=None):
+        return ComposedComponentTransform._mangle_id(
+            composed_type=self._composed_type,
+            parent_id=self.id,
+            child_id=child_id,
+            parent_match=parent_match)
 
     def __init__(self, id, **kwargs):
         # handle _properties
@@ -213,27 +266,29 @@ class ComposedComponentMixin:
             self._aliases = {}
 
         if not isinstance(self._composed_type, str):
-            raise ValueError(f"The '_composed_type' of {self} should be a string, not {self._composed_type}")
+            raise ValueError(
+                f"The '_composed_type' of {self} should be a string, not {self._composed_type}"
+            )
 
         # create Store components for component properties (mangle name to avoid id conflicts)
         prop_values = {k: kwargs.pop(k, None) for k in self._properties}
         self._states = [dcc.Store(id=k, data=v) for k, v in prop_values.items()]
+        alias_values = {k: kwargs.pop(k, None) for k in self._aliases}
 
-        # get & normalise layout
-        layout = self.layout(**prop_values)
+        # get layout by passing the initial values given for own properties and aliases
+        layout = self.layout(**prop_values, **alias_values)
+        # normalise the layout to list
         if not isinstance(layout, list):
             layout = [layout]
 
-        # create component by combining layout and hidden states
+        # create component by combining given layout and added component states
         super().__init__(id=id, children=layout + self._states, **kwargs)
 
-        # mangle ids of components to avoid clash and allow MATCHing
+        # mangle ids of subcomponents to avoid clash and allow MATCHing
         for comp_with_id in self._traverse_ids():
-            comp_with_id.id = dict(component_type=self._composed_type,
-                                   component_parent_id=id,
-                                   subcomponent_id=comp_with_id.id)
+            comp_with_id.id = self._mangle_component_property(comp_with_id.id)
 
-    def layout(self, info, size):
+    def layout(self, **kwargs):
         """Return a layout that will be assigned to the 'children' property of the composed component."""
         raise NotImplementedError
 
@@ -245,79 +300,131 @@ class ComposedComponentMixin:
 
 class ComposedComponentTransform(DashTransform):
     """Rewrite callback dependencies for composed components"""
+    TYPE_NAME = "composed_type"
+
+    @classmethod
+    def _prefix_id(cls, id, prefix):
+        if isinstance(id, str):
+            id = dict(id=id)
+        return {f"{prefix}_{k}": v for k, v in id.items()}
+
+    @classmethod
+    def _mangle_id(cls, parent_id, child_id, composed_type, parent_match=None):
+        """Return a mangled id with dict structure:
+        type -> composed_type
+        parent_id (if str) -> {"parent_id": parent_id} if not parent_match else {"parent_id": parent_match}
+        parent_id (if dict) -> {"parent_key1": parent_value1, "parent_key2": parent_value2, } if not parent_match
+                               else {"parent_key1": parent_match, "parent_key2": parent_match, }
+        and same for child_id (except no logic for parent_match)
+        """
+
+        if parent_match:
+            return {cls.TYPE_NAME: composed_type, **{k: parent_match for k in cls._prefix_id(parent_id, "parent")},
+                    **cls._prefix_id(child_id, "child")}
+        else:
+            return {cls.TYPE_NAME: composed_type, **cls._prefix_id(parent_id, "parent"),
+                    **cls._prefix_id(child_id, "child")}
 
     def __init__(self, app):
+        # keep reference to the dash app
         self._app = app
 
-    def apply(self, callbacks):
-        """add callbacks from composed elements"""
-        components_with_ids = list(self._app.layout._traverse_ids())
-
         # store __class__ of composed components already declared
-        callbacks_declared = set()
-        # for each component of the layout with an id (a ComposedComponent should have an id)
-        for comp in components_with_ids:
-            if isinstance(comp, ComposedComponentMixin) and comp.__class__ not in callbacks_declared:
+        self._callbacks_declared = set()
+        # create lock to manipulate self._callbacks_declared
+        self._callbacks_declared_lock = threading.Lock()
+
+    def _process_composedcomponent_internal_callbacks(self, composed_components):
+        callbacks = self._app.callbacks
+
+        # for each composed component, register the callbacks and postprocess their args
+        for comp in composed_components:
+            assert isinstance(comp, ComposedComponentMixin)
+
+            with self._callbacks_declared_lock:
+                # check if callbacks already declared (if so, skip the component)
+                if comp.__class__ in self._callbacks_declared:
+                    continue
+
                 # mark the type as being already declared
-                callbacks_declared.add(comp.__class__)
+                self._callbacks_declared.add(comp.__class__)
 
-                # store the length of the callbacks list to be able to detect afterwards which callbacks have been added
-                ncallbacks = len(callbacks)
-                # call the ComposedComponent `declare_callbacks` that will add to the app its own callbacks
-                comp.declare_callbacks(self._app)
+            # store the length of the callbacks list to be able to detect afterwards which callbacks have been added
+            ncallbacks = len(callbacks)
 
-                # process each new callback to mangle the arguments and transform 'self'
-                new_callbacks = callbacks[ncallbacks:]
-                for callback in new_callbacks:
-                    for prop in callback["sorted_args"]:
-                        if prop.component_id == "self" and prop.component_property not in comp._aliases:
+            # call the ComposedComponent `declare_callbacks` that will add to the app its own callbacks
+            comp.declare_callbacks(self._app)
+
+            # process each new callback (registered by the ComposedComponentMixin)
+            # to mangle the arguments referring to internal components and transform 'self' references
+            new_callbacks = callbacks[ncallbacks:]
+            for callback in new_callbacks:
+                for prop in callback["sorted_args"]:
+                    if prop.component_id == "self":
+                        if prop.component_property in comp._properties:
                             # manage self new properties
-                            prop.component_id = dict(component_type=comp._composed_type,
-                                                     component_parent_id=dd.MATCH,
-                                                     subcomponent_id=prop.component_property)
+                            prop.component_id = comp._mangle_component_property(child_id=prop.component_property,
+                                                                                parent_match=dd.MATCH)
                             prop.component_property = "data"
-                        elif prop.component_id == "self" and prop.component_property in comp._aliases:
+                        else:
                             # manage aliases
                             _id, _prop = comp._aliases[prop.component_property]
-                            prop.component_id = dict(component_type=comp._composed_type,
-                                                     component_parent_id=dd.MATCH,
-                                                     subcomponent_id=_id)
+                            prop.component_id = comp._mangle_component_property(child_id=_id,
+                                                                                parent_match=dd.MATCH)
                             prop.component_property = _prop
-                        else:
-                            # manage mangling of subcomponents
-                            prop.component_id = dict(component_type=comp._composed_type,
-                                                     component_parent_id=dd.MATCH,
-                                                     subcomponent_id=prop.component_id)
+                    else:
+                        # manage mangling of subcomponents
+                        prop.component_id = comp._mangle_component_property(child_id=prop.component_id,
+                                                                            parent_match=dd.MATCH)
+
+    def apply(self, callbacks):
+        # assign the dash app to the flask server to be able to retrieve the dash app from a current_app
+        # self._app.server.dash_app = self._app
+
+        """add callbacks from composed elements"""
+
+        composed_components_with_ids = [comp for comp in self._app.layout._traverse_ids() if
+                                        isinstance(comp, ComposedComponentMixin)]
+
+        self._process_composedcomponent_internal_callbacks(
+            [comp for comp in composed_components_with_ids]
+        )
 
         # rewrite all arguments of callbacks that refers to properties of ComposedComponent
-
-        # get component that need translation to data store
-        id2comp = {(comp.id["component_parent_id"], comp.id["subcomponent_id"]): comp for comp in
-                   components_with_ids if isinstance(comp.id, dict) and "subcomponent_id" in comp.id}
-        # get aliases
-        alias = {(comp.id, prop): (dict(component_type=comp._composed_type,
-                                        component_parent_id=comp.id,
-                                        subcomponent_id=subid), subprop) for comp in components_with_ids for
-                 prop, (subid, subprop) in getattr(comp, "_aliases", {}).items()}
+        map_dependency_original2translated = [
+                                                 # handle own properties
+                                                 (dd.DashDependency(comp.id, own_prop),
+                                                  lambda dependency, child_id=own_prop, type=comp._composed_type: (
+                                                      ComposedComponentTransform._mangle_id(
+                                                          parent_id=dependency.component_id,
+                                                          child_id=child_id,
+                                                          composed_type=type),
+                                                      "data"))
+                                                 for comp in composed_components_with_ids
+                                                 for own_prop in comp._properties
+                                             ] + [
+                                                 # handle aliased properties
+                                                 (dd.DashDependency(comp.id, alias_prop),
+                                                  lambda dependency, child_id=subid, type=comp._composed_type,
+                                                         subprop=subprop: (
+                                                      ComposedComponentTransform._mangle_id(
+                                                          parent_id=dependency.component_id,
+                                                          child_id=child_id,
+                                                          composed_type=type),
+                                                      subprop))
+                                                 for comp in composed_components_with_ids
+                                                 for alias_prop, (subid, subprop) in comp._aliases.items()
+                                             ]
 
         # convert properties linked to data stores
         for callback in callbacks:
             for prop in callback["sorted_args"]:
-                if isinstance(prop.component_id, dict):
-                    # composed property, do not transform
-                    # TODO: handle cases where the ComposedComponent property is a dict
-                    continue
-
-                # transform composed component own properties
-                proxy_prop_via_store = id2comp.get((prop.component_id, prop.component_property))
-                if proxy_prop_via_store is not None:
-                    prop.component_id = proxy_prop_via_store.id
-                    prop.component_property = "data"
-                else:
-                    # transform aliases
-                    proxy_prop_via_alias = alias.get((prop.component_id, prop.component_property))
-                    if proxy_prop_via_alias is not None:
-                        prop.component_id,prop.component_property = proxy_prop_via_alias
+                # look if prop matches a "to translate" property
+                for (prop_original, prop_translated) in map_dependency_original2translated:
+                    if prop_original == prop:
+                        # if match, translate the property
+                        prop.component_id, prop.component_property = prop_translated(prop)
+                        break
 
         return callbacks
 
@@ -327,8 +434,8 @@ class ComposedComponentTransform(DashTransform):
 
 # region Group transform
 
-class GroupTransform(DashTransform):
 
+class GroupTransform(DashTransform):
     def apply(self, callbacks):
         groups = {}
         # Figure out which callbacks to group together.
@@ -365,11 +472,11 @@ def _combine_callbacks(callbacks):
 
     # TODO: There might be a scope issue here
     def wrapper(*args):
-        local_inputs = list(args)[:len(inputs)]
+        local_inputs = list(args)[: len(inputs)]
         local_states = list(args)[len(inputs):]
         if len(dash.callback_context.triggered) == 0:
             raise PreventUpdate
-        prop_id = dash.callback_context.triggered[0]['prop_id']
+        prop_id = dash.callback_context.triggered[0]["prop_id"]
         output_values = [dash.no_update] * len(outputs)
         for i, entry in enumerate(input_prop_lists):
             # Check if the trigger is an input of the callback.
@@ -380,7 +487,9 @@ def _combine_callbacks(callbacks):
                 inputs_i = [local_inputs[j] for j in input_mappings[i]]
                 states_i = [local_states[j] for j in state_mappings[i]]
                 outputs_i = callbacks[i]["f"](*inputs_i, *states_i)
-                if not callbacks[i]["multi_output"]:  # len(callbacks[i][Output]) == 1:  TODO: Is this right?
+                if not callbacks[i][
+                    "multi_output"
+                ]:  # len(callbacks[i][Output]) == 1:  TODO: Is this right?
                     outputs_i = [outputs_i]
                 for j, item in enumerate(outputs_i):
                     output_values[output_mappings[i][j]] = outputs_i[j]
@@ -390,9 +499,18 @@ def _combine_callbacks(callbacks):
         if all([item == dash.no_update for item in output_values]):
             raise PreventUpdate
         # Return the combined output.
-        return output_values if multi_output else output_values[0]  # TODO: Check for multi output here?
+        return (
+            output_values if multi_output else output_values[0]
+        )  # TODO: Check for multi output here?
 
-    return {Output: outputs, Input: inputs, "f": wrapper, State: states, "kwargs": kwargs, "multi_output": multi_output}
+    return {
+        Output: outputs,
+        Input: inputs,
+        "f": wrapper,
+        State: states,
+        "kwargs": kwargs,
+        "multi_output": multi_output,
+    }
 
 
 def _prep_props(callbacks, key):
@@ -409,6 +527,7 @@ def _prep_props(callbacks, key):
 # endregion
 
 # region Server side output transform
+
 
 class Output(dd.Output):
     """
@@ -428,7 +547,6 @@ class ServersideOutput(Output):
 
 
 class ServersideOutputTransform(DashTransform):
-
     def __init__(self, backend=None, session_check=True):
         self.backend = backend if backend is not None else FileSystemStore()
         self.session_check = session_check
@@ -455,7 +573,9 @@ class ServersideOutputTransform(DashTransform):
                 if not isinstance(output, ServersideOutput) and not memoize:
                     continue
                 output.backend = output.backend if output.backend is not None else self.backend
-                output.session_check = output.session_check if output.session_check is not None else self.session_check
+                output.session_check = (
+                    output.session_check if output.session_check is not None else self.session_check
+                )
             # Keep track of server side callbacks.
             if serverside or memoize:
                 serverside_callbacks.append(callback)
@@ -524,8 +644,12 @@ def _pack_outputs(callback):
                         break
                 # If not update is needed, just return the ids (or values, if not serverside output).
                 if not update_needed:
-                    results = [uid if isinstance(callback[Output][i], ServersideOutput) else
-                               callback[Output][i].backend.get(uid) for i, uid in enumerate(unique_ids)]
+                    results = [
+                        uid
+                        if isinstance(callback[Output][i], ServersideOutput)
+                        else callback[Output][i].backend.get(uid)
+                        for i, uid in enumerate(unique_ids)
+                    ]
                     return results if multi_output else results[0]
             # Do the update.
             data = f(*args)
@@ -558,8 +682,8 @@ def _get_cache_id(func, output, args, session_check=None):
 
 # Interface definition for server stores.
 
-class ServerStore:
 
+class ServerStore:
     def get(self, key, ignore_expired=False):
         raise NotImplementedError()
 
@@ -572,8 +696,8 @@ class ServerStore:
 
 # Place store implementations here.
 
-class FileSystemStore(FileSystemCache):
 
+class FileSystemStore(FileSystemCache):
     def __init__(self, cache_dir="file_system_store", **kwargs):
         super().__init__(cache_dir, **kwargs)
 
@@ -594,8 +718,8 @@ class FileSystemStore(FileSystemCache):
 
 # region No output transform
 
-class NoOutputTransform(DashTransform):
 
+class NoOutputTransform(DashTransform):
     def __init__(self):
         self.initialized = False
         self.hidden_divs = []
@@ -621,11 +745,21 @@ class NoOutputTransform(DashTransform):
 
 # region Transformer implementations
 
+
 class Dash(DashTransformer):
     def __init__(self, *args, output_defaults=None, **kwargs):
-        output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
-        transforms = [TriggerTransform(), ComposedComponentTransform(app=self), NoOutputTransform(), GroupTransform(),
-                      ServersideOutputTransform(**output_defaults)]
+        output_defaults = (
+            dict(backend=None, session_check=True) if output_defaults is None else output_defaults
+        )
+
+        transforms = [
+            TriggerTransform(),
+            ComposedComponentTransform(app=self),
+            NoOutputTransform(),
+            GroupTransform(),
+            ServersideOutputTransform(**output_defaults),
+        ]
         super().__init__(*args, transforms=transforms, **kwargs)
+        self.server.dash_app = self
 
 # endregion
