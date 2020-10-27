@@ -256,7 +256,7 @@ class ComposedComponentMixin(Component):
             child_id=child_id,
             parent_match=parent_match)
 
-    def __init__(self, id, **kwargs):
+    def __init__(self, *, id, **kwargs):
         # handle _properties
         if self._properties is Component.UNDEFINED:
             self._properties = []
@@ -292,9 +292,11 @@ class ComposedComponentMixin(Component):
         """Return a layout that will be assigned to the 'children' property of the composed component."""
         raise NotImplementedError
 
-    def declare_callbacks(self, app):
+    @classmethod
+    def declare_callbacks(cls, app):
         """Declare the callbacks on the component. Use 'self' as property_id to refer
-        to the component properties."""
+        to the component properties.
+        """
         raise NotImplementedError
 
 
@@ -305,8 +307,8 @@ class ComposedComponentTransform(DashTransform):
     @classmethod
     def _prefix_id(cls, id, prefix):
         if isinstance(id, str):
-            id = dict(id=id)
-        return {f"{prefix}_{k}": v for k, v in id.items()}
+            return {f"{prefix}_id": id}
+        return {f"{prefix}_id_{k}": v for k, v in id.items()}
 
     @classmethod
     def _mangle_id(cls, parent_id, child_id, composed_type, parent_match=None):
@@ -329,6 +331,9 @@ class ComposedComponentTransform(DashTransform):
         # keep reference to the dash app
         self._app = app
 
+        # list of explicitly registered composed components
+        self._explicit_composed_components = []
+
         # store __class__ of composed components already declared
         self._callbacks_declared = set()
         # create lock to manipulate self._callbacks_declared
@@ -342,12 +347,13 @@ class ComposedComponentTransform(DashTransform):
             assert isinstance(comp, ComposedComponentMixin)
 
             with self._callbacks_declared_lock:
-                # check if callbacks already declared (if so, skip the component)
-                if comp.__class__ in self._callbacks_declared:
+                # check if callbacks already declared with the given compo id structure (if so, skip the component)
+                key = (comp.__class__, tuple(comp.id) if isinstance(comp.id, dict) else "string")
+                if key in self._callbacks_declared:
                     continue
 
                 # mark the type as being already declared
-                self._callbacks_declared.add(comp.__class__)
+                self._callbacks_declared.add(key)
 
             # store the length of the callbacks list to be able to detect afterwards which callbacks have been added
             ncallbacks = len(callbacks)
@@ -384,11 +390,9 @@ class ComposedComponentTransform(DashTransform):
         """add callbacks from composed elements"""
 
         composed_components_with_ids = [comp for comp in self._app.layout._traverse_ids() if
-                                        isinstance(comp, ComposedComponentMixin)]
+                                        isinstance(comp, ComposedComponentMixin)] + self._explicit_composed_components
 
-        self._process_composedcomponent_internal_callbacks(
-            [comp for comp in composed_components_with_ids]
-        )
+        self._process_composedcomponent_internal_callbacks(composed_components_with_ids)
 
         # rewrite all arguments of callbacks that refers to properties of ComposedComponent
         map_dependency_original2translated = [
@@ -427,6 +431,13 @@ class ComposedComponentTransform(DashTransform):
                         break
 
         return callbacks
+
+    def register_composed_component(self, composed_component_class):
+        if isinstance(self._explicit_composed_components, ComposedComponentMixin):
+            # component is an instance, register the class
+            composed_component_class = composed_component_class.__class__
+
+        self._explicit_composed_components.append(composed_component_class)
 
 
 # endregion
@@ -752,14 +763,27 @@ class Dash(DashTransformer):
             dict(backend=None, session_check=True) if output_defaults is None else output_defaults
         )
 
+        self._composed_component_transform = ComposedComponentTransform(app=self)
+
         transforms = [
             TriggerTransform(),
-            ComposedComponentTransform(app=self),
+            self._composed_component_transform,
             NoOutputTransform(),
             GroupTransform(),
             ServersideOutputTransform(**output_defaults),
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
         self.server.dash_app = self
+
+    def register_composed_component(self, composed_component):
+        """Use this to explicitly register a specific instance of a ComposedComponentMixin with its id having
+        the proper structure (a string or a dict with specific string keys).
+
+        remark: the id structure is important """
+        if not isinstance(composed_component, ComposedComponentMixin):
+            raise ValueError(f"The 'composed_component' should be an instance of a ComposedComponent class "
+                             f"with a proper id structure")
+
+        self._composed_component_transform.register_composed_component(composed_component)
 
 # endregion
