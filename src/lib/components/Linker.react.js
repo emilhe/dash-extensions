@@ -26,15 +26,36 @@ export default class Linker extends Component {
             // Loop link elements.
             for (let j = 0; j < link.length; j++) {
                 const element = link[j];
-                // Loop children.
-                for (let k = 0; k < this.props.children.length; k++) {
-                    const child = this.props.children[k];
-                    const child_props = child.props._dashprivate_layout.props;
-                    // Check if child matches.
-                    if (child_props.id === element.id) {
-                        apply(i, this.linkValues, j, element, k, child, child_props);
-                    }
-                }
+                this._loop_children(this.props.children,
+                    (child, child_props) => {
+                        if (child_props.id === element.id) {
+                            apply(i, this.linkValues, element, child, child_props)
+                        }
+                    })
+            }
+        }
+    }
+
+    _loop_children(children, apply) {
+        // If there are no children, stop the recursion.
+        if (!children || typeof children !== "object"){
+            return
+        }
+        // If only a single child, convert to list.
+        const children_list = "length" in children ? children : [children]
+        // Loop the children.
+        for (let k = 0; k < children_list.length; k++) {
+            const child = children_list[k];
+            // If the children has not props, move to the next one.
+            if(!("props" in child)){
+                continue
+            }
+            // Do the operation.
+            const child_props = child.props._dashprivate_layout? child.props._dashprivate_layout.props : child.props;
+            apply(child, child_props)
+            // If the child has children, do recursion.
+            if("children" in child_props){
+                this._loop_children(child_props.children, apply)
             }
         }
     }
@@ -42,17 +63,17 @@ export default class Linker extends Component {
     render() {
         const oldLinkValues = this.linkValues.slice();
 
-        function getValue(i, linkValues, j, element, k, child, child_props) {
+        function getValue(i, linkValues, element, child, child_props) {
             if (element.prop in child_props && oldLinkValues[i] !== child_props[element.prop]) {
                 linkValues[i] = child_props[element.prop];
             }
         }
 
-        function setValue(i, linkValues, j, element, k, child, child_props) {
+        function setValue(i, linkValues, element, child, child_props) {
             const currentValue = child_props[element.prop];
             if (linkValues[i] !== currentValue) {
                 child_props[element.prop] = linkValues[i];
-                child.key = linkValues[i]; // Force update "FORCE_UPDATE";
+                child.key = linkValues[i];
             }
         }
 
