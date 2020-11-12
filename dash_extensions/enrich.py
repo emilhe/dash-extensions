@@ -513,7 +513,7 @@ class Dash(DashTransformer):
         )
 
         # assign _composed_component_transform to ComposedComponentTransform to be able to retrieve it from self
-        from enrich_composed import ComposedComponentTransform
+        from .enrich_composed import ComposedComponentTransform
         self._composed_component_transform = ComposedComponentTransform(app=self)
 
         transforms = [
@@ -527,20 +527,6 @@ class Dash(DashTransformer):
 
         # assign dash_app to Flask server to be able to retrieve it from the current_app
         self.server.dash_app = self
-
-    def register_composed_component(self, composed_component):
-        """Use this to explicitly register a specific instance of a ComposedComponentMixin with its id having
-        the proper structure (a string or a dict with specific string keys).
-
-        remark: the id structure is important """
-        from enrich_composed import ComposedComponentMixin
-        if not isinstance(composed_component, ComposedComponentMixin):
-            raise ValueError(
-                f"The 'composed_component' should be an instance of a ComposedComponent class "
-                f"with a proper id structure"
-            )
-
-        self._composed_component_transform.register_composed_component(composed_component)
 
     def layout_to_yaml(self):
         """Dump layout to a yaml structure"""

@@ -1,91 +1,103 @@
-import inspect
 import logging
 import threading
-from collections import defaultdict
-from copy import deepcopy, copy
+from copy import copy
+from typing import List, Optional, Tuple, Dict, Callable, Union, FrozenSet, TypeVar, Type, Generator
 
 import dash_core_components as dcc
-import yaml
+import dash_html_components as html
 from dash import dependencies as dd
-from dash.development.base_component import Component
+from dash.development.base_component import Component, MutableSequence
 from flask import current_app
 
-from enrich import DashTransform, State, Output
+from dash_extensions.enrich import DashTransform
 
 logger = logging.getLogger("composed_component")
 
 
-# region ComposedComponent transform
+class DependencyUnmatched(Exception):
+    pass
 
 
-def _rewrite_children_ids(composed_component):
-    """Inject into the id of all direct children component, its own ids and prefix with "child_" all the
-    ids of its children"""
-    for child in composed_component.children_composed_component:
-        # save original id for further mapping in declare_callbacks
-        if not hasattr(child, "_original_id"):
-            child._original_id = child.id
-
-        rewritten_id = _wrap_child_id(composed_component.id, child.id)
-
-        logger.info(f"id rewriting from {composed_component} -> {child.id} to {rewritten_id}")
-
-        child.id = rewritten_id
-
-        # recurse for ComposedComponentMixin
-        if isinstance(child, ComposedComponentMixin):
-            _rewrite_children_ids(child)
+class DashIdError(Exception):
+    pass
 
 
-def wrap(parent_id, component):
-    """Wrap a component by rewriting its id according to the parent id"""
-    try:
-        # retrieve composed_component_transform from current_app
-        # (raise error if not in the context of a Flask request)
-        composed_component_transform: ComposedComponentTransform = current_app.dash_app._composed_component_transform
-    except RuntimeError:
-        raise ValueError(f"ComposedComponentMixin.wrap() can only used within a Dash callback.")
-
-    # backup id
-    if not hasattr(component, "_original_id"):
-        component._original_id = component.id
-
-    # wrap id
-    component.id = _wrap_child_id(parent_id=parent_id, child_id=component.id)
-
-    # cascade rewrite of children of component
-    _rewrite_children_ids(component)
-
-    ############## check that current component has its declare_callbacks already defined
-
-    # check declare_callbacks for component have been registered
-    # if there are added dynamically (ie current_app.xxx does not raise a RuntimeError)
-    if not composed_component_transform.is_component_already_registered(
-            composed_component=component
-    ):
-        id_msg = {
-            k: "any" for k, v in component.id.items() if k != composed_component_transform.TYPE_NAME
-        }
-        msg = (
-            f"The component {component} has not yet its callback registered. It is probably "
-            f"because its has been added dynamically.\n"
-            f"You need to add\n"
-            f"cc.register_composed_component({component.__class__.__name__}(id={id_msg}))\n"
-            f"after you Dash app declaration."
-        )
-        raise TypeError(msg)
-
-    return component
+class Alias(dd.DashDependency):
+    pass
 
 
-def _wrap_child_id(parent_id, child_id, match_parent=False):
-    """Wrap a component id with the parent id."""
+TYPE_NAME = "class"
+CHILD_PREFIX = "*"
+
+# represent a wildcard (MATCH, ALL,...)
+WildCard = TypeVar("WildCard")
+# represent the hash of a component_id
+HashComponentId = Union[str, FrozenSet[Tuple[str, Union[str, WildCard]]]]
+
+# represent the dict version of a component id
+LongComponentId = Dict[str, str]
+
+# represent a component id
+ComponentId = Union[str, LongComponentId]
+
+# represent a generic LongComponentId
+GenericComponentId = Dict[str, Union[str, WildCard]]
+
+
+def id_transformer(
+        generic_key: GenericComponentId, component_class: Type[Component]
+) -> Callable[[GenericComponentId], GenericComponentId]:
+    """Return a function that takes an id (as in a DashDependency) for a component_class
+    and resolve it by prepending the scope generic key.
+    """
+
+    def wrapper(id: GenericComponentId) -> GenericComponentId:
+        id = _get_conform_id(component_class, id)
+
+        return _wrap_child_id(generic_key, id)
+
+    return wrapper
+
+
+def id_inheriter(component_class) -> Callable[[ComponentId, ComponentId], ComponentId]:
+    """Return a function that takes a parent_id and a child_id (of the component_class)
+    and create a new fully qualified id. Useful to rewrite the ids of children of a component.
+
+    Convert the child_id to a dict if not yet a dict ({"id":child_id})
+    If the component_class is ComposedComponentMixin, then add the TYPE_NAME=component_class to the child_id.
+    Combine the parent_id and the child_id with _wrap_child_id
+
+    """
+
+    def wrapper(parent_id, child_id):
+        child_id = _get_conform_id(component_class, child_id)
+
+        return _wrap_child_id(parent_id, child_id)
+
+    return wrapper
+
+
+def _hash_id(component_id: Union[ComponentId, GenericComponentId]) -> HashComponentId:
+    return frozenset(_make_id_generic(component_id).items()) if isinstance(component_id, dict) else component_id
+
+
+def _unhash_id(component_id: HashComponentId) -> Union[ComponentId, GenericComponentId]:
+    return dict(component_id) if isinstance(component_id, frozenset) else component_id
+
+
+def _wrap_child_id(
+        parent_id: GenericComponentId, child_id: GenericComponentId, match_parent=False
+) -> GenericComponentId:
+    """Wrap a component id with the parent id, making the parent generic if match_parent=True."""
+    # if a parent_id is the root component, it has a parent_id == {}
+    # and does not need to wrap the id of its children, so return child_id unchanged
+    if parent_id == {}:
+        return child_id
+
     if isinstance(child_id, str):
         child_id = dict(id=child_id)
 
-    CHILD_PREFIX = "child_"
-
-    level_child = max(k.count(CHILD_PREFIX) for k in parent_id) + 1
+    level_child = (max(k.count(CHILD_PREFIX) for k in parent_id) if parent_id else -1) + 1
 
     return {
         **{f"{CHILD_PREFIX * level_child}{k}": v for k, v in child_id.items()},
@@ -96,17 +108,107 @@ def _wrap_child_id(parent_id, child_id, match_parent=False):
     }
 
 
-def _make_id_generic(id):
+def _get_conform_id(
+        component_class_or_instance: Union[Component, Type[Component]], id: ComponentId = None
+) -> LongComponentId:
+    is_instance = id is None and isinstance(component_class_or_instance, Component)
+    is_class = id is not None and issubclass(component_class_or_instance, Component)
+    if not (is_instance or is_class):
+        raise ValueError(
+            f"You should call with either a composed component class and an id or just a component instance.\n"
+            f"You have called it with _get_conform_id({component_class_or_instance},{repr(id)})"
+        )
+
+    if is_instance:
+        id = component_class_or_instance.id
+    klass = component_class_or_instance if is_class else component_class_or_instance.__class__
+
+    # standardize id to a dict
+    if isinstance(id, str):
+        id = dict(id=id)
+    else:
+        id = copy(id)
+
+    # if klass is a ComposedComponentMixin, add TYPE_NAME
+    if issubclass(klass, ComposedComponentMixin):
+        id[TYPE_NAME] = klass.__qualname__
+
+    return id
+
+
+def _make_id_generic(id: Union[ComponentId, GenericComponentId]) -> GenericComponentId:
     """transform a specific id to a generic one (replacing all non wildcard to MATCH except for TYPE_NAME)"""
     return {
-        k: (
-            dd.MATCH
-            if not k.endswith(ComposedComponentTransform.TYPE_NAME)
-               and not isinstance(v, dd._Wildcard)
-            else v
-        )
+        k: (dd.MATCH if not k.endswith(TYPE_NAME) and not isinstance(v, dd._Wildcard) else v)
         for k, v in id.items()
     }
+
+
+def _find_simple_children_with_ids(
+        component: Component
+) -> Generator[Tuple[ComponentId, Component], None, None]:
+    """yield recursively the children of component.
+    If a ComposedComponentMixin is found, do not recurse into it."""
+    children = getattr(component, "children", [])
+    if not isinstance(children, (tuple, MutableSequence)):
+        children = [children]
+
+    for child in children:
+        # if child has an id, yield it
+        if hasattr(child, "id"):
+            yield child
+        # recurse on standard components (not ComposedComponentMixin)
+        if not isinstance(child, ComposedComponentMixin):
+            yield from _find_simple_children_with_ids(child)
+
+
+# def app_callback_smartifier(scope:"ComponentScope",app_callback):
+#     """Overwrite the standard app.callback by adding the id of the composed component in the State
+#     and providing to the function an extra 'wrap' argument that allow wrapping of new elements with
+#     ids within a callback (dynamic components).
+#
+#     @self.callback(Input(),Output(),...)
+#     def my_callback(...):
+#         ...
+#     ==> no change, equivalent to
+#     @self._app.callback(Input(),Output(),...)
+#     def my_callback(...):
+#         ...
+#
+#
+#     @self.callback(Input(),Output(),...)
+#     def my_callback(wrap, ...):
+#         ...
+#     ==> inject wrapper as variable wrap
+#     @self._app.callback(Input(),Output(),..., State("self", "id"))
+#     def my_callback_wrapper(..., self_id):
+#         return my_callback(wrap=lambda component: self.wrap(self_id,component), ...):
+#     """
+#
+#     """should return new app.callback kind of function that wraps a function f"""
+#     def new_app_callback(*args, **kwargs):
+#         def wrapper(f):
+#             # if first argument of function is named 'wrap', then inject in the call a wrapper with
+#             # lambda elem: class.wrap(self_id, elem)
+#             if next(iter(inspect.signature(f).parameters)) == "wrap":
+#                 # callback start with the magic 'wrap' argument
+#                 # register with an extra State("self","id")
+#                 # a new callback that calls the original callback
+#                 def my_callback_wrapper(**kwargs):
+#                     self_id = kwargs.pop("self_id")
+#                     return f(
+#                         wrap=lambda component, self_id=self_id: wrap(self_id, component), **kwargs
+#                     )
+#
+#                 app_callback(*args, State("self", "id"))(my_callback_wrapper)
+#             else:
+#                 result = app_callback(*args)(f)
+#
+#             return result
+#
+#         return wrapper
+#
+#     return new_app_callback
 
 
 class ComposedComponentMixin(Component):
@@ -155,503 +257,547 @@ class ComposedComponentMixin(Component):
     """
 
     # list of property names to be created to store the state of this component
-    _properties = Component.UNDEFINED
+    _properties: List[str] = []
     # dict of aliases (property name -> component_id.component_property)
     # ie property names that are mapped to properties of internal components
-    _aliases = Component.UNDEFINED
-    # string with the type of the composed component (used to mangle the id of the subcomponents
-    _composed_type = Component.UNDEFINED
+    _aliases: Dict[str, Type[Alias]] = {}
     # original id before mangling to make it pattern matchable
-    _original_id = None
+    _original_id: ComponentId
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id='{self.id}')"
 
     @classmethod
-    def normalize_id(cls, id):
-        if cls._composed_type is Component.UNDEFINED:
+    def _validate_aliases(
+            cls, aliases: Dict[str, Type[Alias]], properties: List[str]
+    ) -> Dict[str, Type[Alias]]:
+        # handle validation and default
+        if not (
+                isinstance(aliases, dict)
+                and all(isinstance(k, str) and isinstance(v, Alias) for k, v in aliases.items())
+        ):
             raise ValueError(
-                f"The '_composed_type' of {cls.__class__} is not specified. "
-                f"Please assign it in your class to a unique string."
+                f"The _aliases of {cls.__qualname__} with id={id} should be a dict {{ alias_prop -> Alias(id, aliased_prop) }}\n"
+                f"Current value of _aliases is {aliases}"
             )
-        if not isinstance(cls._composed_type, str):
+        aliases_with_properties = aliases.copy()
+
+        # check property not defined in both aliases and properties
+        if set(properties).intersection(aliases_with_properties):
             raise ValueError(
-                f"The '_composed_type' of {cls} should be a string, not {cls._composed_type}"
+                f"Error in class {cls.__qualname__} as some owned properties ({properties}) have the same name "
+                f"as some aliased properties ({list(aliases_with_properties)})"
             )
-
-        # convert the id to a dict structure and add the _composed_type
-        if isinstance(id, str):
-            id = dict(id=id)
-        else:
-            assert isinstance(id, dict)
-            assert ComposedComponentTransform.TYPE_NAME not in id
-            id = id.copy()
-        id[ComposedComponentTransform.TYPE_NAME] = cls._composed_type
-
-        return id
-
-    def get_generic_key(self):
-        return (self.__class__, frozenset(_make_id_generic(self.id).items()))
-        return (self.__class__.__qualname__, frozenset(_make_id_generic(self.id).items()))
-
-    def __init__(self, *, id, **kwargs):
-        # handle _properties
-        if self._properties is Component.UNDEFINED:
-            self._properties = []
-
-        # handle _aliases
-        if self._aliases is Component.UNDEFINED:
-            self._aliases = {}
-        else:
-            if not (
-                    isinstance(self._aliases, dict)
-                    and all(
-                isinstance(k, str) and isinstance(v, Alias) for k, v in self._aliases.items()
-            )
-            ):
-                raise ValueError(
-                    f"The _aliases of {self.__class__.__qualname__} with id={id} should be a dict {{ alias_prop -> Alias(id, aliased_prop) }}\n"
-                    f"Current value of _aliases is {self._aliases}"
-                )
-            self._aliases = self._aliases.copy()
-
-        # check property not defined in both _aliases and _properties
-        if set(self._properties).intersection(self._aliases):
-            raise ValueError(
-                f"Some owned properties ({self._properties}) have the same name "
-                f"as some aliased properties ({list(self._aliases)})"
-            )
-
-        # save _original_id to map it to the new id
-        self._original_id = id
-
-        # convert the id to a dict structure and add the _composed_type
-        id = self.normalize_id(id)
-
-        # list all component properties and retrieve default values
-        properties = {k: kwargs.pop(k, None) for k in (self._properties + list(self._aliases))}
-
-        # create Store components for component properties
-        self._states = [dcc.Store(id=k, data=properties[k]) for k in self._properties]
 
         # create own properties as aliases to Store components
         # and insert them at the beginning of a copy of the _aliases dict to be able to use them in the other aliases
-        self._aliases = {
-            **{k: Alias(k, "data") for k in self._properties},
-            **deepcopy(self._aliases),
+        aliases_with_properties = {
+            **{k: Alias(k, "data") for k in properties},
+            **aliases_with_properties,
         }
+        logger.info(
+            f"alias transformation from {aliases} + {properties} to {aliases_with_properties}"
+        )
 
+        return aliases_with_properties
+
+    def __init__(self, *, id, layout_kwargs={}, **kwargs):
+        # backup original id
+        self._original_id = copy(id)
+
+        # handle _properties
+        self._properties = copy(self._properties)
+
+        # handle _aliases
+        self._aliases = self._validate_aliases(aliases=self._aliases, properties=self._properties)
+
+        # list all component properties and retrieve default values
+        properties = {k: kwargs.pop(k, None) for k in list(self._aliases)}
         # get layout by passing the initial values given for own properties and aliases
-        layout = self.layout(**properties)
+        layout = self.layout(**layout_kwargs, **properties)
         # normalise the layout to list to be able to self._states at the end
         if not isinstance(layout, list):
             layout = [layout]
 
         # create component by combining given layout and added component states
-        super().__init__(id=id, children=layout + self._states, **kwargs)
-
-        logger.debug(f"normalisation of id from {self._original_id} to {self.id}")
-
-        # assign parent_composed_component to direct children
-        # and add the direct children to self.children_composed_component
-        self.children_composed_component = []
-        for comp_with_id in self._traverse_ids():
-            # attribute parent_composed_component to children that have not yet the attribute
-            # (ie direct children as others will have the attribute already set by their own parent)
-            if not hasattr(comp_with_id, "parent_composed_component"):
-                comp_with_id.parent_composed_component = self
-                self.children_composed_component.append(comp_with_id)
+        super().__init__(
+            id=id,
+            children=layout + [dcc.Store(id=k, data=properties[k]) for k in self._properties],
+            # **kwargs,
+        )
 
     def layout(self, **kwargs):
-        """Return a layout that will be assigned to the 'children' property of the composed component."""
-        raise NotImplementedError
+        """Return a layout that will be assigned to the 'children' property of the composed component.
 
-    def declare_callbacks(self):
+        Called during __init__
+        """
+        return []
+
+    @classmethod
+    def declare_callbacks(cls):
         """Declare the declare_callbacks on the component. Use 'self' as property_id to refer
         to the component properties.
+
+        Called during callback registration
         """
-        raise NotImplementedError
+        pass
 
-    def callback(self, *args, **kwargs):
-        """Overwrite the standard app.callback by adding the id of the composed component in the State
-        and providing to the function an extra 'wrap' argument that allow wrapping of new elements with
-        ids within a callback (dynamic components).
+    def register_components_explicitly(self):
+        """Return component that may have not been declared in layout (because they are dynamically added
+        in callbacks or conditionally added in layout).
 
-        @self.callback(Input(),Output(),...)
-        def my_callback(...):
-            ...
-        ==> no change, equivalent to
-        @self._app.callback(Input(),Output(),...)
-        def my_callback(...):
-            ...
+        Should return instantiated component with the right id structure.
 
-
-        @self.callback(Input(),Output(),...)
-        def my_callback(wrap, ...):
-            ...
-        ==> inject wrapper as variable wrap
-        @self._app.callback(Input(),Output(),..., State("self", "id"))
-        def my_callback_wrapper(..., self_id):
-            return my_callback(wrap=lambda component: self.wrap(self_id,component), ...):
+        Called before callback registration to complete ComponentScope
         """
+        return []
 
+    @classmethod
+    def callback(cls, *args, **kwargs):
         def wrapper(f):
-            # if first argument of function is named 'wrap', then inject in the call a wrapper with
-            # lambda elem: class.wrap(self_id, elem)
-            if next(iter(inspect.signature(f).parameters)) == "wrap":
-                # callback start with the magic 'wrap' argument
-                # register with an extra State("self","id")
-                # a new callback that calls the original callback
-                def my_callback_wrapper(**kwargs):
-                    self_id = kwargs.pop("self_id")
-                    return f(
-                        wrap=lambda component, self_id=self_id: wrap(self_id, component), **kwargs
-                    )
-
-                self._app.callback(*args, State("self", "id"))(my_callback_wrapper)
-            else:
-                result = self._app.callback(*args)(f)
-
-            return result
+            cls._callbacks.append((args, kwargs, f))
 
         return wrapper
 
+    @classmethod
+    def _register_callbacks(cls, callback_decorator):
+        cls._callbacks = []
+        cls.declare_callbacks()
 
-class DependencyUnmatched(Exception):
-    pass
+        if cls._callbacks and isinstance(cls._callbacks[0], tuple):
+            # case callback declared via cls.callback
+            callbacks = [
+                callback_decorator(*args, **kwargs)(cb) for args, kwargs, cb in cls._callbacks
+            ]
+        else:
+            # case callback declared via app.callback (for RootComponent)
+            callbacks = cls._callbacks
+        return callbacks
 
 
-class Alias(dd.DashDependency):
-    pass
+def get_root_component(layout, callbacks):
+    callbacks = list(callbacks)
+
+    class RootComponent(ComposedComponentMixin, html.Div):
+        """Singleton representing the root component of an app"""
+
+        def layout(self, **kwargs):
+            return layout
+
+        @classmethod
+        def declare_callbacks(cls):
+            cls._callbacks = callbacks
+            return callbacks
+
+    return RootComponent(id="root")
+
+
+class ComponentScope:
+    """An object uniquely identifying a generic scope for a ComposedComponentMixin.
+
+    It has:
+    - a ComposedComponentMixin class (except for root layout)
+    - a generic key
+    - a flat list of ComponentScope
+    - a map between locally scopes ids and a function that convert it to a generic key
+
+    It can:
+    - attach to a ComposedComponentMixin (each CCM should be linked to its Scope) or raise Error if can't do it
+    - register callbacks of its ComposedComponentMixin for the given generic key
+
+
+    It is created by:
+    - giving an app.Layout and recursively create the ComponentScopes
+    """
+
+    _level: int  # 0=root, 1=1 level below root, ...
+    _cc_class = Type[ComposedComponentMixin]
+    _generic_key: GenericComponentId
+    _parent_scope: Optional["ComponentScope"]
+    _children_scopes: Dict[HashComponentId, "ComponentScope"]
+    _children_ids: List[Tuple[ComponentId, "ComponentScope"]]  # [(original_id, scope),...]
+    _map_local_to_generic = Dict[HashComponentId, Callable[[ComponentId], ComponentId]]
+    _map_childid_to_fullid = Dict[HashComponentId, Callable[[ComponentId], ComponentId]]
+    _aliases_resolved = Dict[str, dd.DashDependency]
+
+    # @classmethod
+    # def _get_root_composed_components(cls, layout) -> List["ComposedComponentMixin"]:
+    #     if isinstance(layout, ComposedComponentMixin):
+    #         root_ccs = [layout]
+    #     else:
+    #         root_ccs = [
+    #             comp
+    #             for comp in (_find_simple_children_with_ids(layout))
+    #             if isinstance(comp, ComposedComponentMixin)
+    #         ]
+    #     return root_ccs
+
+    @classmethod
+    def create_from_cc(
+            cls, parent_scope: Optional["ComponentScope"], component: ComposedComponentMixin
+    ) -> "ComponentScope":
+
+        cc_class = component.__class__
+        cc_id = _get_conform_id(component)
+
+        if parent_scope:
+            generic_key = _make_id_generic(_wrap_child_id(parent_scope._generic_key, cc_id))
+            level = parent_scope._level + 1
+        else:
+            generic_key = {}
+            level = 0
+
+        children_ids = []
+        children_scopes = {}
+        map_local_to_generic = {}
+        map_childid_to_fullid = {}
+        aliases_resolved = {}
+
+        # create related scope
+        scope = cls(
+            level,
+            cc_class,
+            generic_key,
+            parent_scope,
+            children_scopes,
+            map_local_to_generic,
+            map_childid_to_fullid,
+            children_ids,
+            aliases_resolved,
+        )
+
+        # look for components to scope
+        components_to_scopify = (
+                list(_find_simple_children_with_ids(component))
+                + component.register_components_explicitly()
+        )
+
+        child_component_id_duplicate_tracker = {}
+
+        # fill in collections of scope
+        for child_component in components_to_scopify:
+            child_component_id = _make_id_generic(child_component.id) if isinstance(child_component.id,dict) else child_component.id
+            hash_child_component_id = _hash_id(child_component.id)
+
+            if hash_child_component_id in child_component_id_duplicate_tracker:
+                if child_component_id_duplicate_tracker[hash_child_component_id] != child_component.__class__:
+                    raise DashIdError(f"Two components have the same id structure (keys={list(child_component.id.keys())})"
+                                      f" yet different classes {child_component_id_duplicate_tracker[hash_child_component_id]} <> {child_component.__class__}.\n"
+                                      f"Change the id structure so that each class has a different one "
+                                      f"(for instance, do not use {{'type': 'my-class', 'index':'my-id'}} but {{'my-class-index':'my-id'}})")
+
+            child_component_id_duplicate_tracker[hash_child_component_id] = child_component.__class__
+
+            # only handle ComposedComponentMixin
+            if not isinstance(child_component, ComposedComponentMixin):
+                children_ids.append((child_component_id, None))
+                continue
+            # create transformer converting the id to the fully resolved id
+            map_local_to_generic[hash_child_component_id] = id_transformer(
+                generic_key=generic_key, component_class=child_component.__class__
+            )
+            map_childid_to_fullid[hash_child_component_id] = id_inheriter(
+                component_class=child_component.__class__
+            )
+
+            # recurse if ComposedComponentMixin
+            if isinstance(child_component, ComposedComponentMixin):
+                # get the child scope
+                child_composed_scope = cls.create_from_cc(
+                    parent_scope=scope, component=child_component
+                )
+
+                # if the child scope is already existing for the parent scope, merge it
+                # otherwise, add it
+                if _hash_id(child_composed_scope._generic_key) in children_scopes:
+                    # there is already a key for such component, merge the new child_composed_scope
+                    # with the existing one
+                    existing_composed_scope = children_scopes[
+                        _hash_id(child_composed_scope._generic_key)
+                    ]
+                    # merge mappings
+                    for map_name in [
+                        "_map_local_to_generic",
+                        "_children_scopes",
+                        "_map_childid_to_fullid",
+                        "_aliases_resolved",
+                    ]:
+                        getattr(existing_composed_scope, map_name).update(
+                            getattr(child_composed_scope, map_name)
+                        )
+                    # merge _children_ids mapping (as a list of (id,scope))
+                    existing_composed_scope._children_ids.extend(
+                        [
+                            elem
+                            for elem in child_composed_scope._children_ids
+                            if elem not in existing_composed_scope._children_ids
+                        ]
+                    )
+                    # link child to existing child
+                    child_composed_scope = existing_composed_scope
+                else:
+                    children_scopes[
+                        _hash_id(child_composed_scope._generic_key)
+                    ] = child_composed_scope
+
+            # add id to list of children ids
+            children_ids.append((child_component_id, child_composed_scope))
+
+        # handle aliases
+        for k, v in component._aliases.items():
+            aliases_resolved[k] = v
+
+        return scope
+
+    def __init__(
+            self,
+            level,
+            cc_class,
+            generic_key,
+            parent_scope,
+            children_scopes,
+            map_local_to_generic,
+            map_childid_to_fullid,
+            children_ids,
+            aliases_resolved,
+    ):
+        assert isinstance(generic_key, dict)
+        assert issubclass(cc_class, ComposedComponentMixin)
+        self._level = level
+        self._cc_class = cc_class
+        self._generic_key = generic_key
+        print("generic_key", generic_key)
+        self._parent_scope = parent_scope
+        self._children_scopes = children_scopes
+        self._map_local_to_generic = map_local_to_generic
+        self._map_childid_to_fullid = map_childid_to_fullid
+        self._children_ids = children_ids
+        self._aliases_resolved = aliases_resolved
+        self.log(f"creating Scope {cc_class.__qualname__}({generic_key})")
+
+    def log(self, msg):
+        logger.info("\t" * self._level + msg)
+
+    def map_local_id(self, component_id: GenericComponentId) -> GenericComponentId:
+        """Map a local id used in a Dependency to a generic id"""
+        self.log(
+            f"mapping {component_id} given {self._children_ids}\n\t\t\t\tand aliases {self._aliases_resolved}"
+        )
+        if component_id == "self":
+            return self._generic_key
+        try:
+            return self._map_local_to_generic[_hash_id(component_id)](component_id)
+        except KeyError:
+            pass
+
+        # not explicit match, check for PATTERN in children_ids
+        _id, _scope = self.map_local_id_to_scope(component_id)
+        if _scope is None:
+            return _wrap_child_id(parent_id=self._generic_key, child_id=component_id)
+        else:
+            return self._map_local_to_generic[_hash_id(_id)](component_id)
+
+    def map_local_id_to_scope(self, component_id: GenericComponentId) -> Optional["ComponentScope"]:
+        for id, scope in self._children_ids:
+            if Alias(id, "dummy") == Alias(component_id, "dummy"):
+                return id, scope
+
+        raise DashIdError(f"Could not find scope related to id '{component_id}'")
+
+    def register_callbacks(self, callback_decorator):
+        """Register callbacks related to the scope and adapt the callbacks for local ids used to resolved ids.
+        Use the callback_decorator to register the callback re the real Dash app.
+        Apply recursively to children ComposedComponentMixin
+        """
+
+        # if not a root non ComposedComponentMixin class
+        assert issubclass(self._cc_class, ComposedComponentMixin)
+        self.log(
+            f"registering callbacks for {self._cc_class.__qualname__} with key = {self._generic_key}"
+        )
+        # create new callbacks for the scope
+        self.callbacks = self._cc_class._register_callbacks(callback_decorator)
+
+        self.log(
+            f"rewriting {len(self.callbacks)} callbacks for {self._cc_class.__qualname__} with key = {self._generic_key}"
+        )
+        # recurse on children scopes
+        for child_scope in self._children_scopes.values():
+            child_scope.register_callbacks(callback_decorator)
+
+        return self.callbacks
+
+    def rewrite_callback_dependencies(self, ):
+
+        # adapt callbacks
+        for cb in self.callbacks:
+            self.log(f"rewriting callback {cb['f']}")
+            for dep in cb["sorted_args"]:
+                # rename local dep.component_id to resolved dep.component_id
+                dep_original = copy(dep)
+                self.resolve_dependency(dep)
+                self.log(f"- rewriting dependency from {dep_original} to {dep}")
+
+        # recurse on children scopes
+        for child_scope in self._children_scopes.values():
+            child_scope.rewrite_callback_dependencies()
+
+    def resolve_dependency(self, dep: dd.DashDependency):
+        if dep.component_id == "self":
+            if dep.component_property in self._aliases_resolved:
+                new_dep = copy(self._aliases_resolved[dep.component_property])
+                new_dep.__class__ = dep.__class__
+                self.resolve_dependency(new_dep)
+            else:
+                new_dep = Alias(self._generic_key, dep.component_property)
+        else:
+            # find the scope related to the id (raise error if not found)
+            _, scope_dep = self.map_local_id_to_scope(dep.component_id)
+            if scope_dep is None:
+                # leaf, add the generic key of the scope
+                new_dep = Alias(
+                    _wrap_child_id(self._generic_key, dep.component_id), dep.component_property
+                )
+            else:
+                new_dep = copy(dep)
+                new_dep.component_id = "self"
+                scope_dep.resolve_dependency(new_dep)
+                if self._level == 0:
+                    # root, bind the id:MATCH to id:component_id
+                    new_dep.component_id.update(id=dep.component_id)
+                else:
+                    # in composed component, bind the ids of the element
+                    new_dep.component_id.update(**self.map_local_id(dep.component_id))
+
+        dep.component_id = copy(new_dep.component_id)
+        dep.component_property = new_dep.component_property
+
+    def adapt_ids(self, component: ComposedComponentMixin):
+        """Adapt ids of component related to scope"""
+
+        self.log(f"replacing ids of children of {component} - level {self._level}")
+        for child_component in _find_simple_children_with_ids(component):
+            _, child_scope = self.map_local_id_to_scope(child_component.id)
+
+            # resolve the child id in function of the parent
+            child_id_conform = (
+                _get_conform_id(child_component) if child_scope else child_component.id
+            )
+            if self._level >= 1:
+                # wrap child id with parent
+                resolved_id = _wrap_child_id(parent_id=component.id, child_id=child_id_conform)
+            elif self._level == 0:
+                # conform to id as first level
+                resolved_id = child_id_conform
+
+            # resolved_id = self.map_child_id(parent_id=component.id, child_id=child_id)
+            self.log(f"id {child_component.id} replaced by {resolved_id}")
+            child_component.id = resolved_id
+
+            # if the component is a ComposedComponentMixin leaf
+            # run recursively after finding the right scope
+            if child_scope:
+                self.log(f"recursing on children of {child_component}")
+                child_scope.adapt_ids(child_component)
+        self.log(f"replacing done for ids of children of {component}")
+
+    # def to_yaml(self):
+    #     def clean_value(v):
+    #         if v is MATCH:
+    #             return "MATCH"
+    #         if isinstance(v, str):
+    #             return v
+    #         return v.__name__
+    #
+    #     return {
+    #         f"{self._cc_class.__name__}({({k: clean_value(v) for k, v in self._generic_key.items()})})": [
+    #             cc.to_yaml() for cc in self._children_scopes.values()
+    #         ]
+    #     }
 
 
 class ComposedComponentTransform(DashTransform):
     """Rewrite callback dependencies for composed components"""
 
-    TYPE_NAME = "composed_type"
-
-    def register_composed_component(self, composed_component_class):
-        if isinstance(self._explicit_composed_components, ComposedComponentMixin):
-            # component is an instance, register the class
-            composed_component_class = composed_component_class.__class__
-
-        self._explicit_composed_components.append(composed_component_class)
-
     def __init__(self, app):
         # keep reference to the Dash app
         self._app = app
 
-        # list of explicitly registered composed components
-        self._explicit_composed_components = []
-
         # store (__class__, generic_key) of composed components already declared
         self._callbacks_declared = set()
-
-        # store (__class__, generic_key) -> callbacks of composed components already declared
-        self._callbacks_declared_list = defaultdict(list)
 
         # create lock to manipulate self._callbacks_declared
         self._callbacks_declared_lock = threading.Lock()
 
-    def is_component_already_registered(
-            self, composed_component: ComposedComponentMixin, mark_as_registered=False
-    ):
-        with self._callbacks_declared_lock:
-            # check if declare_callbacks already declared with the given compo id structure (if so, skip the component)
-            assert isinstance(composed_component.id, dict)
-
-            key = composed_component.get_generic_key()
-            if key in self._callbacks_declared:
-                logger.info(
-                    f"callbacks already declared for {key}"
-                )
-                return True
-
-            if mark_as_registered:
-                logger.info(
-                    f"declaring callbacks for {key}"
-                )
-                # mark the type as being already declared
-                self._callbacks_declared.add(key)
-                return False
-
-        # we should not be here as only call with mark_as_registered=False with dynamic components
-        logger.error(
-            f"no callbacks declared for {composed_component.__class__.__qualname__}.{normalized_id}"
-        )
-        return False
-
-    def get_newly_registered_callbacks(self, composed_component: ComposedComponentMixin):
-        """Return a list of the newly registered declare_callbacks for the given composed_component.
-
-        Return an empty list if the declare_callbacks for the composed_component have already
-        been registered"""
-        # check if the component is already registered and if so skip it
-        # and otherwise mark it as registered
-        if self.is_component_already_registered(composed_component, mark_as_registered=True):
-            return []
-
-        callbacks = self._app.callbacks
-
-        # store the length of the declare_callbacks list to be able to detect afterwards which declare_callbacks have been added
-        n = len(callbacks)
-
-        # call the ComposedComponent `declare_callbacks` that will add to the cc its own declare_callbacks
-        composed_component._app = self._app
-        composed_component.declare_callbacks()
-
-        logger.info(
-            f"{len(callbacks) - n} new callbacks for {composed_component.get_generic_key()}"
-        )
-
-        self._callbacks_declared_list[composed_component.get_generic_key()] = callbacks[n:]
-
-        return callbacks[n:]
-
-    def _specialise_dependency(self, dependency, components):
-        """Take a dependency and a list of component contexts and adapt the dependency to be aligned
-        to one of the component:
-
-        The component context can be:
-        - a component (._original and .id) are used for the adaptation (as component)
-        - a tuple (original dependency, final dependency) for aliases
-
-        If dependency contains Wilcards (ALL, MATCH, ...) they are kept in the transformation.
-        """
-        for child in components:
-            if isinstance(child, Component):
-                if not hasattr(child, "_original_id"):
-                    # skip as component without _original_id
-                    continue
-
-                if dependency == dd.DashDependency(
-                        child._original_id, dependency.component_property
-                ):
-                    # found the children the dependency is referring to
-                    dependency.component_id = new_id = {
-                        **child.id,
-                        **_wrap_child_id(
-                            parent_id=child.parent_composed_component.id,
-                            child_id=dependency.component_id,
-                            match_parent=True,
-                        ),
-                    }
-                    return
-            else:
-                (dep_alias, dep_alias_original, dep_aliased) = child
-                if dep_alias_original == dependency:
-                    dependency.component_id = dep_aliased.component_id
-                    dependency.component_property = dep_aliased.component_property
-                    return
-        else:
-            raise DependencyUnmatched(f"Could not match {dependency} with any of the {components}")
-
-    def _register_callbacks(
-            self, composed_component: ComposedComponentMixin
-    ):
-        # get new declare_callbacks registered for a given comp
-        self.get_newly_registered_callbacks(composed_component)
-
-    def _process_composedcomponent_internal_callbacks(
-            self, key, callbacks
-    ):
-        """For each composed component present in the layout at the start of the application,
-        trigger the callback declaration (once per class of composed component and structure of id)
-        and rewrite the dependencies of the callback (that can only refers to children elements)."""
-
-        logger.info(f"handle internal callbacks for {key}")
-
-        ComposedComponent, composed_component_generic_id_frozen = key
-        composed_component_generic_id = dict(composed_component_generic_id_frozen)
-        # for each composed component, register the declare_callbacks and postprocess their args
-        assert issubclass(ComposedComponent, ComposedComponentMixin)
-
-        # for each internal callback, all ids of internal components should be childified through the GENERIC parent
-        # as well as 'self'
-        for callback in callbacks:
-            logger.debug(f"handling callback {callback['f'].__qualname__} for {composed_component_generic_id}")
-            for dependency in callback["sorted_args"]:
-                dependency_before = copy(dependency)
-                if dependency == Output("self", "children") and ComposedComponent._properties:
-                    raise ValueError(
-                        f"You are using {dependency} of {ComposedComponent} which"
-                        f" has properties {ComposedComponent._properties}.\n"
-                        f"This is not allowed as the properties have been dynamically added"
-                        f" at the end of the {dependency} and you may loose them.\n"
-                        f"Use instead an internal Div.children to do what you want."
-                    )
-                elif dependency.component_id == "self":
-                    # handle the self
-                    dependency.component_id = composed_component_generic_id
-                else:
-                    # handle references to children ids
-                    self._specialise_dependency(
-                        dependency, composed_component.children_composed_component
-                    )
-                logger.debug(f"converted {dependency_before} to {dependency}")
-            print("after", callback)
-
-    def _get_composed_components_with_ids(self, layout):
-        # get all components of the layout that are ComposedComponentMixin
-        # as well as the explicitly declared ComposedComponentMixin
-        composed_components_with_ids = [
-                                           comp for comp in layout._traverse_ids() if
-                                           isinstance(comp, ComposedComponentMixin)
-                                       ] + self._explicit_composed_components
-
-        # add the cc/root layout itself if it is a ComposedComponentMixin
-        if isinstance(layout, ComposedComponentMixin) and layout.id:
-            composed_components_with_ids.append(layout)
-
-        return composed_components_with_ids
-
     def apply(self, callbacks):
-        """Add declare_callbacks from composed elements found in cc.layout or
-        registered explicitly via `register_composed_component`.
-        """
+        logger.info(f"start 'apply' phase with {len(callbacks)} callbacks")
 
-        logging.debug("starting 'apply' phase")
-
-        composed_components_with_ids = self._get_composed_components_with_ids(self._app.layout)
-
-        ## rewrite/adapt ids of children elements
-        # this should also be done when components are added dynamically
-        logging.debug("rewriting ids of composed components")
-        for c in composed_components_with_ids:
-            # start recursive process on ComposedComponentMixins with no parent (ie root elements)
-            if isinstance(c, ComposedComponentMixin) and not hasattr(
-                    c, "parent_composed_component"
-            ):
-                _rewrite_children_ids(c)
-
-        ## declare callbacks from composed components
-        for composed_component in composed_components_with_ids:
-            self._register_callbacks(composed_component)
-
-        # rewrite dependencies of all internal declare_callbacks added by composed components
-        # to resolve them to generic ids
-        for key, callbacks in self._callbacks_declared_list.items():
-            self._process_composedcomponent_internal_callbacks(key, callbacks)
-
-        ## process all declare_callbacks
-        # replace ids
-        self._process_standard_callbacks_replace_ids(self._app.layout, self._app.callbacks)
-        # replace aliases
-        self._process_standard_callbacks_replace_aliases(self._app.layout, self._app.callbacks)
-
-        print(yaml.dump(self._app.callbacks_to_yaml(), sort_keys=False))
-        print(yaml.dump(self._app.layout_to_yaml(), sort_keys=False))
-
+        root_cc = get_root_component(self._app.layout, callbacks)
+        self._app.layout = root_cc
+        root_scope = self._root_scope = ComponentScope.create_from_cc(None, root_cc)
+        root_scope.register_callbacks(callback_decorator=self._app.callback)
+        root_scope.rewrite_callback_dependencies()
+        root_scope.adapt_ids(component=root_cc)
         return callbacks
 
-    def _process_standard_callbacks_replace_aliases(self, layout, callbacks):
-        """Replace aliases to composed components in declare_callbacks."""
+    def find_scope_for_id(self, composed_component_id: LongComponentId) -> ComponentScope:
+        # recursively look for the scope related to the composed_component_id
+        def helper(scope: ComponentScope):
+            # check if some direct children scope has a matching id
+            for hashed_id, child_scope in scope._children_scopes.items():
+                if Alias(composed_component_id, "dummy") == Alias(_unhash_id(hashed_id), "dummy"):
+                    return child_scope
 
-        # get all component with id changed (ie with an _original_id) that are not embedded in another component
-        def unroll_aliases(cc: ComposedComponentMixin):
-            """Get aliases for children composed components + interpret current aliases """
-            result = []
-            assert isinstance(cc, ComposedComponentMixin)
+            # if not, check in all children scopes if there is a match
+            for child_scope in scope._children_scopes.values():
+                try:
+                    return helper(child_scope)
+                except DashIdError:
+                    pass
 
-            for c in cc.children_composed_component:
-                if not isinstance(c, ComposedComponentMixin):
-                    continue
-                children_aliases = unroll_aliases(c)
-                # for (dep_original, dep_final) in children_aliases:
-                #     dep_original.component_id =_wrap_child_id(c.id, dep_original.component_id)
-                #     dep_final.component_id = _wrap_child_id(c.id, dep_final.component_id)
+            raise DashIdError(f"Could not find scope related to id '{composed_component_id}'")
 
-                result.extend(children_aliases)
+        # start with root scope
+        return helper(self._root_scope)
 
-            self_aliases = []
-            for prop, dep in cc._aliases.items():
-                # TODO: see if 'self' should be renamed in process to allow match with previous aliases
-                if dep.component_id == "self":
-                    dep = dd.DashDependency(cc._original_id, dep.component_property)
-                    try:
-                        # try to match against children aliases
-                        self._specialise_dependency(dep, self_aliases)
-                    except DependencyUnmatched:
-                        pass
-                else:
-                    try:
-                        # match against direct children
-                        self._specialise_dependency(dep, cc.children_composed_component)
-                    except DependencyUnmatched:
-                        raise ValueError(
-                            f"Could not resolve alias {cc.__class__.__qualname__}.{prop}.\n"
-                            f"Check that {dep} exists."
-                        )
 
-                alias_resolution = (
-                    # add fully resolve alias dependency
-                    dd.DashDependency(cc.id, prop),
-                    # add local alias dependency
-                    dd.DashDependency(cc._original_id, prop),
-                    # add fully resolved aliased dependency, binded to cc (for MATCH)
-                    dd.DashDependency({**dep.component_id, **cc.id}, dep.component_property),
-                )
-                self_aliases.append(alias_resolution)
-                result.append(alias_resolution)
+def wrap(parent_id: LongComponentId, component: Component):
+    """Wrap a component by rewriting its id according to the parent id. To be used when creating Components within a
+    ComposedComponentMixin callback."""
+    try:
+        # retrieve composed_component_transform from current_app
+        # (raise error if not in the context of a Flask request)
+        composed_component_transform: ComposedComponentTransform = current_app.dash_app._composed_component_transform
+    except RuntimeError:
+        raise ValueError(f"ComposedComponentMixin.wrap() can only used within a Dash callback.")
 
-            return result
+    # backup id
+    if not hasattr(component, "_original_id"):
+        component._original_id = component.id
 
-        map_alias2final = [
-            alias
-            for c in layout._traverse_ids()
-            if (
-                    hasattr(c, "_original_id")  # id changed
-                    and not hasattr(c, "parent_composed_component")  # connected to root layout
-            )
-            for alias in unroll_aliases(c)
-        ]
+    # wrap id
+    component.id = _wrap_child_id(parent_id=parent_id, child_id=_get_conform_id(component))
 
-        for callback in callbacks:
-            for dependency in callback["sorted_args"]:
-                # look if an alias is found
-                for (dep_alias, dep_alias_original, dep_aliased) in map_alias2final:
-                    # for original_id, final in map_alias2final:
-                    if dep_alias == dependency:
-                        dependency.component_id = {
-                            **dep_aliased.component_id,
-                            **dependency.component_id,
-                        }
-                        dependency.component_property = dep_aliased.component_property
-                        break
-                else:
-                    assert "not found"
+    try:
+        if isinstance(component, ComposedComponentMixin):
+            # if the component is a ComposedComponentMixin, we need to rewrite the ids of the internal components
+            # if none can be found (DashIdError), then raise value about the component not being registered
+            component_scope = composed_component_transform.find_scope_for_id(component.id)
 
-    def _process_standard_callbacks_replace_ids(self, layout, callbacks):
-        """Replace original ids with final ids in declare_callbacks."""
+            # cascade rewrite of children of component
+            component_scope.adapt_ids(component)
 
-        # get all component with id changed (ie with an _original_id) that are not embedded in another component
-        map_original2final = [
-            (c._original_id, c)
-            for c in layout._traverse_ids()
-            if (
-                    hasattr(c, "_original_id")  # id changed
-                    and not hasattr(c, "parent_composed_component")  # connected to root layout
-            )
-        ]
+    except DashIdError:
+        id_msg = {
+            k: "any" for k, v in component.id.items() if k != TYPE_NAME
+        }
+        msg = (
+            f"The component {component} has not yet its callback registered. It is probably "
+            f"because its has been added dynamically.\n"
+            f"You need to add\n"
+            f"cc.register_composed_component({component.__class__.__name__}(id={id_msg}))\n"
+            f"after you Dash app declaration."
+        )
+        raise TypeError(msg)
 
-        for callback in callbacks:
-            for dependency in callback["sorted_args"]:
-                # look if dependency id has been rewritten
-                for original_id, final in map_original2final:
-                    if dd.DashDependency(original_id, dependency.component_property) == dependency:
-                        # found mapping
-                        print("---", dependency, original_id, final.id)
-                        new_id = final.id.copy()
-
-                        # overwrite any matchable part of the id
-                        if isinstance(dependency.component_id, str):
-                            new_id.update(id=dependency.component_id)
-                        else:
-                            new_id.update(dependency.component_id)
-
-                        dependency.component_id = new_id
-
-                        break
-                else:
-                    # dependency does not depend on a rewritten id component
-                    print("xxx no need to rewrite", dependency)
-            print(callback)
-
-# endregion
+    return component

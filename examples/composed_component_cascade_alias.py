@@ -4,11 +4,10 @@ import sys
 
 import dash_core_components as dcc
 import dash_html_components as html
-import flask
 from dash.dependencies import State, ALL
 
 from dash_extensions.enrich import Dash, Output, Input
-from enrich_composed import ComposedComponentMixin, Alias, logger
+from dash_extensions.enrich_composed import ComposedComponentMixin, Alias, logger
 
 logger.setLevel(logging.DEBUG)
 logger.propagate = False
@@ -22,29 +21,21 @@ logger.addHandler(handler)
 class A(ComposedComponentMixin, html.Div):
     """Exposes a single alias to its B child."""
 
-    _aliases = {"alias-a": Alias("b", "alias-b"), "alias-c": Alias("c", "alias-c")}
+    _aliases = {"alias-a": Alias("b", "alias-b"), "alias-c": Alias("c", "alias-memory")}
     _composed_type = "a"
 
     def layout(self, **kwargs):
         return [B(id="b"), C(id="c")]
 
-    def declare_callbacks(self):
-        """Declare the declare_callbacks that will handle the update of the size and info properties."""
-        pass
-
 
 class B(ComposedComponentMixin, html.Div):
     """Exposes a single alias to its B child."""
 
-    _aliases = {"alias-b": Alias({"index":"c"}, "alias-c")}
+    _aliases = {"alias-b": Alias({"index": "c"}, "memory")}
     _composed_type = "b"
 
     def layout(self, **kwargs):
-        return [C(id={"index":"c"})]
-
-    def declare_callbacks(self):
-        """Declare the declare_callbacks that will handle the update of the size and info properties."""
-        pass
+        return [C(id={"index": "c"})]
 
 
 class C(ComposedComponentMixin, html.Div):
@@ -52,9 +43,9 @@ class C(ComposedComponentMixin, html.Div):
 
     _properties = ["memory"]
     _aliases = {
-        "alias-c": Alias("self", "memory"),
+        "alias-memory": Alias("self", "memory"),
         "alias-input": Alias("internal", "value"),
-        "alias-of-alias": Alias("self", "alias-c"),
+        "alias-of-alias": Alias("self", "alias-memory"),
     }
     _composed_type = "c"
 
@@ -65,27 +56,19 @@ class C(ComposedComponentMixin, html.Div):
             html.Label(id={"index": "two"}),
         ]
 
-    def declare_callbacks(self):
+    @classmethod
+    def declare_callbacks(cls):
         """Declare the declare_callbacks that will handle the update of the size and info properties."""
 
-        @self.callback(
+        @cls.callback(
             Input("self", "alias-input"),
             State("internal", "children"),
             State({"index": ALL}, "children"),
             Output("self", "memory"),
         )
         def sync_memory(input, children, indexes):
-            print(input, children, indexes)
-            if input=="a":
-                flask.request.environ.get('werkzeug.server.shutdown')()
             return input
 
-        # @self.callback(
-        #     Input("self", "alias-input"),
-        #     Output("self", "children"),
-        # )
-        # def should_raise_error(input):
-        #     return input
 
 
 app = Dash(
@@ -93,6 +76,7 @@ app = Dash(
     title="Composed Component cc - aliases",
     meta_tags=[{"name": "viewport", "content": "width=device-width"}],
 )
+
 
 app.layout = html.Div([A(id="me"), html.Label(id="out")])
 
