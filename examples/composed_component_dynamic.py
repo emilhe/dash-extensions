@@ -11,7 +11,7 @@ from dash import no_update
 from dash.dependencies import State, ALL
 
 from dash_extensions.enrich import Dash, Output, Input
-from dash_extensions.enrich_composed import ComposedComponentMixin, logger, wrap
+from dash_extensions.enrich_composed import ComposedComponentMixin, logger
 
 
 class ButtonToggle(ComposedComponentMixin, html.Button):
@@ -53,19 +53,16 @@ class Flagger(ComposedComponentMixin, html.Div):
     def declare_callbacks(cls):
         @cls.callback(
             Input("new-flag", "value"),
-            State("self", "id"),
             State("flag-div", "children"),
             Output("flag-div", "children"),
         )
-        def add_flag(flag_name, self_id, flags):
+        def add_flag(wrap, flag_name, flags):
             if flag_name:
-                new_button = wrap(self_id, ButtonToggle(id={"type": "flag", "id": flag_name}))
+                new_button = wrap(ButtonToggle(id={"type": "flag", "id": flag_name}))
                 new_label = wrap(
-                    self_id,
                     html.Label(
-                        id={"label-id": flag_name},
-                        children=[f"This is label for {flag_name}"],
-                    ),
+                        id={"label-id": flag_name}, children=[f"This is label for {flag_name}"]
+                    )
                 )
                 return flags + [new_button, new_label]
             return no_update

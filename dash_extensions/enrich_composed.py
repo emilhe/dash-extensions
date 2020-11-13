@@ -1,11 +1,13 @@
+import inspect
 import logging
 import threading
-from copy import copy
+from copy import copy, deepcopy
 from typing import List, Optional, Tuple, Dict, Callable, Union, FrozenSet, TypeVar, Type, Generator
 
 import dash_core_components as dcc
 import dash_html_components as html
 from dash import dependencies as dd
+from dash.dependencies import State
 from dash.development.base_component import Component, MutableSequence
 from flask import current_app
 
@@ -45,7 +47,7 @@ GenericComponentId = Dict[str, Union[str, WildCard]]
 
 
 def id_transformer(
-        generic_key: GenericComponentId, component_class: Type[Component]
+    generic_key: GenericComponentId, component_class: Type[Component]
 ) -> Callable[[GenericComponentId], GenericComponentId]:
     """Return a function that takes an id (as in a DashDependency) for a component_class
     and resolve it by prepending the scope generic key.
@@ -78,7 +80,11 @@ def id_inheriter(component_class) -> Callable[[ComponentId, ComponentId], Compon
 
 
 def _hash_id(component_id: Union[ComponentId, GenericComponentId]) -> HashComponentId:
-    return frozenset(_make_id_generic(component_id).items()) if isinstance(component_id, dict) else component_id
+    return (
+        frozenset(_make_id_generic(component_id).items())
+        if isinstance(component_id, dict)
+        else component_id
+    )
 
 
 def _unhash_id(component_id: HashComponentId) -> Union[ComponentId, GenericComponentId]:
@@ -86,7 +92,7 @@ def _unhash_id(component_id: HashComponentId) -> Union[ComponentId, GenericCompo
 
 
 def _wrap_child_id(
-        parent_id: GenericComponentId, child_id: GenericComponentId, match_parent=False
+    parent_id: GenericComponentId, child_id: GenericComponentId, match_parent=False
 ) -> GenericComponentId:
     """Wrap a component id with the parent id, making the parent generic if match_parent=True."""
     # if a parent_id is the root component, it has a parent_id == {}
@@ -109,7 +115,7 @@ def _wrap_child_id(
 
 
 def _get_conform_id(
-        component_class_or_instance: Union[Component, Type[Component]], id: ComponentId = None
+    component_class_or_instance: Union[Component, Type[Component]], id: ComponentId = None
 ) -> LongComponentId:
     is_instance = id is None and isinstance(component_class_or_instance, Component)
     is_class = id is not None and issubclass(component_class_or_instance, Component)
@@ -145,7 +151,7 @@ def _make_id_generic(id: Union[ComponentId, GenericComponentId]) -> GenericCompo
 
 
 def _find_simple_children_with_ids(
-        component: Component
+    component: Component
 ) -> Generator[Tuple[ComponentId, Component], None, None]:
     """yield recursively the children of component.
     If a ComposedComponentMixin is found, do not recurse into it."""
@@ -160,55 +166,6 @@ def _find_simple_children_with_ids(
         # recurse on standard components (not ComposedComponentMixin)
         if not isinstance(child, ComposedComponentMixin):
             yield from _find_simple_children_with_ids(child)
-
-
-# def app_callback_smartifier(scope:"ComponentScope",app_callback):
-#     """Overwrite the standard app.callback by adding the id of the composed component in the State
-#     and providing to the function an extra 'wrap' argument that allow wrapping of new elements with
-#     ids within a callback (dynamic components).
-#
-#     @self.callback(Input(),Output(),...)
-#     def my_callback(...):
-#         ...
-#     ==> no change, equivalent to
-#     @self._app.callback(Input(),Output(),...)
-#     def my_callback(...):
-#         ...
-#
-#
-#     @self.callback(Input(),Output(),...)
-#     def my_callback(wrap, ...):
-#         ...
-#     ==> inject wrapper as variable wrap
-#     @self._app.callback(Input(),Output(),..., State("self", "id"))
-#     def my_callback_wrapper(..., self_id):
-#         return my_callback(wrap=lambda component: self.wrap(self_id,component), ...):
-#     """
-#
-#     """should return new app.callback kind of function that wraps a function f"""
-#     def new_app_callback(*args, **kwargs):
-#         def wrapper(f):
-#             # if first argument of function is named 'wrap', then inject in the call a wrapper with
-#             # lambda elem: class.wrap(self_id, elem)
-#             if next(iter(inspect.signature(f).parameters)) == "wrap":
-#                 # callback start with the magic 'wrap' argument
-#                 # register with an extra State("self","id")
-#                 # a new callback that calls the original callback
-#                 def my_callback_wrapper(**kwargs):
-#                     self_id = kwargs.pop("self_id")
-#                     return f(
-#                         wrap=lambda component, self_id=self_id: wrap(self_id, component), **kwargs
-#                     )
-#
-#                 app_callback(*args, State("self", "id"))(my_callback_wrapper)
-#             else:
-#                 result = app_callback(*args)(f)
-#
-#             return result
-#
-#         return wrapper
-#
-#     return new_app_callback
 
 
 class ComposedComponentMixin(Component):
@@ -269,12 +226,12 @@ class ComposedComponentMixin(Component):
 
     @classmethod
     def _validate_aliases(
-            cls, aliases: Dict[str, Type[Alias]], properties: List[str]
+        cls, aliases: Dict[str, Type[Alias]], properties: List[str]
     ) -> Dict[str, Type[Alias]]:
         # handle validation and default
         if not (
-                isinstance(aliases, dict)
-                and all(isinstance(k, str) and isinstance(v, Alias) for k, v in aliases.items())
+            isinstance(aliases, dict)
+            and all(isinstance(k, str) and isinstance(v, Alias) for k, v in aliases.items())
         ):
             raise ValueError(
                 f"The _aliases of {cls.__qualname__} with id={id} should be a dict {{ alias_prop -> Alias(id, aliased_prop) }}\n"
@@ -355,7 +312,34 @@ class ComposedComponentMixin(Component):
     @classmethod
     def callback(cls, *args, **kwargs):
         def wrapper(f):
-            cls._callbacks.append((args, kwargs, f))
+            nonlocal args, kwargs
+            # if first argument of f is "wrap" then :
+            # - add a State("self","id") to get the id of the ComposedComponentMixin
+            # - register as callback _f which is _f(*args,**kwargs, self_id) -> f(wrap, *args,**kwargs) with wrap=lambda component:wrap(self_id, component)
+            if next(iter(inspect.signature(f).parameters), "") == "wrap":
+                if "state" in kwargs:
+                    kwargs = deepcopy(kwargs)
+                    kwargs["state"].append(State("self", "id"))
+                else:
+                    args = list(args) + [State("self", "id")]
+
+                def _f(*args, **kwargs):
+                    # retrieve self_id either in the kwargs or as last element of args
+                    self_id = kwargs.pop("self_id", None)
+                    if self_id is None:
+                        *args, self_id = args
+
+                    # create wrapper function
+                    def _wrap(component):
+                        return wrap(self_id, component)
+
+                    # call the original callback with the wrapper
+                    return f(_wrap, *args, **kwargs)
+
+            else:
+                _f = f
+
+            cls._callbacks.append((args, kwargs, _f))
 
         return wrapper
 
@@ -434,7 +418,7 @@ class ComponentScope:
 
     @classmethod
     def create_from_cc(
-            cls, parent_scope: Optional["ComponentScope"], component: ComposedComponentMixin
+        cls, parent_scope: Optional["ComponentScope"], component: ComposedComponentMixin
     ) -> "ComponentScope":
 
         cc_class = component.__class__
@@ -468,25 +452,36 @@ class ComponentScope:
 
         # look for components to scope
         components_to_scopify = (
-                list(_find_simple_children_with_ids(component))
-                + component.register_components_explicitly()
+            list(_find_simple_children_with_ids(component))
+            + component.register_components_explicitly()
         )
 
         child_component_id_duplicate_tracker = {}
 
         # fill in collections of scope
         for child_component in components_to_scopify:
-            child_component_id = _make_id_generic(child_component.id) if isinstance(child_component.id,dict) else child_component.id
+            child_component_id = (
+                _make_id_generic(child_component.id)
+                if isinstance(child_component.id, dict)
+                else child_component.id
+            )
             hash_child_component_id = _hash_id(child_component.id)
 
             if hash_child_component_id in child_component_id_duplicate_tracker:
-                if child_component_id_duplicate_tracker[hash_child_component_id] != child_component.__class__:
-                    raise DashIdError(f"Two components have the same id structure (keys={list(child_component.id.keys())})"
-                                      f" yet different classes {child_component_id_duplicate_tracker[hash_child_component_id]} <> {child_component.__class__}.\n"
-                                      f"Change the id structure so that each class has a different one "
-                                      f"(for instance, do not use {{'type': 'my-class', 'index':'my-id'}} but {{'my-class-index':'my-id'}})")
+                if (
+                    child_component_id_duplicate_tracker[hash_child_component_id]
+                    != child_component.__class__
+                ):
+                    raise DashIdError(
+                        f"Two components have the same id structure (keys={list(child_component.id.keys())})"
+                        f" yet different classes {child_component_id_duplicate_tracker[hash_child_component_id]} <> {child_component.__class__}.\n"
+                        f"Change the id structure so that each class has a different one "
+                        f"(for instance, do not use {{'type': 'my-class', 'index':'my-id'}} but {{'my-class-index':'my-id'}})"
+                    )
 
-            child_component_id_duplicate_tracker[hash_child_component_id] = child_component.__class__
+            child_component_id_duplicate_tracker[
+                hash_child_component_id
+            ] = child_component.__class__
 
             # only handle ComposedComponentMixin
             if not isinstance(child_component, ComposedComponentMixin):
@@ -550,23 +545,22 @@ class ComponentScope:
         return scope
 
     def __init__(
-            self,
-            level,
-            cc_class,
-            generic_key,
-            parent_scope,
-            children_scopes,
-            map_local_to_generic,
-            map_childid_to_fullid,
-            children_ids,
-            aliases_resolved,
+        self,
+        level,
+        cc_class,
+        generic_key,
+        parent_scope,
+        children_scopes,
+        map_local_to_generic,
+        map_childid_to_fullid,
+        children_ids,
+        aliases_resolved,
     ):
         assert isinstance(generic_key, dict)
         assert issubclass(cc_class, ComposedComponentMixin)
         self._level = level
         self._cc_class = cc_class
         self._generic_key = generic_key
-        print("generic_key", generic_key)
         self._parent_scope = parent_scope
         self._children_scopes = children_scopes
         self._map_local_to_generic = map_local_to_generic
@@ -627,7 +621,7 @@ class ComponentScope:
 
         return self.callbacks
 
-    def rewrite_callback_dependencies(self, ):
+    def rewrite_callback_dependencies(self,):
 
         # adapt callbacks
         for cb in self.callbacks:
@@ -762,8 +756,9 @@ class ComposedComponentTransform(DashTransform):
 
 
 def wrap(parent_id: LongComponentId, component: Component):
-    """Wrap a component by rewriting its id according to the parent id. To be used when creating Components within a
-    ComposedComponentMixin callback."""
+    """Wrap a component by rewriting its id according to the parent id (inplace operation), save
+    the original id in component._original_id
+    To be used when creating Components within a ComposedComponentMixin callback."""
     try:
         # retrieve composed_component_transform from current_app
         # (raise error if not in the context of a Flask request)
@@ -788,9 +783,7 @@ def wrap(parent_id: LongComponentId, component: Component):
             component_scope.adapt_ids(component)
 
     except DashIdError:
-        id_msg = {
-            k: "any" for k, v in component.id.items() if k != TYPE_NAME
-        }
+        id_msg = {k: "any" for k, v in component.id.items() if k != TYPE_NAME}
         msg = (
             f"The component {component} has not yet its callback registered. It is probably "
             f"because its has been added dynamically.\n"

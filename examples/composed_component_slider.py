@@ -2,7 +2,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 
-from dash_extensions.enrich import Dash, Output, Input, State
+from dash_extensions.enrich import Dash, Output, Input
 from dash_extensions.enrich_composed import ComposedComponentMixin, Alias
 
 
@@ -31,11 +31,9 @@ class EnhanceSlider(ComposedComponentMixin, html.Div):
         @cls.callback(
             Input("slider", "value"),
             Input("input", "value"),
-            State("slider", "id"),
-            State("input", "id"),
             Output("holder", "children"),
         )
-        def sync_values(slider, input, slider_id, input_id):
+        def sync_values(wrap, slider, input):
             # get the dependency that has triggered the callback
             trigger_id = dash.callback_context.triggered[0]["prop_id"]
 
@@ -47,10 +45,10 @@ class EnhanceSlider(ComposedComponentMixin, html.Div):
                 return dash.no_update
 
             # overwrite the components with new components
-            # reusing the ids of the initial components (as ids have been mangled)
+            # wrap(...) component to allow ids of the components to be properly mangled
             return [
-                dcc.Slider(id=slider_id, min=0, max=100, value=value),
-                dcc.Input(id=input_id, value=value),
+                wrap( dcc.Slider(id="slider", min=0, max=100, value=value)),
+                wrap( dcc.Input(id="input", value=value)),
             ]
 
 
