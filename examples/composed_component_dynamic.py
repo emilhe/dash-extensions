@@ -11,7 +11,7 @@ from dash import no_update
 from dash.dependencies import State, ALL
 
 from dash_extensions.enrich import Dash, Output, Input
-from dash_extensions.enrich_composed import ComposedComponentMixin, logger
+from dash_extensions.enrich_composed import ComposedComponentMixin, logger, ComposedComponent
 
 
 class ButtonToggle(ComposedComponentMixin, html.Button):
@@ -37,7 +37,7 @@ class ButtonToggle(ComposedComponentMixin, html.Button):
             return [f"I'm {state} {btn_id}"]
 
 
-class Flagger(ComposedComponentMixin, html.Div):
+class Flagger(ComposedComponent):
     _properties = ["flags"]
 
     def layout(self, flags):

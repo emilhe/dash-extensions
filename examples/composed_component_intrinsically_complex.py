@@ -11,7 +11,7 @@ import dash_html_components as html
 from dash.dependencies import State, ALL, MATCH
 
 from dash_extensions.enrich import Dash, Output, Input
-from dash_extensions.enrich_composed import ComposedComponentMixin, logger, Alias
+from dash_extensions.enrich_composed import logger, Alias, ComposedComponent
 
 # test all variants of component names and callbacks dependencies
 _ids = ["my-id-simple", {"my-class": "my-class-index"}, {"id": "my-id-structured"}]
@@ -37,7 +37,7 @@ def aliases(text):
     }
 
 
-class A(ComposedComponentMixin, html.Div):
+class A(ComposedComponent):
     _properties = ["my-state"]
     _aliases = aliases("a")
 
@@ -87,7 +87,7 @@ class A(ComposedComponentMixin, html.Div):
             print(args)
 
 
-class B(ComposedComponentMixin, html.Div):
+class B(ComposedComponent):
     _aliases = {"my-value": Alias("self", "children")}
 
     @classmethod

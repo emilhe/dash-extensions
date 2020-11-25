@@ -359,6 +359,11 @@ class ComposedComponentMixin(Component):
         return callbacks
 
 
+class ComposedComponent(ComposedComponentMixin, html.Div):
+    """A base for a ComposedComponentMixin inherited from a Div"""
+    pass
+
+
 def get_root_component(layout, callbacks):
     callbacks = list(callbacks)
 

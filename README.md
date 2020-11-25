@@ -70,11 +70,11 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 
-from dash_extensions.enrich import Dash, Output, Input, State
-from dash_extensions.enrich_composed import ComposedComponentMixin, Alias
+from dash_extensions.enrich import Dash, Output, Input
+from dash_extensions.enrich_composed import ComposedComponent, Alias
 
 
-class EnhanceSlider(ComposedComponentMixin, html.Div):
+class EnhanceSlider(ComposedComponent):
     """Example component enhancing a standard slider with an input field, both being updatable and kept in sync.
 
     Inspired by https://community.plotly.com/t/problem-with-circular-callbacks-slider-changes-input-and-input-changes-slider/39685/2
@@ -146,6 +146,7 @@ app.layout = html.Div(
 def refresh_label(value):
     return f"The value of the enhanced slider is {value}"
 ```
+
 
 
 ## Components

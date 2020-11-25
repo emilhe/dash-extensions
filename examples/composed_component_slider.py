@@ -3,10 +3,10 @@ import dash_core_components as dcc
 import dash_html_components as html
 
 from dash_extensions.enrich import Dash, Output, Input
-from dash_extensions.enrich_composed import ComposedComponentMixin, Alias
+from dash_extensions.enrich_composed import Alias, ComposedComponent
 
 
-class EnhanceSlider(ComposedComponentMixin, html.Div):
+class EnhanceSlider(ComposedComponent):
     """Example component enhancing a standard slider with an input field, both being updatable and kept in sync.
 
     Inspired by https://community.plotly.com/t/problem-with-circular-callbacks-slider-changes-input-and-input-changes-slider/39685/2
@@ -33,7 +33,7 @@ class EnhanceSlider(ComposedComponentMixin, html.Div):
             Input("input", "value"),
             Output("holder", "children"),
         )
-        def sync_values(wrap, slider, input):
+        def sync_values(wrap, slider, input):  # the wrap argument is automatically filled
             # get the dependency that has triggered the callback
             trigger_id = dash.callback_context.triggered[0]["prop_id"]
 
@@ -47,8 +47,8 @@ class EnhanceSlider(ComposedComponentMixin, html.Div):
             # overwrite the components with new components
             # wrap(...) component to allow ids of the components to be properly mangled
             return [
-                wrap( dcc.Slider(id="slider", min=0, max=100, value=value)),
-                wrap( dcc.Input(id="input", value=value)),
+                wrap(dcc.Slider(id="slider", min=0, max=100, value=value)),
+                wrap(dcc.Input(id="input", value=value)),
             ]
 
 
@@ -66,12 +66,12 @@ app.layout = html.Div(
             "and an input to define a value, with both fields synchronised."
         ),
         html.Div(id="inject"),
-        EnhanceSlider(id="first"),
+        EnhanceSlider(id="my-slider"),
     ]
 )
 
 
-@app.callback(Input("first", "value"), Output("inject", "children"))
+@app.callback(Input("my-slider", "value"), Output("inject", "children"))
 def refresh_label(value):
     return f"The value of the enhanced slider is {value}"
 
