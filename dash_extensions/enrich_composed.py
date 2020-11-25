@@ -280,7 +280,7 @@ class ComposedComponentMixin(Component):
         super().__init__(
             id=id,
             children=layout + [dcc.Store(id=k, data=properties[k]) for k in self._properties],
-            # **kwargs,
+            **kwargs,
         )
 
     def layout(self, **kwargs):
