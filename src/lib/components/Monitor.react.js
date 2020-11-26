@@ -40,7 +40,7 @@ export default class Monitor extends Component {
         this._loop_children_recursively(child.props.children, apply)
     }
 
-    _monitor(key, props, target) {
+    _monitor(key, props) {
         if (!props) {
             return
         }
@@ -56,8 +56,10 @@ export default class Monitor extends Component {
             if (this.data[key] && this.data[key].value === props[prop]) {
                 continue
             }
-            // TODO: Add other properties here? Time maybe?
-            target[key] = {value: props[prop], trigger: {id: id, prop: prop}}
+            // Do update.
+            this.data[key] = this.data[key] || {};
+            this.data[key][id] = this.data[key][id] || {};
+            this.data[key][id][prop] = {value: props[prop], time: new Date().getMilliseconds()}
         }
     }
 
@@ -65,20 +67,28 @@ export default class Monitor extends Component {
 
     render() {
         // Update data.
-        const newData = Object.assign({}, this.data)
         React.Children.map(this.props.children, (child) => {
             for (const key in this.props.probes) {
                 const dlp = child.props._dashprivate_layout;
                 const children = dlp.props.children;
-                this._monitor(key, dlp.props, newData)
-                this._loop_children_recursively(children, (child) => this._monitor(key, child.props, newData))
+                this._monitor(key, dlp.props)
+                this._loop_children_recursively(children, (child) => this._monitor(key, child.props))
             }
         })
-        console.log(this.data)
-        // console.log(this.props)
-        // console.log(this.props.setProps)
-        // const d = new Date();
-        this.data = newData;
+        // Derive the data to be passed to Dash.
+        const newData = {}
+        for (const key in this.props.probes) {
+            let time = 0;
+            for (const id in this.data[key]){
+                for (const prop in this.data[key][id]){
+                    const elem = this.data[key][id][prop];
+                    if(elem.time > time){
+                        time = elem.time;
+                        newData[key] = {value: elem.value, trigger: {id:id, prop:prop}}
+                    }
+                }
+            }
+        }
         this.props.setProps({data: newData})
         // Render as-is.
         return <div className={this.props.className} style={this.props.style}>{this.props.children}</div>
