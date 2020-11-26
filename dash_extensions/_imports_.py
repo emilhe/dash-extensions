@@ -1,11 +1,11 @@
 from .Download import Download
 from .Keyboard import Keyboard
-from .Linker import Linker
 from .Lottie import Lottie
+from .Monitor import Monitor
 
 __all__ = [
     "Download",
     "Keyboard",
-    "Linker",
-    "Lottie"
+    "Lottie",
+    "Monitor"
 ]

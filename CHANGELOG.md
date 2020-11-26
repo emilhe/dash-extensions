@@ -2,14 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.32] - UNRELEASED
+## [0.0.32rc8] - UNRELEASED
+
+### Added
+
+- Added javascript helper function in snippets.
+- Added Monitor component.
+- Added support of kwargs (output, input, state) in callbacks [jfftonsic](https://github.com/thedirtyfew/dash-extensions/pull/15).
 
 ### Changed
 
-- Added Linker component.
-- Added support of kwargs (output, input, state) in callbacks [jfftonsic](https://github.com/thedirtyfew/dash-extensions/pull/15).
 - The speed of Lottie animations can now be adjusted dynamically.
-- Memoize keyword can now be a function. If it is, the data iiis transformed by the function before memoization.
+- Memoize keyword can now be a function. If it is, the data is transformed by the function before memoization.
 
 ## [0.0.31] - 23-08-20
 
@@ -22,7 +26,6 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - A new module for transpiling Python code to javascript.
-
 - A new n_keydowns props to the Keyboard component to make it possible to capture all keyboard events.
 
 ## [0.0.28] - 2020-12-08
@@ -36,7 +39,6 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - A new `enrich` module has been added. It exposes the functionality of previous callback blueprints (and more!) through a drop in replacement of (enriched) Dash components. 
-
 - Added folder of example code.
 
 ### Changed
