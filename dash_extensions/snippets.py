@@ -17,7 +17,8 @@ class JavaScriptNamespace:
         self.args = list(args)
 
     def __call__(self, variable):
-        return js_variable(self.args + [variable])
+        all_args = self.args + [variable]
+        return js_variable(*all_args)
 
 
 def js_arrow_function(value):
