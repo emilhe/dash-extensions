@@ -112,7 +112,7 @@ To ease downloading data frames (which seems to be a common use case for Dash us
     
     # Example data.
     df = pd.DataFrame({'a': [1, 2, 3, 4], 'b': [2, 1, 5, 6], 'c': ['x', 'x', 'y', 'y']})
-    # Create app.
+    # Create example app.
     app = dash.Dash(prevent_initial_callbacks=True)
     app.layout = html.Div([html.Button("Download", id="btn"), Download(id="download")])
     
@@ -123,6 +123,45 @@ To ease downloading data frames (which seems to be a common use case for Dash us
     if __name__ == '__main__':
         app.run_server()
 
+### Monitor
+
+The `Monitor` component makes it possible to monitor the state of child components. The most typical use case for this component is bi-directional synchronization of component properties. Here is a small example,
+
+    import dash_core_components as dcc
+    import dash_html_components as html
+    from dash import Dash, no_update
+    from dash.dependencies import Input, Output
+    from dash.exceptions import PreventUpdate
+    from dash_extensions import Monitor
+    
+    app = Dash()
+    app.layout = html.Div(Monitor([
+        dcc.Input(id="deg-fahrenheit", autoComplete="off", type="number"),
+        dcc.Input(id="deg-celsius", autoComplete="off", type="number")],
+        probes=dict(deg=[dict(id="deg-fahrenheit", prop="value"), 
+                         dict(id="deg-celsius", prop="value")]), id="monitor")
+    )
+    
+    @app.callback([Output("deg-fahrenheit", "value"), Output("deg-celsius", "value")], 
+                  [Input("monitor", "data")])
+    def sync_inputs(data):
+        # Get value and trigger id from monitor.
+        try:
+            probe = data["deg"]
+            trigger_id, value = probe["trigger"]["id"], float(probe["value"])
+        except (TypeError, KeyError):
+            raise PreventUpdate
+        # Do the appropriate update.
+        if trigger_id == "deg-fahrenheit":
+            return no_update, (value - 32) * 5 / 9
+        elif trigger_id == "deg-celsius":
+            return value * 9 / 5 + 32, no_update
+    
+    
+    if __name__ == '__main__':
+        app.run_server(debug=False)
+
+  
 
 ### Lottie
 
@@ -150,13 +189,11 @@ The `Keyboard` component makes it possible to capture keyboard events at the doc
     import dash
     import dash_html_components as html
     import json
-    
     from dash.dependencies import Output, Input
     from dash_extensions import Keyboard
     
     app = dash.Dash()
     app.layout = html.Div([Keyboard(id="keyboard"), html.Div(id="output")])
-    
     
     @app.callback(Output("output", "children"), [Input("keyboard", "keydown")])
     def keydown(event):

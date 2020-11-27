@@ -5,15 +5,18 @@ from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 from dash_extensions import Monitor
 
+# Example app.
 app = Dash()
 app.layout = html.Div(Monitor([
     dcc.Input(id="deg-fahrenheit", autoComplete="off", type="number"),
     dcc.Input(id="deg-celsius", autoComplete="off", type="number")],
-    probes=dict(deg=[dict(id="deg-fahrenheit", prop="value"), dict(id="deg-celsius", prop="value")]), id="monitor")
+    probes=dict(deg=[dict(id="deg-fahrenheit", prop="value"),
+                     dict(id="deg-celsius", prop="value")]), id="monitor")
 )
 
 
-@app.callback([Output("deg-fahrenheit", "value"), Output("deg-celsius", "value")], [Input("monitor", "data")])
+@app.callback([Output("deg-fahrenheit", "value"), Output("deg-celsius", "value")],
+              [Input("monitor", "data")])
 def sync_inputs(data):
     # Get value and trigger id from monitor.
     try:
