@@ -10,27 +10,6 @@ import dash_html_components as html
 from dash.dependencies import Output, Input
 
 
-# region JavaScript binding stuff
-
-class JavaScriptNamespace:
-    def __init__(self, *args):
-        self.args = list(args)
-
-    def __call__(self, variable):
-        all_args = self.args + [variable]
-        return js_variable(*all_args)
-
-
-def js_arrow_function(value):
-    return dict(arrow=value)
-
-
-def js_variable(*args):
-    return dict(variable=".".join(list(args)))
-
-
-# endregion
-
 # region Utils for Download component
 
 
