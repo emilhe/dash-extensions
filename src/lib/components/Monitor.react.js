@@ -52,14 +52,17 @@ export default class Monitor extends Component {
             if (props.id !== id || !(prop in props)) {
                 continue
             }
+
+
             // Check if value has changed.
-            if (this.data[key] && this.data[key].value === props[prop]) {
+            if (this.data[key] && this.data[key][id] && this.data[key][id][prop] &&
+                this.data[key][id][prop].value === props[prop]) {
                 continue
             }
             // Do update.
             this.data[key] = this.data[key] || {};
             this.data[key][id] = this.data[key][id] || {};
-            this.data[key][id][prop] = {value: props[prop], time: new Date().getMilliseconds()}
+            this.data[key][id][prop] = {value: props[prop], time: new Date().getTime()}
         }
     }
 
