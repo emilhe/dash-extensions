@@ -7,8 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - A new `javascript` module has been added. It holds helper functions/classes related to the python/javascript interface.
-- Added `Monitor` component. Intended use cases include bi-directional component property synchronization
-- Added support of kwargs (output, input, state) in callbacks [jfftonsic](https://github.com/thedirtyfew/dash-extensions/pull/15).
+- Added support for kwargs (output, input, state) in callbacks [jfftonsic](https://github.com/thedirtyfew/dash-extensions/pull/15).
+- Added `Monitor` component. Intended use cases include bi-directional component property synchronization.
 
 ### Changed
 
