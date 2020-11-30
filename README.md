@@ -1,10 +1,48 @@
-The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into three main blocks, 
+The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into four main blocks, 
 
 * The `snippets` module, which contains a collection of utility functions
 * The `enrich` module, which contains various enriched versions of Dash components
+* The `javascript` module, which contains functionality to ease the interplay between Dash and JavaScript
 * A number of custom components, e.g. the `Download` component
 
-While the `snippets` module documentation will be limited to source code comments, the `enrich` module and the custom components are documented below.
+While the `snippets` module documentation will be limited to source code comments, the `enrich` module, the `javascript` module, and the custom components are documented below.
+
+## Javascript
+
+In Dash, component properties must be JSON serializable. However, many React components take JavaScript functions (or objects) as inputs, which can make it tedious to write Dash wrappers. To ease the process, `dash-extensions` implements a simple bridge for passing function handles (and other variables) as component properties. The `javascript` module is the Python side of the bridge, while the `dash-extensions` package [on npm](https://www.npmjs.com/package/dash-extensions) forms the JavaScript side. 
+
+In the examples below, we will consider the `GeoJSON` component in `dash-leaflet==0.1.10`. The complete example apps are available in the [dash-leaflet documentation](http://dash-leaflet.herokuapp.com/#tutorials).
+
+### JavaScript variables
+
+Any JavaScript variable defined in the (global) window object can passed as a component property. Hence, if we create a .js file in the assets folder with the following content,
+
+    window.myNamespace = Object.assign({}, window.myNamespace, {  
+        mySubNamespace: {  
+            pointToLayer: function(feature, latlng, context) {  
+                return L.circleMarker(latlng)  
+            }  
+        }  
+    });
+
+the `pointToLayer` function of the `myNamespace.mySubNamespace` namespace can now be used as a component property,
+
+    import dash_leaflet as dl
+    from dash_extensions.javascript import Namespace
+    ...
+    ns = Namespace("myNamespace", "mySubNamespace")
+    geojson = dl.GeoJSON(data=data, options=dict(pointToLayer=ns("pointToLayer")))
+
+Note that this approach is not limited to function handles, but can be applied for any data type.
+
+### Arrow functions
+
+In some cases, it might be sufficient to wrap an object as an arrow function, i.e. a function that just returns the (constant) object. This behaviour can be achieved with the following syntax,
+
+    import dash_leaflet as dl
+    from dash_extensions.javascript import arrow_function
+    ...
+    geojson = dl.GeoJSON(hoverStyle=arrow_function(dict(weight=5, color='#666', dashArray='')), ...)
 
 ## Enrichments
 

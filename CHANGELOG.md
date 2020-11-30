@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.33rc1] - 30-11-20
+
+### Added
+
+- Added wild card support for the `group` keyword, requested by [gedemagt](https://github.com/thedirtyfew/dash-extensions/issues/27)
+
 ## [0.0.32] - 27-11-20
 
 ### Added
