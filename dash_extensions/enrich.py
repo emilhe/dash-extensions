@@ -4,17 +4,22 @@ import json
 import pickle
 import secrets
 import uuid
+from json.decoder import JSONDecodeError
+
 import dash
 import dash_html_components as html
 import dash.dependencies as dd
 import plotly
+import re
 
-from dash.dependencies import Input, State
+from dash.dependencies import Input, State, MATCH, ALL, ALLSMALLER
 from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen, flatten
 
+_wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
+_wildcard_values = list(_wildcard_mappings.values())
 
 # region Dash transformer
 
@@ -112,7 +117,11 @@ def _as_list(item):
 
 
 def _create_callback_id(item):
-    return "{}.{}".format(item.component_id, item.component_property)
+    cid = item.component_id
+    if isinstance(cid, dict):
+        cid = {key: cid[key] if cid[key] not in _wildcard_mappings else _wildcard_mappings[cid[key]] for key in cid}
+        cid = json.dumps(cid)
+    return "{}.{}".format(cid, item.component_property)
 
 
 def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
@@ -239,7 +248,26 @@ def _combine_callbacks(callbacks):
         output_values = [dash.no_update] * len(outputs)
         for i, entry in enumerate(input_prop_lists):
             # Check if the trigger is an input of the callback.
-            if prop_id not in entry:
+            match = False
+            for item in entry:
+                # Check for exact matches.
+                match = item == prop_id
+                # Check for wild card matches.
+                if any([wildcard_value in item for wildcard_value in _wildcard_values]):
+                    try:
+                        props = json.loads(prop_id.split(".")[0])
+                        item_props = json.loads(item.split(".")[0])
+                        prop_match = True
+                        for key in props:
+                            if item_props[key] not in _wildcard_values:
+                                prop_match = prop_match and item_props[key] == props[key]
+                            # TODO: Make checks here, no checks (as now) is only valid for ALL
+                        if prop_match:
+                            match = True
+                            break
+                    except JSONDecodeError:
+                        continue
+            if not match:
                 continue
             # Trigger the callback function.
             try:
