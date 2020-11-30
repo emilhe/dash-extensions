@@ -1,8 +1,8 @@
 The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into four main blocks, 
 
 * The `snippets` module, which contains a collection of utility functions
-* The `enrich` module, which contains various enriched versions of Dash components
 * The `javascript` module, which contains functionality to ease the interplay between Dash and JavaScript
+* The `enrich` module, which contains various enriched versions of Dash components
 * A number of custom components, e.g. the `Download` component
 
 While the `snippets` module documentation will be limited to source code comments, the `enrich` module, the `javascript` module, and the custom components are documented below.
