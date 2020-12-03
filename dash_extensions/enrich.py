@@ -21,6 +21,7 @@ from more_itertools import unique_everseen, flatten
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
+
 # region Dash transformer
 
 
