@@ -47,7 +47,7 @@ In some cases, it might be sufficient to wrap an object as an arrow function, i.
 
 ## Enrichments
 
-The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transformations` keyword argument, 
+The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transforms` keyword argument, 
 
     from enrich import DashProxy, TriggerTransform, GroupTransform, ServersideOutputTransform, NoOutputTransform
     
@@ -97,28 +97,17 @@ Makes it possible to use the `ServersideOutput` component. It works like a norma
         def right(df):
             return df["value"].mean()
   
-  The reduced network overhead along with the avoided serialization to/from JSON can yield significant performance improvements, in particular for large data. Note that content of a `ServersideOutput` cannot be accessed by clientside callbacks. 
+The reduced network overhead along with the avoided serialization to/from JSON can yield significant performance improvements, in particular for large data. Note that content of a `ServersideOutput` cannot be accessed by clientside callbacks. 
   
-* A new `memoize` keyword makes it possible to memoize the output of a callback. That is, the callback output is cached, and the cached result is returned when the same inputs occur again.
+In addition, a new `memoize` keyword makes it possible to memoize the output of a callback. That is, the callback output is cached, and the cached result is returned when the same inputs occur again.
 
-        @app.callback(ServersideOutput("store", "data"), Trigger("left", "n_clicks"), memoize=True) 
-        def query():
-            return pd.DataFrame(data=list(range(10)), columns=["value"])
+    @app.callback(ServersideOutput("store", "data"), Trigger("left", "n_clicks"), memoize=True) 
+    def query():
+        return pd.DataFrame(data=list(range(10)), columns=["value"])
 
-    Used with a normal `Output`, this keyword is essentially equivalent to the `@flask_caching.memoize` decorator. For a `ServersideOutput`, the backend to do server side storage will also be used for memoization. Hence you avoid saving each object two times, which would happen if the `@flask_caching.memoize` decorator was used with a `ServersideOutput`.
+Used with a normal `Output`, this keyword is essentially equivalent to the `@flask_caching.memoize` decorator. For a `ServersideOutput`, the backend to do server side storage will also be used for memoization. Hence, you avoid saving each object two times, which would happen if the `@flask_caching.memoize` decorator was used with a `ServersideOutput`.
 
-To enable the enrichments, replace the `Dash` object with a `DashProxy` object with the appropriate transformations applied, 
-
-    from enrich import DashProxy, TriggerTransform, GroupTransform, ServersideOutputTransform, NoOutputTransform
-    
-    app = DashProxy(transforms=[
-        TriggerTransform(),  # enable use of Trigger objects
-        GroupTransform(),  # enable use of the group keyword
-        ServersideOutputTransform(),  # enable use of ServersideOutput objects
-        NoOutputTransform(),  # enable callbacks without output
-    ])
-
-## Components
+## Multipage
 
 The `multipage` module makes it easy to create multipage apps. Pages can be constructed explicitly with the following syntax,
 
@@ -146,10 +135,7 @@ Once the pages have been constructed, they can be passed to a `PageCollection` o
     pc.navigation(app)
     pc.callbacks(app)
 
-    if __name__ == '__main__':
-        app.run_server(debug=False)
-
-See the example folder on git for a complete example.
+The complete example is available [on github](https://github.com/thedirtyfew/dash-extensions/blob/multipage/examples/multipage_app.py).
 
 ## Components
 
