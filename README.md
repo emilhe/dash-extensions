@@ -1,4 +1,4 @@
-The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into four main blocks, 
+The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into five main blocks, 
 
 * The `snippets` module, which contains a collection of utility functions
 * The `javascript` module, which contains functionality to ease the interplay between Dash and JavaScript
@@ -135,7 +135,7 @@ Once the pages have been constructed, they can be passed to a `PageCollection` o
     pc.navigation(app)
     pc.callbacks(app)
 
-The complete example is available [on github](https://github.com/thedirtyfew/dash-extensions/blob/multipage/examples/multipage_app.py).
+The complete example is available [on github](https://github.com/thedirtyfew/dash-extensions/blob/master/examples/multipage_app.py).
 
 ## Components
 
