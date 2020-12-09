@@ -5,6 +5,7 @@ import sys as _sys
 import json
 
 import dash as _dash
+# from . import assets  # noqa
 
 # noinspection PyUnresolvedReferences
 from ._imports_ import *

@@ -4,34 +4,32 @@ import json
 import pickle
 import secrets
 import uuid
-from json.decoder import JSONDecodeError
-
 import dash
 import dash_html_components as html
 import dash.dependencies as dd
 import plotly
-import re
 
-from dash.dependencies import Input, State, MATCH, ALL, ALLSMALLER
+from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER
 from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen, flatten
+from json.decoder import JSONDecodeError
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
 
-# region Dash transformer
+# region Dash proxy
 
 
-class DashTransformer(dash.Dash):
+class DashProxy(dash.Dash):
 
-    def __init__(self, *args, transforms, **kwargs):
+    def __init__(self, *args, transforms=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.callbacks = []
-        self.arg_types = [Output, Input, State]
-        self.transforms = transforms
+        self.arg_types = [dd.Output, dd.Input, dd.State]
+        self.transforms = transforms if transforms is not None else []
         # Do the transform initialization.
         for transform in self.transforms:
             transform.init(self)
@@ -52,14 +50,14 @@ class DashTransformer(dash.Dash):
                 for key in callback:
                     if isinstance(element, key):
                         # Check if this is a wild card output.
-                        if not multi_output and isinstance(element, Output):
+                        if not multi_output and isinstance(element, dd.Output):
                             component_id = element.component_id
                             if isinstance(component_id, dict):
                                 multi_output = any([component_id[k] in [dd.ALLSMALLER, dd.ALL] for k in component_id])
                         callback[key].append(element)
                         arg_order.append(element)
         if not multi_output:
-            multi_output = len(callback[Output]) > 1
+            multi_output = len(callback[dd.Output]) > 1
         # Save the kwargs for later.
         callback["kwargs"] = kwargs
         callback["sorted_args"] = arg_order
@@ -72,6 +70,15 @@ class DashTransformer(dash.Dash):
 
         return wrapper
 
+    def _register_callbacks(self, app=None):
+        callbacks = list(self._resolve_callbacks())
+        for callback in callbacks:
+            outputs = callback[dd.Output][0] if len(callback[dd.Output]) == 1 else callback[dd.Output]
+            if app is None:
+                super().callback(outputs, callback[dd.Input], callback[dd.State], **callback["kwargs"])(callback["f"])
+            else:
+                app.callback(outputs, callback[dd.Input], callback[dd.State], **callback["kwargs"])(callback["f"])
+
     def _layout_value(self):
         layout = self._layout() if self._layout_is_function else self._layout
         for transform in self.transforms:
@@ -83,10 +90,7 @@ class DashTransformer(dash.Dash):
          This method registers the callbacks on the Dash app and injects a session secret.
         """
         # Register the callbacks.
-        callbacks = list(self._resolve_callbacks())
-        for callback in callbacks:
-            outputs = callback[Output][0] if len(callback[Output]) == 1 else callback[Output]
-            super().callback(outputs, callback[Input], callback[State], **callback["kwargs"])(callback["f"])
+        self._register_callbacks()
         # Proceed as normally.
         super()._setup_server()
         # Set session secret. Used by some subclasses.
@@ -156,6 +160,89 @@ class DashTransform:
 
 # endregion
 
+# region Prefix ID transform
+
+class PrefixIdTransform(DashTransform):
+
+    def __init__(self, prefix):
+        self.prefix = prefix
+        self.initialized = False
+
+    def apply(self, callbacks):
+        for callback in callbacks:
+            for arg in callback["sorted_args"]:
+                prefix_id(arg, self.prefix)
+        return callbacks
+
+    def layout(self, layout, layout_is_function):
+        # TODO: Will this work with layout functions?
+        if layout_is_function or not self.initialized:
+            prefix_id_recursively(layout, self.prefix)
+            self.initialized = True
+        return layout
+
+
+def apply_prefix(prefix, component_id):
+    if isinstance(component_id, dict):
+        # TODO: Handle wild cards.
+        # for key in component_id:
+        #     if key == "index":
+        #         continue
+        #     component_id[key] = "{}-{}".format(prefix, component_id[key])
+        return component_id
+    return "{}-{}".format(prefix, component_id)
+
+
+def prefix_id(arg, key):
+    if hasattr(arg, 'component_id'):
+        arg.component_id = apply_prefix(key, arg.component_id)
+    if hasattr(arg, '__len__'):
+        for entry in arg:
+            entry.component_id = apply_prefix(key, entry.component_id)
+
+
+def prefix_id_recursively(item, key):
+    if hasattr(item, "id"):
+        item.id = apply_prefix(key, item.id)
+    if hasattr(item, "children"):
+        children = item.children
+        if hasattr(children, "id"):
+            children.id = apply_prefix(key, children.id)
+        if hasattr(children, "__len__"):
+            for child in children:
+                prefix_id_recursively(child, key)
+
+        #
+        # # TODO: If layout is NOT a function, maybe apply prefix on init for performance?
+        # layout = self._layout()
+        # if not self.prefix_id:
+        #     return layout
+        # return prefix_id_recursively(layout, self.id)
+        #
+        # return None
+
+    #
+    # def layout(self, layout, layout_is_function):
+    #     if layout_is_function or not self.initialized:
+    #         children = layout.children + self.hidden_divs
+    #         layout.children = children
+    #         self.initialized = True
+    #     return layout
+    #
+    # def layout(self, layout, layout_is_function):
+    #     if
+    #
+    #     # TODO: If layout is NOT a function, maybe apply prefix on init for performance?
+    #     layout = self._layout()
+    #     if not self.prefix_id:
+    #         return layout
+    #     return prefix_id_recursively(layout, self.id)
+    #
+    #     return None
+
+
+# endregion
+
 # region Trigger transform (the only default transform)
 
 class Trigger(Input):
@@ -194,7 +281,7 @@ def filter_args(args_filter):
 
 
 def trigger_filter(args):
-    inputs_args = [item for item in args if isinstance(item, Input) or isinstance(item, State)]
+    inputs_args = [item for item in args if isinstance(item, dd.Input) or isinstance(item, dd.State)]
     is_trigger = [isinstance(item, Trigger) for item in inputs_args]
     return is_trigger
 
@@ -227,16 +314,16 @@ class GroupTransform(DashTransform):
 
 # NOTE: No performance considerations what so ever. Just an initial proof-of-concept implementation.
 def _combine_callbacks(callbacks):
-    inputs, input_props, input_prop_lists, input_mappings = _prep_props(callbacks, Input)
-    states, state_props, state_prop_lists, state_mappings = _prep_props(callbacks, State)
-    outputs, output_props, output_prop_lists, output_mappings = _prep_props(callbacks, Output)
+    inputs, input_props, input_prop_lists, input_mappings = _prep_props(callbacks, dd.Input)
+    states, state_props, state_prop_lists, state_mappings = _prep_props(callbacks, dd.State)
+    outputs, output_props, output_prop_lists, output_mappings = _prep_props(callbacks, dd.Output)
     # TODO: What kwargs to use?
     kwargs = callbacks[0]["kwargs"]
     multi_output = any([callback["multi_output"] for callback in callbacks])
     if not multi_output:
         all_outputs = []
         for callback in callbacks:
-            all_outputs += callback[Output]
+            all_outputs += callback[dd.Output]
         multi_output = len(list(set(all_outputs))) > 1
 
     # TODO: There might be a scope issue here
@@ -287,7 +374,8 @@ def _combine_callbacks(callbacks):
         # Return the combined output.
         return output_values if multi_output else output_values[0]  # TODO: Check for multi output here?
 
-    return {Output: outputs, Input: inputs, "f": wrapper, State: states, "kwargs": kwargs, "multi_output": multi_output}
+    return {dd.Output: outputs, dd.Input: inputs,
+            "f": wrapper, dd.State: states, "kwargs": kwargs, "multi_output": multi_output}
 
 
 def _prep_props(callbacks, key):
@@ -305,7 +393,7 @@ def _prep_props(callbacks, key):
 
 # region Server side output transform
 
-class Output(dd.Output):
+class EnrichedOutput(Output):
     """
      Like a normal Output, includes additional properties related to storing the data.
     """
@@ -316,7 +404,7 @@ class Output(dd.Output):
         self.session_check = session_check
 
 
-class ServersideOutput(Output):
+class ServersideOutput(EnrichedOutput):
     """
      Like a normal Output, but with the content stored only server side.
     """
@@ -342,7 +430,7 @@ class ServersideOutputTransform(DashTransform):
             memoize = callback["kwargs"].get("memoize", None)
             serverside = False
             # Keep tract of which outputs are server side outputs.
-            for output in callback[Output]:
+            for output in callback[dd.Output]:
                 if isinstance(output, ServersideOutput):
                     serverside_output_map[_create_callback_id(output)] = output
                     serverside = True
@@ -357,7 +445,7 @@ class ServersideOutputTransform(DashTransform):
         # 2) Inject cached data into callbacks.
         for callback in callbacks:
             # Figure out which args need loading.
-            items = callback[Input] + callback[State]
+            items = callback[dd.Input] + callback[dd.State]
             item_ids = [_create_callback_id(item) for item in items]
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
@@ -511,10 +599,10 @@ class NoOutputTransform(DashTransform):
 
     def apply(self, callbacks):
         for callback in callbacks:
-            if len(callback[Output]) == 0:
+            if len(callback[dd.Output]) == 0:
                 output_id = str(uuid.uuid4())
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
-                callback[Output] = [Output(output_id, "children")]
+                callback[dd.Output] = [dd.Output(output_id, "children")]
                 self.hidden_divs.append(hidden_div)
         return callbacks
 
@@ -523,7 +611,7 @@ class NoOutputTransform(DashTransform):
 
 # region Transformer implementations
 
-class Dash(DashTransformer):
+class Dash(DashProxy):
     def __init__(self, *args, output_defaults=None, **kwargs):
         output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
         transforms = [TriggerTransform(), NoOutputTransform(), GroupTransform(),
