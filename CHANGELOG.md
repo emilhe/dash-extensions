@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.34rc1] - UNRELEASED
+## [0.0.34] - 09-12-20
 
 ### Added
 
