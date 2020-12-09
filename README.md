@@ -6,7 +6,7 @@ The purpose of this package is to provide various extensions to the Plotly Dash 
 * The `multipage` module, which contains utilities for multi page apps
 * A number of custom components, e.g. the `Download` component
 
-While the `snippets` module documentation will be limited to source code comments, the `enrich` module, the `javascript` module, and the custom components are documented below.
+While the `snippets` module documentation will be limited to source code comments, the `javascript` module, the `enrich` module, the `multipage` module, and the custom components are documented below.
 
 ## Javascript
 
