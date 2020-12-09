@@ -16,4 +16,4 @@ def layout(*args, **kwargs):
 def callbacks(app):
     @app.callback(Output("output", "children"), [Input("input", "value")])
     def hello(value):
-        return f"PAGE says: Hello {value}!"
+        return f"MODULE says: Hello {value}!"

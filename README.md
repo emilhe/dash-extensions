@@ -47,7 +47,7 @@ In some cases, it might be sufficient to wrap an object as an arrow function, i.
 
 ## Enrichments
 
-The `enrich` module provides a number of enrichments of the `Dash` object, which can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transformations` keyword argument, 
+The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transformations` keyword argument, 
 
     from enrich import DashProxy, TriggerTransform, GroupTransform, ServersideOutputTransform, NoOutputTransform
     
@@ -58,7 +58,7 @@ The `enrich` module provides a number of enrichments of the `Dash` object, which
         NoOutputTransform(),  # enable callbacks without output
     ])
 
-The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to only load the transforms are that actually used.
+The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to load only the transforms are that actually used.
 
 #### TriggerTransform
 
@@ -118,6 +118,38 @@ To enable the enrichments, replace the `Dash` object with a `DashProxy` object w
         NoOutputTransform(),  # enable callbacks without output
     ])
 
+## Components
+
+The `multipage` module makes it easy to create multipage apps. Pages can be constructed explicitly with the following syntax,
+
+    page = Page(id="page", label="A page", layout=layout, callbacks=callbacks)
+
+where the `layout` function returns the page layout and the `callbacks` function registers any callbacks. Per default, all component ids are prefixed by the page id to avoid id collisions. It is also possible to construct a page from a module,
+
+    page = module_to_page(module, id="module", label="A module")
+
+if the module implements the `layout` and `callbacks` functions. Finally, any app constructed using a `DashProxy` object can be turned into a page,
+
+    page = app_to_page(app, id="app", label="An app")
+
+Once the pages have been constructed, they can be passed to a `PageCollection` object, which takes care of navigation. Hence a multipage app with a burger menu would be something like,
+
+    # Create pages.
+    pc = PageCollection(pages=[
+        Page(id="page", label="A page", layout=layout, callbacks=callbacks),
+        ...
+    ])
+    # Create app.
+    app = DashProxy(suppress_callback_exceptions=True)
+    app.layout = html.Div([make_burger(pc, effect="slide", position="right"), default_layout()])
+    # Register callbacks.
+    pc.navigation(app)
+    pc.callbacks(app)
+
+    if __name__ == '__main__':
+        app.run_server(debug=False)
+
+See the example folder on git for a complete example.
 
 ## Components
 
@@ -221,7 +253,9 @@ The `Monitor` component makes it possible to monitor the state of child componen
     if __name__ == '__main__':
         app.run_server(debug=False)
 
-  
+### Burger
+
+The `Burger` component is a light wrapper of [react-burger-menu](https://github.com/negomi/react-burger-menu), which enables [cool interactive burger menus](https://negomi.github.io/react-burger-menu/).
 
 ### Lottie
 

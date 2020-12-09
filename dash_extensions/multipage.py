@@ -17,7 +17,7 @@ class Page:
         # Per default, use prefix transform.
         self._proxy = proxy
         if proxy is None:
-            transforms = [PrefixIdTransform(id)] if prefix_ids is None else []
+            transforms = [PrefixIdTransform(id)] if prefix_ids else []
             self._proxy = DashProxy(transforms=transforms)
             if callbacks is not None:
                 callbacks(self._proxy)
