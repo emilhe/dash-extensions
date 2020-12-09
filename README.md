@@ -3,6 +3,7 @@ The purpose of this package is to provide various extensions to the Plotly Dash 
 * The `snippets` module, which contains a collection of utility functions
 * The `javascript` module, which contains functionality to ease the interplay between Dash and JavaScript
 * The `enrich` module, which contains various enriched versions of Dash components
+* The `multipage` module, which contains utilities for multi page apps
 * A number of custom components, e.g. the `Download` component
 
 While the `snippets` module documentation will be limited to source code comments, the `enrich` module, the `javascript` module, and the custom components are documented below.
@@ -46,32 +47,47 @@ In some cases, it might be sufficient to wrap an object as an arrow function, i.
 
 ## Enrichments
 
-At the time of writing, the following enrichments (as compared to Dash 1.14.0) have been implemented,
+The `enrich` module provides a number of enrichments of the `Dash` object, which can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transformations` keyword argument, 
 
-* Ordering and form (single element versus list) of (`Output`, `Input`, `State`) does not matter. Hence, you could do this,
+    from enrich import DashProxy, TriggerTransform, GroupTransform, ServersideOutputTransform, NoOutputTransform
+    
+    app = DashProxy(transforms=[
+        TriggerTransform(),  # enable use of Trigger objects
+        GroupTransform(),  # enable use of the group keyword
+        ServersideOutputTransform(),  # enable use of ServersideOutput objects
+        NoOutputTransform(),  # enable callbacks without output
+    ])
 
-        @app.callback(Input("input_id", "input_prop"), Output("output_id", "output_prop"))
+The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to only load the transforms are that actually used.
 
-* A new `Trigger` component has been added. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
+#### TriggerTransform
 
-        @app.callback(Output("output_id", "output_prop"), Trigger("button", "n_clicks"))
-        def func():  # note that "n_clicks" is not included as an argument 
+Makes it possible to use the `Trigger` component. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
 
-* It is now possible to have callbacks without an `Output`,
+    @app.callback(Output("output_id", "output_prop"), Trigger("button", "n_clicks"))
+    def func():  # note that "n_clicks" is not included as an argument 
 
-        @app.callback(Trigger("button", "n_clicks"))  # note that the callback has no output
+#### NoOutputTransform
 
-* A new `group` keyword makes it possible to bundle callbacks together. This feature serves as a work around for Dash not being able to target an output multiple times. Here is a small example,
+Assigns dummy output automatically when a callback if declared without an `Output`,
 
-        @app.callback(Output("log", "children"), Trigger("left", "n_clicks"), group="my_group") 
-        def left():
-            return "left"
-            
-        @app.callback(Output("log", "children"), Trigger("right", "n_clicks"), group="my_group") 
-        def right():
-            return "right"
+    @app.callback(Trigger("button", "n_clicks"))  # note that the callback has no output
 
-* A new `ServersideOutput` component has been added. It works like a normal `Output`, but _keeps the data on the server_. By skipping the data transfer between server/client, the network overhead is reduced drastically, and the serialization to JSON can be avoided. Hence, you can now return complex objects, such as a pandas data frame, directly,
+#### GroupTransform
+
+Enables the `group` keyword, which makes it possible to bundle callbacks together. This feature serves as a work around for Dash not being able to target an output multiple times. Here is a small example,
+
+    @app.callback(Output("log", "children"), Trigger("left", "n_clicks"), group="my_group") 
+    def left():
+        return "left"
+        
+    @app.callback(Output("log", "children"), Trigger("right", "n_clicks"), group="my_group") 
+    def right():
+        return "right"
+
+#### ServersideOutputTransform
+
+Makes it possible to use the `ServersideOutput` component. It works like a normal `Output`, but _keeps the data on the server_. By skipping the data transfer between server/client, the network overhead is reduced drastically, and the serialization to JSON can be avoided. Hence, you can now return complex objects, such as a pandas data frame, directly,
 
         @app.callback(ServersideOutput("store", "data"), Trigger("left", "n_clicks")) 
         def query():
@@ -90,12 +106,18 @@ At the time of writing, the following enrichments (as compared to Dash 1.14.0) h
             return pd.DataFrame(data=list(range(10)), columns=["value"])
 
     Used with a normal `Output`, this keyword is essentially equivalent to the `@flask_caching.memoize` decorator. For a `ServersideOutput`, the backend to do server side storage will also be used for memoization. Hence you avoid saving each object two times, which would happen if the `@flask_caching.memoize` decorator was used with a `ServersideOutput`.
-            
-To enable the enrichments, simply replace the imports of the `Dash` object and the (`Output`, `Input`, `State`) objects with their enriched counterparts,
 
-    from dash_extensions.enrich import Dash, Output, Input, State
+To enable the enrichments, replace the `Dash` object with a `DashProxy` object with the appropriate transformations applied, 
 
-The syntax in the `enrich` module should be considered alpha stage. It might change without notice.
+    from enrich import DashProxy, TriggerTransform, GroupTransform, ServersideOutputTransform, NoOutputTransform
+    
+    app = DashProxy(transforms=[
+        TriggerTransform(),  # enable use of Trigger objects
+        GroupTransform(),  # enable use of the group keyword
+        ServersideOutputTransform(),  # enable use of ServersideOutput objects
+        NoOutputTransform(),  # enable callbacks without output
+    ])
+
 
 ## Components
 

@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 
 - Added `Burger` component and `multipage` module.
 
+### Changed
+
+- Change name of `DashTransformer` to `DashProxy`.
+- Added support for mixing of dash.depencency components (i.e. Input, Output, ...) and enriched components.
+
 ## [0.0.33] - 30-11-20
 
 ### Added
