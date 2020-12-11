@@ -212,34 +212,6 @@ def prefix_id_recursively(item, key):
             for child in children:
                 prefix_id_recursively(child, key)
 
-        #
-        # # TODO: If layout is NOT a function, maybe apply prefix on init for performance?
-        # layout = self._layout()
-        # if not self.prefix_id:
-        #     return layout
-        # return prefix_id_recursively(layout, self.id)
-        #
-        # return None
-
-    #
-    # def layout(self, layout, layout_is_function):
-    #     if layout_is_function or not self.initialized:
-    #         children = layout.children + self.hidden_divs
-    #         layout.children = children
-    #         self.initialized = True
-    #     return layout
-    #
-    # def layout(self, layout, layout_is_function):
-    #     if
-    #
-    #     # TODO: If layout is NOT a function, maybe apply prefix on init for performance?
-    #     layout = self._layout()
-    #     if not self.prefix_id:
-    #         return layout
-    #     return prefix_id_recursively(layout, self.id)
-    #
-    #     return None
-
 
 # endregion
 
@@ -374,7 +346,7 @@ def _combine_callbacks(callbacks):
         # Return the combined output.
         return output_values if multi_output else output_values[0]  # TODO: Check for multi output here?
 
-    return {dd.Output: outputs, dd.Input: inputs,
+    return {dd.Output: outputs, dd.Input: inputs, "sorted_args": outputs + inputs + states,
             "f": wrapper, dd.State: states, "kwargs": kwargs, "multi_output": multi_output}
 
 

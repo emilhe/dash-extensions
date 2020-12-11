@@ -2,8 +2,8 @@ import dash_html_components as html
 import dash_core_components as dcc
 
 from dash.exceptions import PreventUpdate
-from enrich import Output, Input, PrefixIdTransform, DashProxy
-from Burger import Burger
+from .enrich import Output, Input, PrefixIdTransform, DashProxy
+from .Burger import Burger
 
 URL_ID = "url"
 CONTENT_ID = "content"
