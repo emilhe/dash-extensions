@@ -9,7 +9,7 @@ import dash_html_components as html
 import dash.dependencies as dd
 import plotly
 
-from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER
+from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER, _Wildcard
 from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
@@ -171,7 +171,7 @@ class PrefixIdTransform(DashTransform):
     def apply(self, callbacks):
         for callback in callbacks:
             for arg in callback["sorted_args"]:
-                prefix_id(arg, self.prefix)
+                arg.component_id = apply_prefix(self.prefix, arg.component_id)
         return callbacks
 
     def layout(self, layout, layout_is_function):
@@ -184,33 +184,26 @@ class PrefixIdTransform(DashTransform):
 
 def apply_prefix(prefix, component_id):
     if isinstance(component_id, dict):
-        # TODO: Handle wild cards.
-        # for key in component_id:
-        #     if key == "index":
-        #         continue
-        #     component_id[key] = "{}-{}".format(prefix, component_id[key])
+        for key in component_id:
+            # This branch handles the IDs. TODO: Can we always assume use of ints?
+            if type(component_id[key]) == int:
+                continue
+            # This branch handles the wildcard callbacks.
+            if isinstance(component_id[key], _Wildcard):
+                continue
+            # All "normal" props are prefixed.
+            component_id[key] = "{}-{}".format(prefix, component_id[key])
         return component_id
     return "{}-{}".format(prefix, component_id)
-
-
-def prefix_id(arg, key):
-    if hasattr(arg, 'component_id'):
-        arg.component_id = apply_prefix(key, arg.component_id)
-    if hasattr(arg, '__len__'):
-        for entry in arg:
-            entry.component_id = apply_prefix(key, entry.component_id)
 
 
 def prefix_id_recursively(item, key):
     if hasattr(item, "id"):
         item.id = apply_prefix(key, item.id)
     if hasattr(item, "children"):
-        children = item.children
-        if hasattr(children, "id"):
-            children.id = apply_prefix(key, children.id)
-        if hasattr(children, "__len__"):
-            for child in children:
-                prefix_id_recursively(child, key)
+        children = _as_list(item.children)
+        for child in children:
+            prefix_id_recursively(child, key)
 
 
 # endregion

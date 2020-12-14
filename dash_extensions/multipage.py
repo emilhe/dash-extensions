@@ -2,7 +2,7 @@ import dash_html_components as html
 import dash_core_components as dcc
 
 from dash.exceptions import PreventUpdate
-from .enrich import Output, Input, PrefixIdTransform, DashProxy
+from .enrich import Output, Input, PrefixIdTransform, DashProxy, prefix_id_recursively
 from .Burger import Burger
 
 URL_ID = "url"
@@ -13,6 +13,7 @@ class Page:
     def __init__(self, id, label, layout=None, callbacks=None, prefix_ids=True, proxy=None):
         self.id = id
         self.label = label
+        self._prefix_ids = prefix_ids
         self._layout = layout
         # Per default, use prefix transform.
         self._proxy = proxy
@@ -34,12 +35,25 @@ class Page:
 
         return _layout
 
+    @layout.setter
+    def layout(self, layout):
+        self._layout = layout
+
     @property
     def callbacks(self):
         def _callbacks(app):
             return self._proxy._register_callbacks(app)
 
         return _callbacks
+
+    @callbacks.setter
+    def callbacks(self, callbacks):
+        callbacks(self._proxy)
+
+    def render(self, layout):
+        if self._prefix_ids:
+            prefix_id_recursively(layout, self.id)
+        return layout
 
 
 class PageCollection:
