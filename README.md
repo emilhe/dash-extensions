@@ -182,8 +182,7 @@ To ease downloading data frames (which seems to be a common use case for Dash us
 
     import dash
     import pandas as pd
-    import dash_html_components as html
-    
+    import dash_html_components as html 
     from dash.dependencies import Output, Input
     from dash_extensions import Download
     from dash_extensions.snippets import send_data_frame
@@ -200,6 +199,58 @@ To ease downloading data frames (which seems to be a common use case for Dash us
      
     if __name__ == '__main__':
         app.run_server()
+
+Finally, a `send_bytes`  utility method is included to make it easy to download in-memory objects that support writing to BytesIO. Typical use cases are excel files,
+
+    import dash
+    import dash_html_components as html
+    import numpy as np
+    import pandas as pd
+    from dash.dependencies import Output, Input
+    from dash_extensions import Download
+    from dash_extensions.snippets import send_bytes
+
+    # Example data.
+    data = np.column_stack((np.arange(10), np.arange(10) * 2))
+    df = pd.DataFrame(columns=["a column", "another column"], data=data)
+    # Create example app.
+    app = dash.Dash(prevent_initial_callbacks=True)
+    app.layout = html.Div([html.Button("Download xlsx", id="btn"), Download(id="download")])
+
+    @app.callback(Output("download", "data"), [Input("btn", "n_clicks")])
+    def generate_xlsx(n_nlicks):
+
+        def to_xlsx(bytes_io):
+            xslx_writer = pd.ExcelWriter(bytes_io, engine="xlsxwriter")
+            df.to_excel(xslx_writer, index=False, sheet_name="sheet1")
+            xslx_writer.save()
+
+        return send_bytes(to_xlsx, "some_name.xlsx")
+
+
+    if __name__ == '__main__':
+        app.run_server()
+
+and figure objects,
+
+    import dash
+    import dash_html_components as html
+    import plotly.graph_objects as go
+    from dash.dependencies import Input, Output
+    from dash_extensions import Download
+    from dash_extensions.snippets import send_bytes
+
+    app = dash.Dash()
+    app.layout = html.Div([html.Button("Download", id="btn"), Download(id="download")])
+
+    @app.callback(Output("download", "data"), [Input("btn", "n_clicks")])
+    def download(n_clicks):
+        f = go.Figure()
+        return send_bytes(f.write_image, "figure.png")
+
+    if __name__ == '__main__':
+        app.run_server()
+        
 
 ### Monitor
 
