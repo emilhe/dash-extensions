@@ -305,6 +305,8 @@ def _combine_callbacks(callbacks):
             for item in entry:
                 # Check for exact matches.
                 match = item == prop_id
+                if match:
+                    break
                 # Check for wild card matches.
                 if any([wildcard_value in item for wildcard_value in _wildcard_values]):
                     try:
