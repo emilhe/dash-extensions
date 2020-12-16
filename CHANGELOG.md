@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.0.38] - 16-12-20
 
-### Added
+### Changed
 
 - Bug fix related to [callback grouping with multiple inputs](https://github.com/thedirtyfew/dash-extensions/issues/34).
 
