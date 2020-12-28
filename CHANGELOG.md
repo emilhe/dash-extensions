@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.39rc3] - 28-12-20
+
+### Added
+
+- Added `DashWebSocket` component.
+
 ## [0.0.38] - 16-12-20
 
 ### Changed
