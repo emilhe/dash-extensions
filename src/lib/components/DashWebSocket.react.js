@@ -6,9 +6,11 @@ import PropTypes from 'prop-types';
  */
 export default class DashWebSocket extends Component {
 
-    _init_client(){
+    _init_client() {
         // Create a new client.
-        const {url, protocols} = this.props;
+        let {url} = this.props;
+        const {protocols} = this.props;
+        url = url? url : "ws://" + location.host + "/ws";
         this.client = new WebSocket(url, protocols);
         // Listen for events.
         this.client.onopen = (e) => {
@@ -34,7 +36,7 @@ export default class DashWebSocket extends Component {
         }
         this.client.onerror = (e) => {
             // TODO: Implement this one also.
-            this.props.setProps({ error: JSON.stringify(e)})
+            this.props.setProps({error: JSON.stringify(e)})
         }
         this.client.onclose = (e) => {
             // TODO: Add more properties here?
@@ -57,8 +59,8 @@ export default class DashWebSocket extends Component {
     componentDidUpdate(prevProps) {
         const {send} = this.props;
         // Send messages.
-        if(send && send !== prevProps.send) {
-            if(this.props.open && !this.props.close){
+        if (send && send !== prevProps.send) {
+            if (this.props.open && !this.props.close) {
                 this.client.send(send)
             }
         }
@@ -106,7 +108,7 @@ DashWebSocket.propTypes = {
     /**
      * The websocket endpoint (e.g. wss://echo.websocket.org).
      */
-    url: PropTypes.string.isRequired,
+    url: PropTypes.string,
 
     /**
      * Supported websocket protocols (optional).
