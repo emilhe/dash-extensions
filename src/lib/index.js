@@ -4,6 +4,7 @@ import Lottie from './components/Lottie.react';
 import Keyboard from './components/Keyboard.react';
 import Monitor from './components/Monitor.react';
 import Burger from './components/Burger.react';
+import Ticker from './components/Ticker.react';
 import WebSocket from './components/WebSocket.react';
 
 export {
@@ -12,5 +13,6 @@ export {
     Keyboard,
     Monitor,
     Burger,
-    WebSocket
+    WebSocket,
+    Ticker
 };
