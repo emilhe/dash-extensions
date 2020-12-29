@@ -1,6 +1,6 @@
 {
   "name": "dash-extensions",
-  "version": "0.0.39rc3",
+  "version": "0.0.39",
   "description": "Extensions for Plotly Dash.",
   "main": "build/index.js",
   "scripts": {
@@ -21,7 +21,8 @@
     "base64-js": "^1.3.1",
     "ramda": "^0.26.1",
     "react-lottie": "^1.2.3",
-    "react-burger-menu": "^2.6.10"
+    "react-burger-menu": "^2.6.10",
+    "react-ticker": "^1.2.2"
   },
   "devDependencies": {
     "@babel/core": "^7.5.4",

@@ -12,6 +12,6 @@ __all__ = [
     "Keyboard",
     "Lottie",
     "Monitor",
-    "WebSocket",
-    "Ticker"
+    "Ticker",
+    "WebSocket"
 ]
