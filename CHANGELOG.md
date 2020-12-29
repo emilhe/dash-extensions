@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.39rc3] - 28-12-20
+
+### Added
+
+- Added `WebSocket` component and `websocket.py` file with websocket utils.
+- Added `Ticker` component.
+
 ## [0.0.38] - 16-12-20
 
 ### Changed

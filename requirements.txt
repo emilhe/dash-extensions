@@ -1,5 +1,10 @@
-dash
+dash~=1.18.1
 more-itertools
 pyyaml
 Flask-Caching
 requests
+Flask
+plotly
+gevent
+gevent-websocket
+setuptools
