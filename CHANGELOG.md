@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `DashWebSocket` component.
+- Added `WebSocket` component and `websocket.py` file with websocket utils.
 
 ## [0.0.38] - 16-12-20
 

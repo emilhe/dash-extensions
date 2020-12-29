@@ -1,14 +1,14 @@
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_extensions as de
-
 from dash import Dash
 from dash.dependencies import Input, Output
+from dash_extensions import WebSocket
 
+# Create example app.
 app = Dash(prevent_initial_callbacks=True)
 app.layout = html.Div([
     dcc.Input(id="input", autoComplete="off"), html.Div(id="message"),
-    de.DashWebSocket(url="wss://echo.websocket.org", id="ws")
+    WebSocket(url="wss://echo.websocket.org", id="ws")
 ])
 
 

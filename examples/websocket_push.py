@@ -3,23 +3,29 @@ import dash_extensions as de
 
 from dash import Dash
 from dash.dependencies import Input, Output
-from dash_extensions.socket import SocketPool, run_server
+from dash_extensions.websocket import SocketPool, run_server
 
 # Create example app.
 app = Dash(prevent_initial_callbacks=True)
 socket_pool = SocketPool(app)
-# Create example app.
-app.layout = html.Div([html.Div(id="msg"), de.DashWebSocket(id="ws")])
+app.layout = html.Div([html.Div(id="msg"), de.WebSocket(id="ws")])
 # Update div using websocket.
 app.clientside_callback("function(msg){return \"Response from websocket: \" + msg.data;}",
                         Output("msg", "children"), [Input("ws", "message")])
 
 
-# End point to push messages.
+# End point to send message to current session.
 @app.server.route("/send/<message>")
 def send_message(message):
-    socket_pool.send_all(message)
+    socket_pool.send(message)
     return f"Message [{message}] sent."
+
+
+# End point to broadcast message to ALL sessions.
+@app.server.route("/broadcast/<message>")
+def broadcast_message(message):
+    socket_pool.broadcast(message)
+    return f"Message [{message}] broadcast."
 
 
 if __name__ == '__main__':

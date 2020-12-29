@@ -5,29 +5,30 @@ import dash_extensions as de
 from gevent import sleep
 from dash import Dash
 from dash.dependencies import Input, Output
-from dash_extensions.socket import SocketPool, run_server
+from dash_extensions.websocket import SocketPool, run_server
 
 
-def long_calculation(msg, ws):
-    sleep(2)  # Delay message to simulate a long calculation
-    ws.send(f"Calculation completed: {msg}")
+def ws_handler(ws):
+    msg = ws.receive()  # receive input data
+    sleep(2)  # add delay to simulate a long calculation
+    ws.send(f"Calculation completed: {msg}")  # send output data
 
 
 # Create example app.
 app = Dash(prevent_initial_callbacks=True)
-socket_pool = SocketPool(app, message_handler=long_calculation)
+socket_pool = SocketPool(app, handler=ws_handler)
 # Create example app.
-app.layout = html.Div([html.Button("Run", id="btn"), html.Div(id="msg"), de.DashWebSocket(id="ws")])
+app.layout = html.Div([html.Button("Run", id="btn"), html.Div(id="msg"), de.WebSocket(id="ws")])
 
 
 @app.callback(Output("ws", "send"), [Input("btn", "n_clicks")])
 def start_calc(n_clicks):
-    return n_clicks
+    return n_clicks  # by sending data (n_clicks) to the "send" prop of ws, the "ws_handler" is invoked
 
 
 @app.callback(Output("msg", "children"), [Input("ws", "message")])
 def show_result(result):
-    return json.dumps(result)
+    return json.dumps(result)  # the "message" prop of ws triggers this callback when "ws_handler" invokes "send"
 
 
 if __name__ == '__main__':

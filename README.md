@@ -141,6 +141,42 @@ The complete example is available [on github](https://github.com/thedirtyfew/das
 
 The components listed here can be used in the `layout` of your Dash app. 
 
+### WebSocket
+
+The `WebSocket` component enables communication via _websockets_ in Dash. Simply add the `WebSocket` component to the layout and set the `url` property to the websocket endpoint. Messages can be send by writing to the `send` property, and received messages are written to the `message` property. Here is a small example,
+
+    import dash_core_components as dcc
+    import dash_html_components as html
+    from dash import Dash
+    from dash.dependencies import Input, Output
+    from dash_extensions import WebSocket
+    
+    # Create example app.
+    app = Dash(prevent_initial_callbacks=True)
+    app.layout = html.Div([
+        dcc.Input(id="input", autoComplete="off"), html.Div(id="message"),
+        WebSocket(url="wss://echo.websocket.org", id="ws")
+    ])
+    
+    @app.callback(Output("ws", "send"), [Input("input", "value")])
+    def send(value):
+        return value
+    
+    @app.callback(Output("message", "children"), [Input("ws", "message")])
+    def message(e):
+        return f"Response from websocket: {e['data']}"
+    
+    if __name__ == '__main__':
+        app.run_server()
+
+Websockets make it possible to solve a number of cases, which can otherwise be challenging in Dash, e.g.
+
+* Updating client content without server interaction
+* Pushing updates from the server to the client(s)
+* Running long processes asynchronously
+
+Examples can be found in the `examples` folder.
+
 ### Download
 
 The `Download` component provides an easy way to download data from a Dash application. Simply add the `Download` component to the app layout, and add a callback which targets its `data` property. Here is a small example,
