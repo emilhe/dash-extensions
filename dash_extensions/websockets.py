@@ -3,8 +3,6 @@ import json
 import secrets
 from flask_sockets import Sockets
 from flask import session
-from gevent import pywsgi
-from geventwebsocket.handler import WebSocketHandler
 
 
 def ensure_session_id():
@@ -48,5 +46,7 @@ class SocketPool:
 
 
 def run_server(app, port=5000):
+    from gevent import pywsgi
+    from geventwebsocket.handler import WebSocketHandler
     server = pywsgi.WSGIServer(('', port), app.server, handler_class=WebSocketHandler)
     server.serve_forever()

@@ -1,14 +1,14 @@
 import dash_html_components as html
-import dash_extensions as de
 
 from dash import Dash
 from dash.dependencies import Input, Output
-from dash_extensions.websocket import SocketPool, run_server
+from dash_extensions.websockets import SocketPool, run_server
+from dash_extensions import WebSocket
 
 # Create example app.
 app = Dash(prevent_initial_callbacks=True)
 socket_pool = SocketPool(app)
-app.layout = html.Div([html.Div(id="msg"), de.WebSocket(id="ws")])
+app.layout = html.Div([html.Div(id="msg"), WebSocket(id="ws")])
 # Update div using websocket.
 app.clientside_callback("function(msg){return \"Response from websocket: \" + msg.data;}",
                         Output("msg", "children"), [Input("ws", "message")])

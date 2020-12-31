@@ -1,11 +1,11 @@
 import json
 import dash_html_components as html
-import dash_extensions as de
 
 from gevent import sleep
 from dash import Dash
 from dash.dependencies import Input, Output
-from dash_extensions.websocket import SocketPool, run_server
+from dash_extensions import WebSocket
+from dash_extensions.websockets import SocketPool, run_server
 
 
 def ws_handler(ws):
@@ -18,7 +18,7 @@ def ws_handler(ws):
 app = Dash(prevent_initial_callbacks=True)
 socket_pool = SocketPool(app, handler=ws_handler)
 # Create example app.
-app.layout = html.Div([html.Button("Run", id="btn"), html.Div(id="msg"), de.WebSocket(id="ws")])
+app.layout = html.Div([html.Button("Run", id="btn"), html.Div(id="msg"), WebSocket(id="ws")])
 
 
 @app.callback(Output("ws", "send"), [Input("btn", "n_clicks")])

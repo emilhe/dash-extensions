@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.39rc3] - 28-12-20
+## [0.0.40] - 31-12-20
+
+### Changes
+
+- Renaming of `websocket.py` to `websockets.py` to address a [Windows compatibility issue](https://github.com/thedirtyfew/dash-extensions/issues/38).
+
+## [0.0.39] - 28-12-20
 
 ### Added
 
