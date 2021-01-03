@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.41] - 03-01-20
+
+### Changes
+
+- Bugfix in `NoOutputTransform`.
+
 ## [0.0.40] - 31-12-20
 
 ### Changes

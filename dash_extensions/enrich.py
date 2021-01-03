@@ -559,7 +559,7 @@ class NoOutputTransform(DashTransform):
 
     def layout(self, layout, layout_is_function):
         if layout_is_function or not self.initialized:
-            children = layout.children + self.hidden_divs
+            children = _as_list(layout.children) + self.hidden_divs
             layout.children = children
             self.initialized = True
         return layout
