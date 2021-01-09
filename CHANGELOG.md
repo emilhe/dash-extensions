@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.42] - 09-01-20
+
+### Changes
+
+- Bugfix in `Burger` thanks to [JonThom](https://github.com/thedirtyfew/dash-extensions/issues/39).
+
 ## [0.0.41] - 03-01-20
 
 ### Changes

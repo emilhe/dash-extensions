@@ -47,10 +47,10 @@ BurgerMenu.propTypes = {
 
     height: PropTypes.string,
 
-    position: PropTypes.oneOf("left", "right"),
+    position: PropTypes.oneOf(["left", "right"]),
 
-    effect: PropTypes.oneOf("slide", "stack", "elastic", "bubble", "push", "pushRotate", "scaleDown",
-        "scaleRotate", "fallDown", "reveal"),
+    effect: PropTypes.oneOf(["slide", "stack", "elastic", "bubble", "push", "pushRotate", "scaleDown",
+        "scaleRotate", "fallDown", "reveal"]),
 
     className: PropTypes.string,
 
