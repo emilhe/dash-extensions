@@ -137,6 +137,49 @@ Once the pages have been constructed, they can be passed to a `PageCollection` o
 
 The complete example is available [on github](https://github.com/thedirtyfew/dash-extensions/blob/master/examples/multipage_app.py).
 
+## Dataiku
+
+The `dataiku` module provides a few utility functions to ease the integration of Dash apps in the [dataiku](https://www.dataiku.com/) ecosystem. To get started, create a standard web app. Clear the HTML tab (and the CSS tab if you don't need the styles) and paste the following boiler plate code in the JS tab,
+
+    /*
+    Plotly Dash integration boiler plate code.
+    */
+    window.onload = function() {
+        // setup url for application end point
+        const appPrefix = 'dash'
+        const appUrl = getWebAppBackendUrl('/' + appPrefix + '/')
+        // setup url for app configuration
+        const configUrl = getWebAppBackendUrl('/configure')
+        const args = '?webAppBackendUrl=' + encodeURIComponent(getWebAppBackendUrl('/')) + '&appPrefix=' + appPrefix;
+        // do the magic
+        fetch( configUrl + args )
+       .then(async r=> {
+           const json = await r.json()
+           // if there is no error, redirect to Dash app
+           if (!json.error) {
+               location.replace(appUrl)
+           }
+           // otherwise, output the error to the page
+           else {
+               document.write(json.error);
+           }
+       }).catch(e=>console.error('Boo...' + e));
+    }
+
+Next, go to the Python tab and create the Dash like this,
+
+    import dash
+    import dash_html_components as html
+    from dash_extensions.dataiku import setup_dataiku
+    
+    # Path for storing app configuration (must be writeable).
+    config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.json")
+    # Create a small example app.
+    dash_app = dash.Dash(__name__, **setup_dataiku(app, config_path))
+    dash_app.layout = html.Div("Hello from Dash!")
+
+You should now see the text `Hello from Dash!` in the preview window. 
+
 ## Components
 
 The components listed here can be used in the `layout` of your Dash app. 
