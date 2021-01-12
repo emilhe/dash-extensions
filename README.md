@@ -142,7 +142,7 @@ The complete example is available [on github](https://github.com/thedirtyfew/das
 The `dataiku` module provides a few utility functions to ease the integration of Dash apps in the [dataiku](https://www.dataiku.com/) ecosystem. To get started, create a standard web app. Make sure that the selected code environment (can be configured in the Settings tab) has the following packages installed,
 
     dash==1.18.1
-    dash_extensions==0.0.44
+    dash-extensions==0.0.44
 
 Replace the content of the HTML tab with
 
