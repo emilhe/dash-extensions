@@ -139,34 +139,18 @@ The complete example is available [on github](https://github.com/thedirtyfew/das
 
 ## Dataiku
 
-The `dataiku` module provides a few utility functions to ease the integration of Dash apps in the [dataiku](https://www.dataiku.com/) ecosystem. To get started, create a standard web app. Clear the HTML tab (and the CSS tab if you don't need the styles) and paste the following boiler plate code in the JS tab,
+The `dataiku` module provides a few utility functions to ease the integration of Dash apps in the [dataiku](https://www.dataiku.com/) ecosystem. To get started, create a standard web app. Make sure that the selected code environment (can be configured in the Settings tab) has the following packages installed,
 
-    /*
-    Plotly Dash integration boiler plate code.
-    */
-    window.onload = function() {
-        // setup url for application end point
-        const appPrefix = 'dash'
-        const appUrl = getWebAppBackendUrl('/' + appPrefix + '/')
-        // setup url for app configuration
-        const configUrl = getWebAppBackendUrl('/configure')
-        const args = '?webAppBackendUrl=' + encodeURIComponent(getWebAppBackendUrl('/')) + '&appPrefix=' + appPrefix;
-        // do the magic
-        fetch( configUrl + args )
-       .then(async r=> {
-           const json = await r.json()
-           // if there is no error, redirect to Dash app
-           if (!json.error) {
-               location.replace(appUrl)
-           }
-           // otherwise, output the error to the page
-           else {
-               document.write(json.error);
-           }
-       }).catch(e=>console.error('Boo...' + e));
-    }
+    dash==1.18.1
+    dash_extensions==0.0.44
 
-Next, go to the Python tab and create the Dash like this,
+Replace the content of the HTML tab with
+
+    <head>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/thedirtyfew/dash-extensions@dataiku/snippets/dataiku.js"></script>
+    </head>
+
+and clear the JS and CSS tabs (unless you the JS/CSS code). Finally, go to the Python tab and replace the content with
 
     import dash
     import dash_html_components as html
@@ -178,7 +162,7 @@ Next, go to the Python tab and create the Dash like this,
     dash_app = dash.Dash(__name__, **setup_dataiku(app, config_path))
     dash_app.layout = html.Div("Hello from Dash!")
 
-You should now see the text `Hello from Dash!` in the preview window. 
+After clicking save, you should see the text `Hello from Dash!` in the preview window (a backend restart might be required). Congratulations! You have created you first Dash app in dataiku.
 
 ## Components
 
