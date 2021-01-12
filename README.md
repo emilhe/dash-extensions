@@ -147,7 +147,7 @@ The `dataiku` module provides a few utility functions to ease the integration of
 Replace the content of the HTML tab with
 
     <head>
-        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/thedirtyfew/dash-extensions@dataiku/snippets/dataiku.js"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/thedirtyfew/dash-extensions@0.0.44/snippets/dataiku.js"></script>
     </head>
 
 and clear the JS and CSS tabs (unless you the JS/CSS code). Finally, go to the Python tab and replace the content with
