@@ -46,22 +46,16 @@ export default class Monitor extends Component {
         }
         const elements = this.props.probes[key];
         for (let i = 0; i < elements.length; i++) {
-            const id = elements[i].id ? elements[i].id : elements[i][0]
+            let id = elements[i].id ? elements[i].id : elements[i][0]
             const prop = elements[i].prop ? elements[i].prop : elements[i][1]
+            let compare_id = props.id
+
+            // If ids are objects, convert them to strings
+            if (typeof id === 'object'){id = JSON.stringify(id)}
+            if (typeof compare_id === 'object'){compare_id = JSON.stringify(compare_id)}
+
             // Check if there is a match.
-
-            let idsMatch = true;
-            if (typeof props.id === 'object'){
-                for (const [id_key, id_value] of Object.entries(props.id)) {
-                    if (!Object.hasOwnProperty.call(id, id_key) || id[id_key] !== id_value) {
-                        idsMatch = false;
-                    }
-                }
-            } else {
-                idsMatch = props.id === id
-            }
-
-            if (!idsMatch || !(prop in props)) {
+            if (compare_id !== id || !(prop in props)) {
                 continue
             }
 
