@@ -49,7 +49,19 @@ export default class Monitor extends Component {
             const id = elements[i].id ? elements[i].id : elements[i][0]
             const prop = elements[i].prop ? elements[i].prop : elements[i][1]
             // Check if there is a match.
-            if (props.id !== id || !(prop in props)) {
+
+            let idsMatch = true;
+            if (typeof props.id === 'object'){
+                for (const [id_key, id_value] of Object.entries(props.id)) {
+                    if (!Object.hasOwnProperty.call(id, id_key) || id[id_key] !== id_value) {
+                        idsMatch = false;
+                    }
+                }
+            } else {
+                idsMatch = props.id === id
+            }
+
+            if (!idsMatch || !(prop in props)) {
                 continue
             }
 
@@ -113,7 +125,7 @@ Monitor.propTypes = {
                 PropTypes.arrayOf(PropTypes.string),
                 // object notation, i.e. {"id": id, "prop": prop}
                 PropTypes.shape({
-                    id: PropTypes.string.isRequired,
+                    id: PropTypes.oneOfType([PropTypes.string.isRequired, PropTypes.object.isRequired]),
                     prop: PropTypes.any.isRequired,
                 })
             ])
