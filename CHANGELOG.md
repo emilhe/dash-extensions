@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.45] - 06-02-21
+
+### Change
+
+- Added support for dict IDs in the `Monitor` component thanks to [Yook74](https://github.com/thedirtyfew/dash-extensions/issues/45).
+
 ## [0.0.44] - 12-01-21
 
 ### Added
