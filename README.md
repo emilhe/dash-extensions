@@ -389,8 +389,12 @@ The `Keyboard` component makes it possible to capture keyboard events at the doc
     app = dash.Dash()
     app.layout = html.Div([Keyboard(id="keyboard"), html.Div(id="output")])
     
-    @app.callback(Output("output", "children"), [Input("keyboard", "keydown")])
-    def keydown(event):
+    @app.callback(
+        Output("output", "children"), 
+        [Input("keyboard", "n_keydowns")],
+        [State("keyboard", "keydown")],
+    )
+    def keydown(n_keydowns, event):
         return json.dumps(event)
     
     
