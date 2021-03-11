@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.46] - 11-03-21
+
+### Change
+
+- Added a new function in the `dataiku` module.
+
 ## [0.0.45] - 06-02-21
 
 ### Change
