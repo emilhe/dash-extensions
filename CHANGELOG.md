@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.47] - UNRELEASED
+
+### Change
+
+- Added a new `MultiplexerTransform` that makes it possible to target an output multiple times.
+
 ## [0.0.46] - 11-03-21
 
 ### Change
