@@ -129,7 +129,7 @@ class Triggered(object):
             setattr(self, key, kwargs[key])
 
 
-def get_triggered():
+def get_triggered() -> Triggered:
     triggered = dash.callback_context.triggered
     if not triggered:
         return Triggered(None)

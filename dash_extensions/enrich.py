@@ -4,6 +4,8 @@ import json
 import pickle
 import secrets
 import uuid
+from collections import defaultdict
+
 import dash
 import dash_html_components as html
 import dash.dependencies as dd
@@ -15,6 +17,8 @@ from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen, flatten
 from json.decoder import JSONDecodeError
+
+from snippets import get_triggered
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -354,6 +358,72 @@ def _prep_props(callbacks, key):
     prop_lists = [[_create_callback_id(item) for item in callback[key]] for callback in callbacks]
     mappings = [[props.index(item) for item in l] for l in prop_lists]
     return all, props, prop_lists, mappings
+
+
+# endregion
+
+# region Multiplexer transform
+
+def _mp_id(output, idx):
+    return dict(id=output.component_id, prop=output.component_property, idx=idx)
+
+
+# TODO: Maybe change to using store instead of Div?
+def _mp_element(mp_id):
+    return html.Div(id=mp_id, style={"display": "none"})
+
+
+# Property for multiplexer storage, e.g. children for Div or Data for storage.
+def _mp_prop():
+    return "children"
+
+
+class MultiplexerTransform(DashTransform):
+
+    def __init__(self):
+        self.initialized = False
+        self.hidden_divs = []
+        self.app = DashProxy()
+
+    def layout(self, layout, layout_is_function):
+        if layout_is_function or not self.initialized:
+            children = _as_list(layout.children) + self.hidden_divs
+            layout.children = children
+            self.initialized = True
+        return layout
+
+    def apply(self, callbacks):
+        # Group by output.
+        output_map = defaultdict(list)
+        for callback in callbacks:
+            for output in callback[Output]:
+                output_map[output].append(callback)
+        # Apply multiplexer where needed.
+        for output in output_map:
+            # If there is only one output, multiplexing is not needed.
+            if len(output_map[output]) == 1:
+                continue
+            self._apply_multiplexer(output, output_map[output])
+
+        return callbacks + self.app.callbacks
+
+    def _apply_multiplexer(self, output, callbacks):
+        proxies = []
+        for i, callback in enumerate(callbacks):
+            # Create proxy element.
+            proxies.append(_mp_element(_mp_id(output, i)))
+            # Assign proxy element as output.
+            callback[Output][callback[Output].index(output)] = Output(proxies[-1].id, _mp_prop())
+        # Collect proxy elements to add to layout.
+        self.hidden_divs.extend(proxies)
+
+        # Create a new multiplexer callback. # TODO: Make this one client side for better performance
+        @self.app.callback(output, [Input(_mp_id(output, ALL), _mp_prop())])
+        def multiplexer(*args):
+            triggered = get_triggered()
+            if triggered.id is None:
+                raise PreventUpdate
+            return getattr(triggered, _mp_prop())
 
 
 # endregion
