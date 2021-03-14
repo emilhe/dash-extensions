@@ -4,8 +4,7 @@ import json
 import pickle
 import secrets
 import uuid
-from collections import defaultdict
-
+import dash_core_components as dcc
 import dash
 import dash_html_components as html
 import dash.dependencies as dd
@@ -17,8 +16,9 @@ from flask import session
 from flask_caching.backends import FileSystemCache
 from more_itertools import unique_everseen, flatten
 from json.decoder import JSONDecodeError
+from collections import defaultdict
+from typing import Dict
 
-from snippets import get_triggered
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -32,6 +32,7 @@ class DashProxy(dash.Dash):
     def __init__(self, *args, transforms=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.callbacks = []
+        self.clientside_callbacks = []
         self.arg_types = [dd.Output, dd.Input, dd.State]
         self.transforms = transforms if transforms is not None else []
         # Do the transform initialization.
@@ -74,14 +75,21 @@ class DashProxy(dash.Dash):
 
         return wrapper
 
+    def clientside_callback(self, clientside_function, *args, **kwargs):
+        self.clientside_callbacks.append(dict(clientside_function=clientside_function, args=args, kwargs=kwargs))
+
     def _register_callbacks(self, app=None):
         callbacks = list(self._resolve_callbacks())
+        app = super() if app is None else app
         for callback in callbacks:
             outputs = callback[dd.Output][0] if len(callback[dd.Output]) == 1 else callback[dd.Output]
-            if app is None:
-                super().callback(outputs, callback[dd.Input], callback[dd.State], **callback["kwargs"])(callback["f"])
-            else:
-                app.callback(outputs, callback[dd.Input], callback[dd.State], **callback["kwargs"])(callback["f"])
+            app.callback(outputs, callback[dd.Input], callback[dd.State], **callback["kwargs"])(callback["f"])
+
+    def _register_clientside_callbacks(self, app=None):
+        clientside_callbacks = list(self._resolve_clientside_callbacks())
+        app = super() if app is None else app
+        for callback in clientside_callbacks:
+            app.clientside_callback(callback["clientside_function"], *callback["args"], **callback["kwargs"])
 
     def _layout_value(self):
         layout = self._layout() if self._layout_is_function else self._layout
@@ -95,6 +103,7 @@ class DashProxy(dash.Dash):
         """
         # Register the callbacks.
         self._register_callbacks()
+        self._register_clientside_callbacks()
         # Proceed as normally.
         super()._setup_server()
         # Set session secret. Used by some subclasses.
@@ -109,6 +118,15 @@ class DashProxy(dash.Dash):
         for transform in self.transforms:
             callbacks = transform.apply(callbacks)
         return callbacks
+
+    def _resolve_clientside_callbacks(self):
+        """
+         This method resolves the clientside_callbacks, i.e. it applies the clientside_callbacks injections.
+        """
+        clientside_callbacks = self.clientside_callbacks
+        for transform in self.transforms:
+            clientside_callbacks = transform.apply_clientside(clientside_callbacks)
+        return clientside_callbacks
 
 
 def _get_session_id(session_key=None):
@@ -157,6 +175,9 @@ class DashTransform:
 
     def apply(self, callbacks):
         raise NotImplementedError()
+
+    def apply_clientside(self, clientside_callbacks):
+        return clientside_callbacks
 
     def layout(self, layout, layout_is_function):
         return layout
@@ -364,18 +385,16 @@ def _prep_props(callbacks, key):
 
 # region Multiplexer transform
 
-def _mp_id(output, idx):
+def _mp_id(output: Output, idx: int) -> Dict[str, str]:
     return dict(id=output.component_id, prop=output.component_property, idx=idx)
 
 
-# TODO: Maybe change to using store instead of Div?
-def _mp_element(mp_id):
-    return html.Div(id=mp_id, style={"display": "none"})
+def _mp_element(mp_id: Dict[str, str]) -> dcc.Store:
+    return dcc.Store(id=mp_id)
 
 
-# Property for multiplexer storage, e.g. children for Div or Data for storage.
-def _mp_prop():
-    return "children"
+def _mp_prop() -> str:
+    return "data"
 
 
 class MultiplexerTransform(DashTransform):
@@ -405,25 +424,29 @@ class MultiplexerTransform(DashTransform):
                 continue
             self._apply_multiplexer(output, output_map[output])
 
-        return callbacks + self.app.callbacks
+        return callbacks
+
+    def apply_clientside(self, clientside_callbacks):
+        return clientside_callbacks + self.app.clientside_callbacks
 
     def _apply_multiplexer(self, output, callbacks):
+        inputs = []
         proxies = []
         for i, callback in enumerate(callbacks):
             # Create proxy element.
             proxies.append(_mp_element(_mp_id(output, i)))
             # Assign proxy element as output.
             callback[Output][callback[Output].index(output)] = Output(proxies[-1].id, _mp_prop())
+            # Create proxy input.
+            inputs.append(Input(_mp_id(output, ALL), _mp_prop()))
         # Collect proxy elements to add to layout.
         self.hidden_divs.extend(proxies)
-
-        # Create a new multiplexer callback. # TODO: Make this one client side for better performance
-        @self.app.callback(output, [Input(_mp_id(output, ALL), _mp_prop())])
-        def multiplexer(*args):
-            triggered = get_triggered()
-            if triggered.id is None:
-                raise PreventUpdate
-            return getattr(triggered, _mp_prop())
+        # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
+        self.app.clientside_callback("""
+            function(){
+                return dash_clientside.callback_context.triggered[0].value;
+            }
+        """, output, inputs)
 
 
 # endregion
