@@ -19,7 +19,6 @@ from json.decoder import JSONDecodeError
 from collections import defaultdict
 from typing import Dict
 
-
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
@@ -97,18 +96,20 @@ class DashProxy(dash.Dash):
             layout = transform.layout(layout, self._layout_is_function)
         return layout
 
-    def _setup_server(self):
+    def _setup_server(self, app=None):
         """
          This method registers the callbacks on the Dash app and injects a session secret.
         """
         # Register the callbacks.
-        self._register_callbacks()
-        self._register_clientside_callbacks()
+        self._register_callbacks(app)
+        self._register_clientside_callbacks(app)
         # Proceed as normally.
-        super()._setup_server()
+        parent = super() if app is not None else app
+        parent._setup_server()
         # Set session secret. Used by some subclasses.
-        if not self.server.secret_key:
-            self.server.secret_key = secrets.token_urlsafe(16)
+        app = self if app is not None else app
+        if not app.server.secret_key:
+            app.server.secret_key = secrets.token_urlsafe(16)
 
     def _resolve_callbacks(self):
         """
@@ -127,6 +128,18 @@ class DashProxy(dash.Dash):
         for transform in self.transforms:
             clientside_callbacks = transform.apply_clientside(clientside_callbacks)
         return clientside_callbacks
+
+    def hijack(self, app: dash.Dash):
+        # Change properties.
+        app.config.update(self.config)
+        app.title = self.title
+        app.index_string = self.index_string
+        # Inject layout.
+        app.layout = html.Div()  # fool layout validator
+        app._layout_value = self._layout_value
+        # Register callbacks.
+        self._register_callbacks(app)
+        self._register_clientside_callbacks(app)
 
 
 def _get_session_id(session_key=None):
