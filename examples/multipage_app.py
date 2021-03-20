@@ -47,7 +47,6 @@ pc = PageCollection(pages=[
 ])
 # Create app.
 app = DashProxy(suppress_callback_exceptions=True)
-# app.layout = html.Div([make_burger(pc, effect="slide", right=True), default_layout()])
 app.layout = html.Div(simple_menu(pc) + [html.Div(id=CONTENT_ID), dcc.Location(id=URL_ID)])
 # Register callbacks.
 pc.navigation(app)
