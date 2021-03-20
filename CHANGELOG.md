@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 
 ### Change
 
+- Updated `Burger` component; added new properties, added new example, slight changes to interface.
+- Updated `multipage_app.py` example; removed dependency on burger menu, removed burger helper function in `multipage.py`.
 - Added a `hijack` function to the `DashProxy` object. It can be used to inject app state into other app objects, typically used in frameworks such as dataiku where the `Dash` object is constructed outside of the user code context. 
 
 ### Remove
