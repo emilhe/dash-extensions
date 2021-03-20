@@ -117,7 +117,7 @@ if the module implements the `layout` and `callbacks` functions. Finally, any ap
 
     page = app_to_page(app, id="app", label="An app")
 
-Once the pages have been constructed, they can be passed to a `PageCollection` object, which takes care of navigation. Hence a multipage app with a burger menu would be something like,
+Once the pages have been constructed, they can be passed to a `PageCollection` object, which takes care of navigation. Hence a multipage app with a simple menu would be something like,
 
     # Create pages.
     pc = PageCollection(pages=[
@@ -126,7 +126,7 @@ Once the pages have been constructed, they can be passed to a `PageCollection` o
     ])
     # Create app.
     app = DashProxy(suppress_callback_exceptions=True)
-    app.layout = html.Div([make_burger(pc, effect="slide", position="right"), default_layout()])
+    app.layout = html.Div(simple_menu(pc) + [html.Div(id=CONTENT_ID), dcc.Location(id=URL_ID)])
     # Register callbacks.
     pc.navigation(app)
     pc.callbacks(app)
@@ -135,7 +135,7 @@ The complete example is available [on github](https://github.com/thedirtyfew/das
 
 ## Dataiku
 
-The `dataiku` module provides a few utility functions to ease the integration of Dash apps in the [dataiku](https://www.dataiku.com/) ecosystem. To get started, create a standard web app. Make sure that the selected code environment (can be configured in the Settings tab) has the following packages installed,
+The `dataiku` module provides a few utility functions to ease the integration of Dash apps in [dataiku](https://www.dataiku.com/) 8.x (from 9.0, an official Dash integration is provided). To get started, create a standard web app. Make sure that the selected code environment (can be configured in the Settings tab) has the following packages installed,
 
     dash==1.18.1
     dash-extensions==0.0.44
@@ -309,7 +309,117 @@ and figure objects,
 
     if __name__ == '__main__':
         app.run_server()
-        
+
+
+### BeforeAfter
+
+The `BeforeAfter` component is a light wrapper of [react-before-after-slider](https://github.com/transitive-bullshit/react-before-after-slider/), which makes it possible to [highlight differences between two images](https://transitive-bullshit.github.io/react-before-after-slider/). Here is a small example,
+
+    import dash_html_components as html
+    from dash import Dash
+    from dash_extensions import BeforeAfter
+    
+    app = Dash()
+    app.layout = html.Div([
+        BeforeAfter(before="assets/lena_bw.png", after="assets/lena_color.png", width=512, height=512)
+    ])
+    
+    if __name__ == '__main__':
+        app.run_server()
+
+
+### Ticker
+
+The `Ticker` component is a light wrapper of [react-ticker](https://github.com/AndreasFaust/react-ticker), which makes it easy to show [moving text](https://andreasfaust.github.io/react-ticker/). Here is a small example,
+
+    import dash
+    import dash_html_components as html
+    from dash_extensions import Ticker
+    
+    app = dash.Dash(__name__)
+    app.layout = html.Div(Ticker([html.Div("Some text")], direction="toRight"))
+    
+    if __name__ == '__main__':
+        app.run_server()
+
+### Lottie
+
+The `Lottie` component makes it possible to run Lottie animations in Dash. Here is a small example,
+
+    import dash
+    import dash_html_components as html
+    import dash_extensions as de
+    
+    # Setup options.
+    url = "https://assets9.lottiefiles.com/packages/lf20_YXD37q.json"
+    options = dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRatio='xMidYMid slice'))
+    # Create example app.
+    app = dash.Dash(__name__)
+    app.layout = html.Div(de.Lottie(options=options, width="25%", height="25%", url=url))
+    
+    if __name__ == '__main__':
+        app.run_server()
+
+### Burger
+
+The `Burger` component is a light wrapper of [react-burger-menu](https://github.com/negomi/react-burger-menu), which enables [cool interactive burger menus](https://negomi.github.io/react-burger-menu/). Here is a small example,
+
+    import dash_html_components as html
+    from dash import Dash
+    from dash_extensions import Burger
+    
+    
+    def link_element(icon, text):
+        return html.A(children=[html.I(className=icon), html.Span(text)], href=f"/{text}",
+                      className="bm-item", style={"display": "block"})
+    
+    
+    # Example CSS from the original demo.
+    external_css = [
+        "https://negomi.github.io/react-burger-menu/example.css",
+        "https://negomi.github.io/react-burger-menu/normalize.css",
+        "https://negomi.github.io/react-burger-menu/fonts/font-awesome-4.2.0/css/font-awesome.min.css"
+    ]
+    # Create example app.
+    app = Dash(external_stylesheets=external_css)
+    app.layout = html.Div([
+        Burger(children=[
+            html.Nav(children=[
+                link_element("fa fa-fw fa-star-o", "Favorites"),
+                link_element("fa fa-fw fa-bell-o", "Alerts"),
+                link_element("fa fa-fw fa-envelope-o", "Messages"),
+                link_element("fa fa-fw fa-comment-o", "Comments"),
+                link_element("fa fa-fw fa-bar-chart-o", "Analytics"),
+                link_element("fa fa-fw fa-newspaper-o", "Reading List")
+            ], className="bm-item-list", style={"height": "100%"})
+        ], id="slide"),
+        html.Main("Hello world!", style={"width": "100%", "height": "100vh"}, id="main")
+    ], id="outer-container", style={"height": "100%"})
+    
+    if __name__ == '__main__':
+        app.run_server()
+
+
+### Keyboard
+
+The `Keyboard` component makes it possible to capture keyboard events at the document level. Here is a small example,
+
+    import dash
+    import dash_html_components as html
+    import json
+    from dash.dependencies import Output, Input
+    from dash_extensions import Keyboard
+    
+    app = dash.Dash()
+    app.layout = html.Div([Keyboard(id="keyboard"), html.Div(id="output")])
+    
+    @app.callback(Output("output", "children"), [Input("keyboard", "keydown")])
+    def keydown(event):
+        return json.dumps(event)
+    
+    
+    if __name__ == '__main__':
+        app.run_server()
 
 ### Monitor
 
@@ -348,47 +458,3 @@ The `Monitor` component makes it possible to monitor the state of child componen
     
     if __name__ == '__main__':
         app.run_server(debug=False)
-
-### Burger
-
-The `Burger` component is a light wrapper of [react-burger-menu](https://github.com/negomi/react-burger-menu), which enables [cool interactive burger menus](https://negomi.github.io/react-burger-menu/).
-
-### Lottie
-
-The `Lottie` component makes it possible to run Lottie animations in Dash. Here is a small example,
-
-    import dash
-    import dash_html_components as html
-    import dash_extensions as de
-    
-    # Setup options.
-    url = "https://assets9.lottiefiles.com/packages/lf20_YXD37q.json"
-    options = dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRatio='xMidYMid slice'))
-    # Create example app.
-    app = dash.Dash(__name__)
-    app.layout = html.Div(de.Lottie(options=options, width="25%", height="25%", url=url))
-    
-    if __name__ == '__main__':
-        app.run_server()
-
-
-### Keyboard
-
-The `Keyboard` component makes it possible to capture keyboard events at the document level. Here is a small example,
-
-    import dash
-    import dash_html_components as html
-    import json
-    from dash.dependencies import Output, Input
-    from dash_extensions import Keyboard
-    
-    app = dash.Dash()
-    app.layout = html.Div([Keyboard(id="keyboard"), html.Div(id="output")])
-    
-    @app.callback(Output("output", "children"), [Input("keyboard", "keydown")])
-    def keydown(event):
-        return json.dumps(event)
-    
-    
-    if __name__ == '__main__':
-        app.run_server()
