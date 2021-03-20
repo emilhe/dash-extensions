@@ -2,8 +2,7 @@ import dash_html_components as html
 import dash_core_components as dcc
 
 from dash.exceptions import PreventUpdate
-from .enrich import Output, Input, PrefixIdTransform, DashProxy, prefix_id_recursively
-from .Burger import Burger
+from dash_extensions.enrich import Output, Input, PrefixIdTransform, DashProxy, prefix_id_recursively
 
 URL_ID = "url"
 CONTENT_ID = "content"
@@ -97,22 +96,6 @@ class PageCollection:
         for page in self.pages:
             page.callbacks(app)
 
-
-# region Menus
-
-def make_burger(page_collection, before_pages=None, after_pages=None, href=None, **kwargs):
-    children = []
-    pages = page_collection.pages
-    for i, page in enumerate(pages):
-        children.append(html.A(children=page.label, href=href(page) if href is not None else "/{}".format(page.id)))
-        if i < (len(pages) - 1):
-            children.append(html.Br())
-    children = before_pages + children if before_pages is not None else children
-    children = children + after_pages if after_pages is not None else children
-    return Burger(children=children, **kwargs)
-
-
-# endregion
 
 # region Conversions
 
