@@ -1,3 +1,4 @@
+from .BeforeAfter import BeforeAfter
 from .Burger import Burger
 from .Download import Download
 from .Keyboard import Keyboard
@@ -7,6 +8,7 @@ from .Ticker import Ticker
 from .WebSocket import WebSocket
 
 __all__ = [
+    "BeforeAfter",
     "Burger",
     "Download",
     "Keyboard",

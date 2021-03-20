@@ -6,6 +6,7 @@ import Monitor from './components/Monitor.react';
 import Burger from './components/Burger.react';
 import Ticker from './components/Ticker.react';
 import WebSocket from './components/WebSocket.react';
+import BeforeAfter from './components/BeforeAfter.react';
 
 export {
     Download,
@@ -14,5 +15,6 @@ export {
     Monitor,
     Burger,
     WebSocket,
-    Ticker
+    Ticker,
+    BeforeAfter
 };

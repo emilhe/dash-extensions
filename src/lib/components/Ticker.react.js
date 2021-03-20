@@ -3,8 +3,7 @@ import PropTypes from 'prop-types';
 import ReactTicker from 'react-ticker';
 
 /**
- * A modified version of dcc.Link that adds a few more options. E.g. you can disable scrolling to
- * the top upon updating the url.
+ * A light wrapper of ReactTicker.
  */
 export default class Ticker extends Component {
 

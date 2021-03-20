@@ -4,9 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [0.0.47] - UNRELEASED
 
+### Added
+
+- A new `MultiplexerTransform` that makes it possible to target an output multiple times.
+- A new `BeforeAfter` component (to show before/after images).
+
 ### Change
 
-- Added a new `MultiplexerTransform` that makes it possible to target an output multiple times.
+- Added a `hijack` function to the `DashProxy` object. It can be used to inject app state into other app objects, typically used in frameworks such as dataiku where the `Dash` object is constructed outside of the user code context. 
+
+### Remove
+
+- Removed the `GroupTransform` (not really necessary with the new `MultiplexerTransform`).
+- Removed the `TriggerTransform`.
 
 ## [0.0.46] - 11-03-21
 

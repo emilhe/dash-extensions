@@ -49,48 +49,36 @@ In some cases, it might be sufficient to wrap an object as an arrow function, i.
 
 The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transforms` keyword argument, 
 
-    from enrich import DashProxy, TriggerTransform, GroupTransform, ServersideOutputTransform, NoOutputTransform
+    from enrich import DashProxy, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform
     
     app = DashProxy(transforms=[
-        TriggerTransform(),  # enable use of Trigger objects
-        GroupTransform(),  # enable use of the group keyword
+        MultiplexerTransform(),  # makes it possible to target an output multiple times in callbacks
         ServersideOutputTransform(),  # enable use of ServersideOutput objects
         NoOutputTransform(),  # enable callbacks without output
     ])
 
 The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to load only the transforms are that actually used.
 
-#### TriggerTransform
+#### MultiplexerTransform
 
-Makes it possible to use the `Trigger` component. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
+Makes it possible to target an output by multiple callbacks, i.e enabling code like
 
-    @app.callback(Output("output_id", "output_prop"), Trigger("button", "n_clicks"))
-    def func():  # note that "n_clicks" is not included as an argument 
-
-#### NoOutputTransform
-
-Assigns dummy output automatically when a callback if declared without an `Output`,
-
-    @app.callback(Trigger("button", "n_clicks"))  # note that the callback has no output
-
-#### GroupTransform
-
-Enables the `group` keyword, which makes it possible to bundle callbacks together. This feature serves as a work around for Dash not being able to target an output multiple times. Here is a small example,
-
-    @app.callback(Output("log", "children"), Trigger("left", "n_clicks"), group="my_group") 
-    def left():
+    @app.callback(Output("log", "children"), Input("left", "n_clicks")) 
+    def left(_):
         return "left"
         
-    @app.callback(Output("log", "children"), Trigger("right", "n_clicks"), group="my_group") 
-    def right():
+    @app.callback(Output("log", "children"), Input("right", "n_clicks")) 
+    def right(_):
         return "right"
+
+Under the hood, when `n` > 1 callbacks target the same element as output, _n_ `Store` elements are created, and the callbacks are redirect to target these intermediate outputs. Finally, a callback is added with the intermediate outputs as inputs and the original output as output. The strategy was contributed by [dwelch91](https://community.plotly.com/u/dwelch91/summary).
 
 #### ServersideOutputTransform
 
 Makes it possible to use the `ServersideOutput` component. It works like a normal `Output`, but _keeps the data on the server_. By skipping the data transfer between server/client, the network overhead is reduced drastically, and the serialization to JSON can be avoided. Hence, you can now return complex objects, such as a pandas data frame, directly,
 
-        @app.callback(ServersideOutput("store", "data"), Trigger("left", "n_clicks")) 
-        def query():
+        @app.callback(ServersideOutput("store", "data"), Input("left", "n_clicks")) 
+        def query(_):
             return pd.DataFrame(data=list(range(10)), columns=["value"])
             
         @app.callback(Output("log", "children"), Input("store", "data")) 
@@ -101,11 +89,19 @@ The reduced network overhead along with the avoided serialization to/from JSON c
   
 In addition, a new `memoize` keyword makes it possible to memoize the output of a callback. That is, the callback output is cached, and the cached result is returned when the same inputs occur again.
 
-    @app.callback(ServersideOutput("store", "data"), Trigger("left", "n_clicks"), memoize=True) 
-    def query():
+    @app.callback(ServersideOutput("store", "data"), Input("left", "n_clicks"), memoize=True) 
+    def query(_):
         return pd.DataFrame(data=list(range(10)), columns=["value"])
 
 Used with a normal `Output`, this keyword is essentially equivalent to the `@flask_caching.memoize` decorator. For a `ServersideOutput`, the backend to do server side storage will also be used for memoization. Hence, you avoid saving each object two times, which would happen if the `@flask_caching.memoize` decorator was used with a `ServersideOutput`.
+
+#### NoOutputTransform
+
+Makes it possible to write callbacks with an `Output`,
+
+    @app.callback(Input("button", "n_clicks"))  # note that the callback has no output
+
+Under the hood, a (hidden) dummy `Output` element is assigned and added to the app layout.
 
 ## Multipage
 

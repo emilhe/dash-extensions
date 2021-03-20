@@ -247,156 +247,6 @@ def prefix_id_recursively(item, key):
 
 # endregion
 
-# region Trigger transform (the only default transform)
-
-class Trigger(Input):
-    """
-     Like an Input, a trigger can trigger a callback, but it's values it not included in the resulting function call.
-    """
-
-    def __init__(self, component_id, component_property):
-        super().__init__(component_id, component_property)
-
-
-class TriggerTransform(DashTransform):
-
-    def apply(self, callbacks):
-        for callback in callbacks:
-            is_trigger = trigger_filter(callback["sorted_args"])
-            # Check if any triggers are there.
-            if not any(is_trigger):
-                continue
-            # If so, filter the callback args.
-            f = callback["f"]
-            callback["f"] = filter_args(is_trigger)(f)
-        return callbacks
-
-
-def filter_args(args_filter):
-    def wrapper(f):
-        @functools.wraps(f)
-        def decorated_function(*args):
-            filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]]
-            return f(*filtered_args)
-
-        return decorated_function
-
-    return wrapper
-
-
-def trigger_filter(args):
-    inputs_args = [item for item in args if isinstance(item, dd.Input) or isinstance(item, dd.State)]
-    is_trigger = [isinstance(item, Trigger) for item in inputs_args]
-    return is_trigger
-
-
-# endregion
-
-# region Group transform
-
-class GroupTransform(DashTransform):
-
-    def apply(self, callbacks):
-        groups = {}
-        # Figure out which callbacks to group together.
-        grouped_callbacks = []
-        for i in range(len(callbacks)):
-            key = callbacks[i]["kwargs"].pop("group", None)
-            if key:
-                if key not in groups:
-                    groups[key] = []
-                groups[key].append(i)
-            else:
-                grouped_callbacks.append(callbacks[i])
-        # Do the grouping.
-        for key in groups:
-            grouped_callback = _combine_callbacks([callbacks[i] for i in groups[key]])
-            grouped_callbacks.append(grouped_callback)
-
-        return grouped_callbacks
-
-
-# NOTE: No performance considerations what so ever. Just an initial proof-of-concept implementation.
-def _combine_callbacks(callbacks):
-    inputs, input_props, input_prop_lists, input_mappings = _prep_props(callbacks, dd.Input)
-    states, state_props, state_prop_lists, state_mappings = _prep_props(callbacks, dd.State)
-    outputs, output_props, output_prop_lists, output_mappings = _prep_props(callbacks, dd.Output)
-    # TODO: What kwargs to use?
-    kwargs = callbacks[0]["kwargs"]
-    multi_output = any([callback["multi_output"] for callback in callbacks])
-    if not multi_output:
-        all_outputs = []
-        for callback in callbacks:
-            all_outputs += callback[dd.Output]
-        multi_output = len(list(set(all_outputs))) > 1
-
-    # TODO: There might be a scope issue here
-    def wrapper(*args):
-        local_inputs = list(args)[:len(inputs)]
-        local_states = list(args)[len(inputs):]
-        if len(dash.callback_context.triggered) == 0:
-            raise PreventUpdate
-        prop_id = dash.callback_context.triggered[0]['prop_id']
-        output_values = [dash.no_update] * len(outputs)
-        for i, entry in enumerate(input_prop_lists):
-            # Check if the trigger is an input of the callback.
-            match = False
-            for item in entry:
-                # Check for exact matches.
-                match = item == prop_id
-                if match:
-                    break
-                # Check for wild card matches.
-                if any([wildcard_value in item for wildcard_value in _wildcard_values]):
-                    try:
-                        props = json.loads(prop_id.split(".")[0])
-                        item_props = json.loads(item.split(".")[0])
-                        prop_match = True
-                        for key in props:
-                            if item_props[key] not in _wildcard_values:
-                                prop_match = prop_match and item_props[key] == props[key]
-                            # TODO: Make checks here, no checks (as now) is only valid for ALL
-                        if prop_match:
-                            match = True
-                            break
-                    except JSONDecodeError:
-                        continue
-            if not match:
-                continue
-            # Trigger the callback function.
-            try:
-                inputs_i = [local_inputs[j] for j in input_mappings[i]]
-                states_i = [local_states[j] for j in state_mappings[i]]
-                outputs_i = callbacks[i]["f"](*inputs_i, *states_i)
-                if not callbacks[i]["multi_output"]:  # len(callbacks[i][Output]) == 1:  TODO: Is this right?
-                    outputs_i = [outputs_i]
-                for j, item in enumerate(outputs_i):
-                    output_values[output_mappings[i][j]] = outputs_i[j]
-            except PreventUpdate:
-                continue
-        # Check if an update is needed.
-        if all([item == dash.no_update for item in output_values]):
-            raise PreventUpdate
-        # Return the combined output.
-        return output_values if multi_output else output_values[0]  # TODO: Check for multi output here?
-
-    return {dd.Output: outputs, dd.Input: inputs, "sorted_args": outputs + inputs + states,
-            "f": wrapper, dd.State: states, "kwargs": kwargs, "multi_output": multi_output}
-
-
-def _prep_props(callbacks, key):
-    all = []
-    for callback in callbacks:
-        all.extend(callback[key])
-    all = list(unique_everseen(all))
-    props = [_create_callback_id(item) for item in all]
-    prop_lists = [[_create_callback_id(item) for item in callback[key]] for callback in callbacks]
-    mappings = [[props.index(item) for item in l] for l in prop_lists]
-    return all, props, prop_lists, mappings
-
-
-# endregion
-
 # region Multiplexer transform
 
 def _mp_id(output: Output, idx: int) -> Dict[str, str]:
@@ -575,11 +425,8 @@ def _pack_outputs(callback):
                 unique_ids = []
                 update_needed = False
                 for i, output in enumerate(callback[Output]):
-                    # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = trigger_filter(callback["sorted_args"])
-                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     # Generate unique ID.
-                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
+                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
                     unique_ids.append(unique_id)
                     if not output.backend.has(unique_id):
                         update_needed = True
@@ -599,9 +446,7 @@ def _pack_outputs(callback):
                 # Replace only for server side outputs.
                 if serverside_output or memoize:
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = trigger_filter(callback["sorted_args"])
-                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
-                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
+                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
                     output.backend.set(unique_id, data[i])
                     # Replace only for server side outputs.
                     if serverside_output:
@@ -688,8 +533,7 @@ class NoOutputTransform(DashTransform):
 class Dash(DashProxy):
     def __init__(self, *args, output_defaults=None, **kwargs):
         output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
-        transforms = [TriggerTransform(), NoOutputTransform(), GroupTransform(),
-                      ServersideOutputTransform(**output_defaults)]
+        transforms = [MultiplexerTransform(), NoOutputTransform(), ServersideOutputTransform(**output_defaults)]
         super().__init__(*args, transforms=transforms, **kwargs)
 
 # endregion
