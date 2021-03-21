@@ -131,7 +131,7 @@ Once the pages have been constructed, they can be passed to a `PageCollection` o
     pc.navigation(app)
     pc.callbacks(app)
 
-The complete example is available [on github](https://github.com/thedirtyfew/dash-extensions/blob/master/examples/multipage_app.py).
+The complete example is available [in the examples folder](https://github.com/thedirtyfew/dash-extensions/blob/master/examples/multipage_app.py).
 
 ## Dataiku
 
