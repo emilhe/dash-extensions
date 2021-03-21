@@ -23,7 +23,8 @@
     "react-before-after-slider": "^1.0.4",
     "react-burger-menu": "^2.6.10",
     "react-lottie": "^1.2.3",
-    "react-ticker": "^1.2.2"
+    "react-ticker": "^1.2.2",
+    "ssri": ">=8.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.5.4",
