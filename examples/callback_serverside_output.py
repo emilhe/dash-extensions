@@ -2,7 +2,7 @@ import time
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
-from dash_extensions.enrich import Dash, Output, Input, Trigger, ServersideOutput
+from dash_extensions.enrich import Dash, Output, Input, State, ServersideOutput
 
 app = Dash(prevent_initial_callbacks=True)
 app.layout = html.Div([
@@ -11,8 +11,8 @@ app.layout = html.Div([
 ])
 
 
-@app.callback(ServersideOutput("store", "data"), Trigger("btn", "n_clicks"))
-def query_data():
+@app.callback(ServersideOutput("store", "data"), Input("btn", "n_clicks"))
+def query_data(n_clicks):
     time.sleep(1)
     return px.data.gapminder()  # no JSON serialization here
 
@@ -22,8 +22,8 @@ def update_dd(df):
     return [{"label": column, "value": column} for column in df["year"]]  # no JSON de-serialization here
 
 
-@app.callback(Output("graph", "figure"), [Input("store", "data"), Input("dd", "value")])
-def update_graph(df, value):
+@app.callback(Output("graph", "figure"), [Input("dd", "value"), State("store", "data")])
+def update_graph(value, df):
     df = df.query("year == {}".format(value))  # no JSON de-serialization here
     return px.sunburst(df, path=['continent', 'country'], values='pop', color='lifeExp', hover_data=['iso_alpha'])
 
