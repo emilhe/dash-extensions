@@ -12,7 +12,7 @@ app.layout = html.Div([
 
 
 @app.callback(ServersideOutput("store", "data"), Input("btn", "n_clicks"))
-def query_data():
+def query_data(n_clicks):
     time.sleep(1)
     return px.data.gapminder()  # no JSON serialization here
 
