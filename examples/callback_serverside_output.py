@@ -2,7 +2,7 @@ import time
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
-from dash_extensions.enrich import Dash, Output, Input, Trigger, ServersideOutput
+from dash_extensions.enrich import Dash, Output, Input, ServersideOutput
 
 app = Dash(prevent_initial_callbacks=True)
 app.layout = html.Div([
@@ -11,7 +11,7 @@ app.layout = html.Div([
 ])
 
 
-@app.callback(ServersideOutput("store", "data"), Trigger("btn", "n_clicks"))
+@app.callback(ServersideOutput("store", "data"), Input("btn", "n_clicks"))
 def query_data():
     time.sleep(1)
     return px.data.gapminder()  # no JSON serialization here
