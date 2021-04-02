@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.49] - 02-04-21
+
+### Change
+
+- Bugfix in `ServersideOutput` when using `dash.no_update`.
+
 ## [0.0.48] - 02-04-21
 
 ### Change

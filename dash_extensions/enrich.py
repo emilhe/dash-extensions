@@ -543,8 +543,11 @@ def _pack_outputs(callback):
             if callable(memoize):
                 data = memoize(data)
             for i, output in enumerate(callback[Output]):
-                serverside_output = isinstance(callback[Output][i], ServersideOutput)
+                # Skip no_update updates.
+                if isinstance(data[i], type(dash.no_update)):
+                    continue
                 # Replace only for server side outputs.
+                serverside_output = isinstance(callback[Output][i], ServersideOutput)
                 if serverside_output or memoize:
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
                     is_trigger = trigger_filter(callback["sorted_args"])
