@@ -310,7 +310,7 @@ class MultiplexerTransform(DashTransform):
             function(){
                 return dash_clientside.callback_context.triggered[0].value;
             }
-        """, output, inputs)
+        """, output, inputs, prevent_initial_call=True)
 
 
 # endregion
