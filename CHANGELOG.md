@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.48] - 02-04-21
+
+### Change
+
+- Bugfixes in `MultiplexerTransform`, both of dcc.Loading and of proxies firing unintentionally on load. 
+- Reintroduced the `TriggerTransform` based on community feedback.
+- Security fixes of underlying npm packages.
+
 ## [0.0.47] - 21-03-21
 
 ### Added

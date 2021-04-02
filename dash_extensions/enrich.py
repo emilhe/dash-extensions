@@ -1,7 +1,6 @@
 import functools
 import hashlib
 import json
-import operator
 import pickle
 import secrets
 import uuid
@@ -13,11 +12,9 @@ import plotly
 
 from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER, _Wildcard
 from dash.development.base_component import Component
-from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
-from more_itertools import unique_everseen, flatten
-from json.decoder import JSONDecodeError
+from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict
 
@@ -249,6 +246,51 @@ def prefix_id_recursively(item, key):
 
 # endregion
 
+# region Trigger transform (the only default transform)
+
+class Trigger(Input):
+    """
+     Like an Input, a trigger can trigger a callback, but it's values it not included in the resulting function call.
+    """
+
+    def __init__(self, component_id, component_property):
+        super().__init__(component_id, component_property)
+
+
+class TriggerTransform(DashTransform):
+
+    def apply(self, callbacks):
+        for callback in callbacks:
+            is_trigger = trigger_filter(callback["sorted_args"])
+            # Check if any triggers are there.
+            if not any(is_trigger):
+                continue
+            # If so, filter the callback args.
+            f = callback["f"]
+            callback["f"] = filter_args(is_trigger)(f)
+        return callbacks
+
+
+def filter_args(args_filter):
+    def wrapper(f):
+        @functools.wraps(f)
+        def decorated_function(*args):
+            filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]]
+            return f(*filtered_args)
+
+        return decorated_function
+
+    return wrapper
+
+
+def trigger_filter(args):
+    inputs_args = [item for item in args if isinstance(item, dd.Input) or isinstance(item, dd.State)]
+    is_trigger = [isinstance(item, Trigger) for item in inputs_args]
+    return is_trigger
+
+
+# endregion
+
 # region Multiplexer transform
 
 def _mp_id(output: Output, idx: int) -> Dict[str, str]:
@@ -326,7 +368,7 @@ class MultiplexerTransform(DashTransform):
             # Inject proxies in a component, either user defined or top level.
             else:
                 target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
-                proxies = functools.reduce(operator.concat, list(self.proxy_map.values()))
+                proxies = list(flatten(list(self.proxy_map.values())))
                 target.children = _as_list(target.children) + proxies
             self.initialized = True
         return layout
@@ -481,8 +523,11 @@ def _pack_outputs(callback):
                 unique_ids = []
                 update_needed = False
                 for i, output in enumerate(callback[Output]):
+                    # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
+                    is_trigger = trigger_filter(callback["sorted_args"])
+                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     # Generate unique ID.
-                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
+                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
                     unique_ids.append(unique_id)
                     if not output.backend.has(unique_id):
                         update_needed = True
@@ -502,7 +547,9 @@ def _pack_outputs(callback):
                 # Replace only for server side outputs.
                 if serverside_output or memoize:
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    unique_id = _get_cache_id(f, output, list(args), output.session_check)
+                    is_trigger = trigger_filter(callback["sorted_args"])
+                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
+                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
                     output.backend.set(unique_id, data[i])
                     # Replace only for server side outputs.
                     if serverside_output:
@@ -589,7 +636,8 @@ class NoOutputTransform(DashTransform):
 class Dash(DashProxy):
     def __init__(self, *args, output_defaults=None, **kwargs):
         output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
-        transforms = [MultiplexerTransform(), NoOutputTransform(), ServersideOutputTransform(**output_defaults)]
+        transforms = [TriggerTransform(), MultiplexerTransform(), NoOutputTransform(),
+                      ServersideOutputTransform(**output_defaults)]
         super().__init__(*args, transforms=transforms, **kwargs)
 
 # endregion

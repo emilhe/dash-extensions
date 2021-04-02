@@ -49,15 +49,23 @@ In some cases, it might be sufficient to wrap an object as an arrow function, i.
 
 The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transforms` keyword argument, 
 
-    from enrich import DashProxy, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform
+    from enrich import DashProxy, TriggerTransform, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform
     
     app = DashProxy(transforms=[
+        TriggerTransform(),  # enable use of Trigger objects
         MultiplexerTransform(),  # makes it possible to target an output multiple times in callbacks
         ServersideOutputTransform(),  # enable use of ServersideOutput objects
         NoOutputTransform(),  # enable callbacks without output
     ])
 
 The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to load only the transforms are that actually used.
+
+#### TriggerTransform
+
+Makes it possible to use the `Trigger` component. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
+
+    @app.callback(Output("output_id", "output_prop"), Trigger("button", "n_clicks"))
+    def func():  # note that "n_clicks" is not included as an argument 
 
 #### MultiplexerTransform
 
