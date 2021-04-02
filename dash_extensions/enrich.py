@@ -1,6 +1,7 @@
 import functools
 import hashlib
 import json
+import operator
 import pickle
 import secrets
 import uuid
@@ -11,6 +12,7 @@ import dash.dependencies as dd
 import plotly
 
 from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER, _Wildcard
+from dash.development.base_component import Component
 from dash.exceptions import PreventUpdate
 from flask import session
 from flask_caching.backends import FileSystemCache
@@ -261,17 +263,71 @@ def _mp_prop() -> str:
     return "data"
 
 
-class MultiplexerTransform(DashTransform):
+def inject_proxies(node, proxy_map):
+    if not hasattr(node, "children") or node.children is None:
+        return
+    children = _as_list(node.children)
+    modified = False
+    for i, child in enumerate(children):
+        # Attach the proxy components as children of the original component to ensure dcc.Loading works.
+        if not hasattr(child, "id"):
+            continue
+        for key in proxy_map:
+            if not child.id == key:
+                continue
+            children[i] = html.Div([child] + proxy_map[key])
+            modified = True
+    if modified:
+        node.children = children
 
-    def __init__(self):
+
+def inject_proxies_recursively(node, proxy_map):
+    if not hasattr(node, "children") or node.children is None:
+        return
+    children = _as_list(node.children)
+    modified = False
+    for i, child in enumerate(children):
+        # Do recursion.
+        inject_proxies(child, proxy_map)
+        # Attach the proxy components as children of the original component to ensure dcc.Loading works.
+        if not hasattr(child, "id"):
+            continue
+        for key in proxy_map:
+            if not child.id == key:
+                continue
+            children[i] = html.Div([child] + proxy_map[key])
+            modified = True
+    if modified:
+        node.children = children
+
+
+class MultiplexerTransform(DashTransform):
+    """
+    The MultiplexerTransform makes it possible to target an output by callbacks multiple times. Under the hood, proxy
+    components (dcc.Store) are used, and the proxy_location keyword argument determines where these proxies are placed.
+    The default value "inplace" means that the original component is replace by a Div element that wraps the original
+    component and its proxies. The means that dcc.Loading will work, but it also means that if you replace the layout
+    of a component higher in the tree in a callback, you might end up deleting the proxies (!), which will break your
+    app. For this particular case, you can set proxy_location to a custom component (or None to use the layout root),
+    to place the proxies here instead. To use dcc.Loading for this particular case, the proxy_location must be wrapped.
+    """
+
+    def __init__(self, proxy_location="inplace"):
         self.initialized = False
-        self.hidden_divs = []
+        self.proxy_location = proxy_location
+        self.proxy_map = defaultdict(lambda: [])
         self.app = DashProxy()
 
     def layout(self, layout, layout_is_function):
         if layout_is_function or not self.initialized:
-            children = _as_list(layout.children) + self.hidden_divs
-            layout.children = children
+            # Inject proxies in a user defined component.
+            if self.proxy_location == "inplace":
+                inject_proxies_recursively(layout, self.proxy_map)
+            # Inject proxies in a component, either user defined or top level.
+            else:
+                target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
+                proxies = functools.reduce(operator.concat, list(self.proxy_map.values()))
+                target.children = _as_list(target.children) + proxies
             self.initialized = True
         return layout
 
@@ -304,7 +360,7 @@ class MultiplexerTransform(DashTransform):
             # Create proxy input.
             inputs.append(Input(_mp_id(output, ALL), _mp_prop()))
         # Collect proxy elements to add to layout.
-        self.hidden_divs.extend(proxies)
+        self.proxy_map[output.component_id].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
         self.app.clientside_callback("""
             function(){
