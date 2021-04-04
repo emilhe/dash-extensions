@@ -41,7 +41,7 @@ class Page:
     @property
     def callbacks(self):
         def _callbacks(app):
-            return self._proxy._register_callbacks(app)
+            return self._proxy._register_all_callbacks(app)
 
         return _callbacks
 

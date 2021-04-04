@@ -89,6 +89,10 @@ class DashProxy(dash.Dash):
         for callback in clientside_callbacks:
             app.clientside_callback(callback["clientside_function"], *callback["args"], **callback["kwargs"])
 
+    def _register_all_callbacks(self, app=None):
+        self._register_callbacks(app=app)
+        self._register_clientside_callbacks(app=app)
+
     def _layout_value(self):
         layout = self._layout() if self._layout_is_function else self._layout
         for transform in self.transforms:
@@ -209,6 +213,12 @@ class PrefixIdTransform(DashTransform):
     def apply(self, callbacks):
         for callback in callbacks:
             for arg in callback["sorted_args"]:
+                arg.component_id = apply_prefix(self.prefix, arg.component_id)
+        return callbacks
+
+    def apply_clientside(self, callbacks):
+        for callback in callbacks:
+            for arg in callback["args"]:
                 arg.component_id = apply_prefix(self.prefix, arg.component_id)
         return callbacks
 
