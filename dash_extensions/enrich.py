@@ -305,24 +305,6 @@ def _mp_prop() -> str:
     return "data"
 
 
-def inject_proxies(node, proxy_map):
-    if not hasattr(node, "children") or node.children is None:
-        return
-    children = _as_list(node.children)
-    modified = False
-    for i, child in enumerate(children):
-        # Attach the proxy components as children of the original component to ensure dcc.Loading works.
-        if not hasattr(child, "id"):
-            continue
-        for key in proxy_map:
-            if not child.id == key:
-                continue
-            children[i] = html.Div([child] + proxy_map[key])
-            modified = True
-    if modified:
-        node.children = children
-
-
 def inject_proxies_recursively(node, proxy_map):
     if not hasattr(node, "children") or node.children is None:
         return
@@ -330,7 +312,7 @@ def inject_proxies_recursively(node, proxy_map):
     modified = False
     for i, child in enumerate(children):
         # Do recursion.
-        inject_proxies(child, proxy_map)
+        inject_proxies_recursively(child, proxy_map)
         # Attach the proxy components as children of the original component to ensure dcc.Loading works.
         if not hasattr(child, "id"):
             continue
@@ -354,7 +336,7 @@ class MultiplexerTransform(DashTransform):
     to place the proxies here instead. To use dcc.Loading for this particular case, the proxy_location must be wrapped.
     """
 
-    def __init__(self, proxy_location="inplace"):
+    def __init__(self, proxy_location=None):
         self.initialized = False
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
