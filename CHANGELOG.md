@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.50] - 07-04-21
+
+### Change
+
+- Bugfix in `MultiplexerTransform` when `proxy_location='inplace'`.
+
 ## [0.0.49] - 02-04-21
 
 ### Change
