@@ -64,8 +64,6 @@ class DashProxy(dash.Dash):
         callback["kwargs"] = kwargs
         callback["sorted_args"] = arg_order
         callback["multi_output"] = multi_output
-        # Save the callback for later.
-        self.callbacks.append(callback)
 
         return callback
 
@@ -74,6 +72,7 @@ class DashProxy(dash.Dash):
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         callback = self._collect_callback(*args, **kwargs)
+        self.callbacks.append(callback)
 
         def wrapper(f):
             callback["f"] = f
@@ -83,6 +82,7 @@ class DashProxy(dash.Dash):
     def clientside_callback(self, clientside_function, *args, **kwargs):
         callback = self._collect_callback(*args, **kwargs)
         callback["f"] = clientside_function
+        self.clientside_callbacks.append(callback)
 
     def _register_callbacks(self, app=None):
         callbacks, clientside_callbacks = self._resolve_callbacks()
@@ -362,11 +362,6 @@ class MultiplexerTransform(DashTransform):
 
     # TODO: Implement this part!
     def apply(self, callbacks, clientside_callbacks):
-        # Merge callbacks and clientside callbacks.
-        for cb in callbacks:
-            cb["clientside"] = False
-        for cb in clientside_callbacks:
-            cb["clientside"] = True
         all_callbacks = callbacks + clientside_callbacks
         # Group by output.
         output_map = defaultdict(list)
