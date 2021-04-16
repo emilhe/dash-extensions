@@ -105,7 +105,7 @@ Used with a normal `Output`, this keyword is essentially equivalent to the `@fla
 
 #### NoOutputTransform
 
-Makes it possible to write callbacks with an `Output`,
+Makes it possible to write callbacks without an `Output`,
 
     @app.callback(Input("button", "n_clicks"))  # note that the callback has no output
 
