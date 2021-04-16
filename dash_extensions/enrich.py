@@ -362,9 +362,15 @@ class MultiplexerTransform(DashTransform):
 
     # TODO: Implement this part!
     def apply(self, callbacks, clientside_callbacks):
+        # Merge callbacks and clientside callbacks.
+        for cb in callbacks:
+            cb["clientside"] = False
+        for cb in clientside_callbacks:
+            cb["clientside"] = True
+        all_callbacks = callbacks + clientside_callbacks
         # Group by output.
         output_map = defaultdict(list)
-        for callback in callbacks:
+        for callback in all_callbacks:
             for output in callback[Output]:
                 output_map[output].append(callback)
         # Apply multiplexer where needed.
