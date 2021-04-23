@@ -341,14 +341,20 @@ class MultiplexerTransform(DashTransform):
     to place the proxies here instead. To use dcc.Loading for this particular case, the proxy_location must be wrapped.
     """
 
-    def __init__(self, proxy_location=None):
+    def __init__(self, proxy_location=None, proxy_wrapper_map=None):
         self.initialized = False
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
+        self.proxy_wrapper_map = proxy_wrapper_map
         self.app = DashProxy()
 
     def layout(self, layout, layout_is_function):
         if layout_is_function or not self.initialized:
+            # Apply wrappers if needed.
+            if self.proxy_wrapper_map:
+                for key in self.proxy_wrapper_map:
+                    if key in self.proxy_map:
+                        self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
             # Inject proxies in a user defined component.
             if self.proxy_location == "inplace":
                 inject_proxies_recursively(layout, self.proxy_map)
@@ -360,7 +366,6 @@ class MultiplexerTransform(DashTransform):
             self.initialized = True
         return layout
 
-    # TODO: Implement this part!
     def apply(self, callbacks, clientside_callbacks):
         all_callbacks = callbacks + clientside_callbacks
         # Group by output.
@@ -388,7 +393,7 @@ class MultiplexerTransform(DashTransform):
             # Create proxy input.
             inputs.append(Input(_mp_id(output, ALL), _mp_prop()))
         # Collect proxy elements to add to layout.
-        self.proxy_map[output.component_id].extend(proxies)
+        self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
         self.app.clientside_callback("""
             function(){
