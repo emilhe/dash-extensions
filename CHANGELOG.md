@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.53] - 24-04-21
+
+### Change
+
+- XXX
+- Added `keyup`, `n_keyups`, and `keys_pressed` props to `Keyboard` component.
+
 ## [0.0.52] - 24-04-21
 
 ### Change
