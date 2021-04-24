@@ -13,7 +13,7 @@ import plotly
 from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER, _Wildcard
 from dash.development.base_component import Component
 from flask import session
-from flask_caching.backends import FileSystemCache
+from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict
@@ -147,7 +147,7 @@ def _get_session_id(session_key=None):
 def _as_list(item):
     if item is None:
         return []
-    return item if isinstance(item, list) else list(item)
+    return item if isinstance(item, list) else [item]
 
 
 def _create_callback_id(item):
@@ -628,7 +628,18 @@ class FileSystemStore(FileSystemCache):
             return None
 
 
-# TODO: Add a redis store.
+class RedisStore(RedisCache):
+
+    def __init__(self, default_timeout=24 * 3600, **kwargs):
+        """
+        The timeout must be large enough that a (k,v) pair NEVER expires during a user session.
+        """
+        super().__init__(default_timeout=default_timeout, **kwargs)
+
+    def get(self, key, ignore_expired=False):
+        # TODO: Is there any way to honor ignore_expired for redis? I don't think so
+        return super().get(key)
+
 
 # endregion
 

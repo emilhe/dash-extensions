@@ -6,13 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Change
 
-- XXX
+- Added support for Redis in `ServersideOutputTransform` via a new `RedisStore` component (experimental).
 - Added `keyup`, `n_keyups`, and `keys_pressed` props to `Keyboard` component.
-
-## [0.0.52] - 24-04-21
-
-### Change
-
 - Added support for the `ALL` wildcard in `MultiplexerTransform`, and MATCH/ALLSMALLER now raises an appropriate error.
 - Added new proxy_wrapper feature (useful for e.g. the `Loading` component) in `MultiplexerTransform`.
 - Added support for client side callback transforms in `DashProxy`.
