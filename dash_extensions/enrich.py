@@ -299,6 +299,8 @@ def trigger_filter(args):
 # region Multiplexer transform
 
 def _mp_id(output: Output, idx: int) -> Dict[str, str]:
+    if isinstance(output.component_id, dict):
+        return {**output.component_id, **dict(prop=output.component_property, idx=idx)}
     return dict(id=output.component_id, prop=output.component_property, idx=idx)
 
 
@@ -386,18 +388,22 @@ class MultiplexerTransform(DashTransform):
         inputs = []
         proxies = []
         for i, callback in enumerate(callbacks):
+            mp_id = _mp_id(output, i)
+            mp_id_escaped = {k: mp_id[k] if mp_id[k] not in _wildcard_mappings else _wildcard_mappings[mp_id[k]]
+                             for k in mp_id}
             # Create proxy element.
-            proxies.append(_mp_element(_mp_id(output, i)))
+            proxies.append(_mp_element(mp_id_escaped))
             # Assign proxy element as output.
-            callback[Output][callback[Output].index(output)] = Output(proxies[-1].id, _mp_prop())
+            callback[Output][callback[Output].index(output)] = Output(mp_id_escaped, _mp_prop())
             # Create proxy input.
-            inputs.append(Input(_mp_id(output, ALL), _mp_prop()))
+            inputs.append(Input(mp_id, _mp_prop()))
         # Collect proxy elements to add to layout.
         self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
         self.app.clientside_callback("""
             function(){
-                return dash_clientside.callback_context.triggered[0].value;
+                const ts = dash_clientside.callback_context.triggered;
+                return ts[0].value;
             }
         """, output, inputs, prevent_initial_call=True)
 
