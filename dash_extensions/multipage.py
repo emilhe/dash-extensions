@@ -2,7 +2,7 @@ import dash_html_components as html
 import dash_core_components as dcc
 
 from dash.exceptions import PreventUpdate
-from dash_extensions.enrich import Output, Input, PrefixIdTransform, DashProxy, prefix_id_recursively
+from dash_extensions.enrich import Output, Input, PrefixIdTransform, DashProxy, prefix_recursively
 
 URL_ID = "url"
 CONTENT_ID = "content"
@@ -51,7 +51,7 @@ class Page:
 
     def render(self, layout):
         if self._prefix_ids:
-            prefix_id_recursively(layout, self.id)
+            prefix_recursively(layout, self.id)
         return layout
 
 

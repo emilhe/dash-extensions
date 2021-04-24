@@ -199,8 +199,9 @@ class DashTransform:
 
 class PrefixIdTransform(DashTransform):
 
-    def __init__(self, prefix):
+    def __init__(self, prefix, prefix_func=None):
         self.prefix = prefix
+        self.prefix_func = prefix_func if prefix_func is not None else prefix_component
         self.initialized = False
 
     def _apply(self, callbacks):
@@ -218,7 +219,7 @@ class PrefixIdTransform(DashTransform):
     def layout(self, layout, layout_is_function):
         # TODO: Will this work with layout functions?
         if layout_is_function or not self.initialized:
-            prefix_id_recursively(layout, self.prefix)
+            prefix_recursively(layout, self.prefix, self.prefix_func)
             self.initialized = True
         return layout
 
@@ -238,13 +239,23 @@ def apply_prefix(prefix, component_id):
     return "{}-{}".format(prefix, component_id)
 
 
-def prefix_id_recursively(item, key):
-    if hasattr(item, "id"):
-        item.id = apply_prefix(key, item.id)
+def prefix_recursively(item, key, prefix_func):
+    prefix_func(key, item)
     if hasattr(item, "children"):
         children = _as_list(item.children)
         for child in children:
-            prefix_id_recursively(child, key)
+            prefix_recursively(child, key, prefix_func)
+
+
+def prefix_component(key, component):
+    if hasattr(component, "id"):
+        component.id = apply_prefix(key, component.id)
+    if not hasattr(component, "_namespace"):
+        return
+    # Special handling of dash bootstrap components. TODO: Maybe add others?
+    if component._namespace == "dash_bootstrap_components":
+        if component._type == "Tooltip":
+            component.target = apply_prefix(key, component.target)
 
 
 # endregion
