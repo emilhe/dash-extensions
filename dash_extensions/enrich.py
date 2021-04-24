@@ -24,7 +24,6 @@ _wildcard_values = list(_wildcard_mappings.values())
 
 # region Dash proxy
 
-
 class DashProxy(dash.Dash):
 
     def __init__(self, *args, transforms=None, **kwargs):
@@ -37,7 +36,7 @@ class DashProxy(dash.Dash):
         for transform in self.transforms:
             transform.init(self)
 
-    def callback(self, *args, **kwargs):
+    def _collect_callback(self, *args, **kwargs):
         """
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
@@ -65,7 +64,14 @@ class DashProxy(dash.Dash):
         callback["kwargs"] = kwargs
         callback["sorted_args"] = arg_order
         callback["multi_output"] = multi_output
-        # Save the callback for later.
+
+        return callback
+
+    def callback(self, *args, **kwargs):
+        """
+         This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
+        """
+        callback = self._collect_callback(*args, **kwargs)
         self.callbacks.append(callback)
 
         def wrapper(f):
@@ -74,20 +80,19 @@ class DashProxy(dash.Dash):
         return wrapper
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
-        self.clientside_callbacks.append(dict(clientside_function=clientside_function, args=args, kwargs=kwargs))
+        callback = self._collect_callback(*args, **kwargs)
+        callback["f"] = clientside_function
+        self.clientside_callbacks.append(callback)
 
     def _register_callbacks(self, app=None):
-        callbacks = list(self._resolve_callbacks())
+        callbacks, clientside_callbacks = self._resolve_callbacks()
         app = super() if app is None else app
-        for callback in callbacks:
-            outputs = callback[dd.Output][0] if len(callback[dd.Output]) == 1 else callback[dd.Output]
-            app.callback(outputs, callback[dd.Input], callback[dd.State], **callback["kwargs"])(callback["f"])
-
-    def _register_clientside_callbacks(self, app=None):
-        clientside_callbacks = list(self._resolve_clientside_callbacks())
-        app = super() if app is None else app
-        for callback in clientside_callbacks:
-            app.clientside_callback(callback["clientside_function"], *callback["args"], **callback["kwargs"])
+        for cb in callbacks:
+            outputs = cb[dd.Output][0] if len(cb[dd.Output]) == 1 else cb[dd.Output]
+            app.callback(outputs, cb[dd.Input], cb[dd.State], **cb["kwargs"])(cb["f"])
+        for cb in clientside_callbacks:
+            outputs = cb[dd.Output][0] if len(cb[dd.Output]) == 1 else cb[dd.Output]
+            app.clientside_callback(cb["f"], outputs, cb[dd.Input], cb[dd.State], **cb["kwargs"])
 
     def _layout_value(self):
         layout = self._layout() if self._layout_is_function else self._layout
@@ -101,7 +106,6 @@ class DashProxy(dash.Dash):
         """
         # Register the callbacks.
         self._register_callbacks()
-        self._register_clientside_callbacks()
         # Proceed as normally.
         super()._setup_server()
         # Set session secret. Used by some subclasses.
@@ -112,19 +116,10 @@ class DashProxy(dash.Dash):
         """
          This method resolves the callbacks, i.e. it applies the callback injections.
         """
-        callbacks = self.callbacks
+        callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
         for transform in self.transforms:
-            callbacks = transform.apply(callbacks)
-        return callbacks
-
-    def _resolve_clientside_callbacks(self):
-        """
-         This method resolves the clientside_callbacks, i.e. it applies the clientside_callbacks injections.
-        """
-        clientside_callbacks = self.clientside_callbacks
-        for transform in self.transforms:
-            clientside_callbacks = transform.apply_clientside(clientside_callbacks)
-        return clientside_callbacks
+            callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
+        return callbacks, clientside_callbacks
 
     def hijack(self, app: dash.Dash):
         # Change properties.
@@ -136,7 +131,6 @@ class DashProxy(dash.Dash):
         app._layout_value = self._layout_value
         # Register callbacks.
         self._register_callbacks(app)
-        self._register_clientside_callbacks(app)
         # Setup secret.
         if not app.server.secret_key:
             app.server.secret_key = secrets.token_urlsafe(16)
@@ -186,11 +180,14 @@ class DashTransform:
     def init(self, dt):
         pass
 
-    def apply(self, callbacks):
-        raise NotImplementedError()
+    def apply(self, callbacks, clientside_callbacks):
+        return self.apply_serverside(callbacks), self.apply_clientside(clientside_callbacks)
 
-    def apply_clientside(self, clientside_callbacks):
-        return clientside_callbacks
+    def apply_serverside(self, callbacks):
+        return callbacks  # per default do nothing
+
+    def apply_clientside(self, callbacks):
+        return callbacks  # per default do nothing
 
     def layout(self, layout, layout_is_function):
         return layout
@@ -202,20 +199,27 @@ class DashTransform:
 
 class PrefixIdTransform(DashTransform):
 
-    def __init__(self, prefix):
+    def __init__(self, prefix, prefix_func=None):
         self.prefix = prefix
+        self.prefix_func = prefix_func if prefix_func is not None else prefix_component
         self.initialized = False
 
-    def apply(self, callbacks):
+    def _apply(self, callbacks):
         for callback in callbacks:
             for arg in callback["sorted_args"]:
                 arg.component_id = apply_prefix(self.prefix, arg.component_id)
         return callbacks
 
+    def apply_serverside(self, callbacks):
+        return self._apply(callbacks)
+
+    def apply_clientside(self, callbacks):
+        return self._apply(callbacks)
+
     def layout(self, layout, layout_is_function):
         # TODO: Will this work with layout functions?
         if layout_is_function or not self.initialized:
-            prefix_id_recursively(layout, self.prefix)
+            prefix_recursively(layout, self.prefix, self.prefix_func)
             self.initialized = True
         return layout
 
@@ -235,13 +239,23 @@ def apply_prefix(prefix, component_id):
     return "{}-{}".format(prefix, component_id)
 
 
-def prefix_id_recursively(item, key):
-    if hasattr(item, "id"):
-        item.id = apply_prefix(key, item.id)
+def prefix_recursively(item, key, prefix_func):
+    prefix_func(key, item)
     if hasattr(item, "children"):
         children = _as_list(item.children)
         for child in children:
-            prefix_id_recursively(child, key)
+            prefix_recursively(child, key, prefix_func)
+
+
+def prefix_component(key, component):
+    if hasattr(component, "id"):
+        component.id = apply_prefix(key, component.id)
+    if not hasattr(component, "_namespace"):
+        return
+    # Special handling of dash bootstrap components. TODO: Maybe add others?
+    if component._namespace == "dash_bootstrap_components":
+        if component._type == "Tooltip":
+            component.target = apply_prefix(key, component.target)
 
 
 # endregion
@@ -259,7 +273,9 @@ class Trigger(Input):
 
 class TriggerTransform(DashTransform):
 
-    def apply(self, callbacks):
+    # NOTE: This transform cannot be implemented for clientside callbacks since the JS can't be modified from here.
+
+    def apply_serverside(self, callbacks):
         for callback in callbacks:
             is_trigger = trigger_filter(callback["sorted_args"])
             # Check if any triggers are there.
@@ -294,7 +310,23 @@ def trigger_filter(args):
 # region Multiplexer transform
 
 def _mp_id(output: Output, idx: int) -> Dict[str, str]:
+    if isinstance(output.component_id, dict):
+        return {**output.component_id, **dict(prop=output.component_property, idx=idx)}
     return dict(id=output.component_id, prop=output.component_property, idx=idx)
+
+
+def _escape_wildcards(mp_id):
+    if not isinstance(mp_id, dict):
+        return mp_id
+    for key in mp_id:
+        # The ALL wildcard is supported.
+        if mp_id[key] == ALL:
+            mp_id[key] = _wildcard_mappings[ALL]
+            continue
+        # Other ALL wildcards are NOT supported.
+        if mp_id[key] in _wildcard_mappings:
+            raise ValueError(f"Multiplexer does not support wildcard [{mp_id[key]}]")
+    return mp_id
 
 
 def _mp_element(mp_id: Dict[str, str]) -> dcc.Store:
@@ -336,14 +368,20 @@ class MultiplexerTransform(DashTransform):
     to place the proxies here instead. To use dcc.Loading for this particular case, the proxy_location must be wrapped.
     """
 
-    def __init__(self, proxy_location=None):
+    def __init__(self, proxy_location=None, proxy_wrapper_map=None):
         self.initialized = False
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
+        self.proxy_wrapper_map = proxy_wrapper_map
         self.app = DashProxy()
 
     def layout(self, layout, layout_is_function):
         if layout_is_function or not self.initialized:
+            # Apply wrappers if needed.
+            if self.proxy_wrapper_map:
+                for key in self.proxy_wrapper_map:
+                    if key in self.proxy_map:
+                        self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
             # Inject proxies in a user defined component.
             if self.proxy_location == "inplace":
                 inject_proxies_recursively(layout, self.proxy_map)
@@ -355,10 +393,11 @@ class MultiplexerTransform(DashTransform):
             self.initialized = True
         return layout
 
-    def apply(self, callbacks):
+    def apply(self, callbacks, clientside_callbacks):
+        all_callbacks = callbacks + clientside_callbacks
         # Group by output.
         output_map = defaultdict(list)
-        for callback in callbacks:
+        for callback in all_callbacks:
             for output in callback[Output]:
                 output_map[output].append(callback)
         # Apply multiplexer where needed.
@@ -368,27 +407,27 @@ class MultiplexerTransform(DashTransform):
                 continue
             self._apply_multiplexer(output, output_map[output])
 
-        return callbacks
-
-    def apply_clientside(self, clientside_callbacks):
-        return clientside_callbacks + self.app.clientside_callbacks
+        return callbacks, clientside_callbacks + self.app.clientside_callbacks
 
     def _apply_multiplexer(self, output, callbacks):
         inputs = []
         proxies = []
         for i, callback in enumerate(callbacks):
+            mp_id = _mp_id(output, i)
+            mp_id_escaped = _escape_wildcards(mp_id)
             # Create proxy element.
-            proxies.append(_mp_element(_mp_id(output, i)))
+            proxies.append(_mp_element(mp_id_escaped))
             # Assign proxy element as output.
-            callback[Output][callback[Output].index(output)] = Output(proxies[-1].id, _mp_prop())
+            callback[Output][callback[Output].index(output)] = Output(mp_id_escaped, _mp_prop())
             # Create proxy input.
-            inputs.append(Input(_mp_id(output, ALL), _mp_prop()))
+            inputs.append(Input(mp_id, _mp_prop()))
         # Collect proxy elements to add to layout.
-        self.proxy_map[output.component_id].extend(proxies)
+        self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
         self.app.clientside_callback("""
             function(){
-                return dash_clientside.callback_context.triggered[0].value;
+                const ts = dash_clientside.callback_context.triggered;
+                return ts[0].value;
             }
         """, output, inputs, prevent_initial_call=True)
 
@@ -425,8 +464,10 @@ class ServersideOutputTransform(DashTransform):
         if not dt.server.secret_key:
             dt.server.secret_key = secrets.token_urlsafe(16)
 
-    def apply(self, callbacks):
-        # 1) Creat index.
+    # NOTE: Doesn't make sense for clientside callbacks.
+
+    def apply_serverside(self, callbacks):
+        # 1) Create index.
         serverside_callbacks = []
         serverside_output_map = {}
         for callback in callbacks:
@@ -587,6 +628,8 @@ class FileSystemStore(FileSystemCache):
             return None
 
 
+# TODO: Add a redis store.
+
 # endregion
 
 # region No output transform
@@ -604,7 +647,7 @@ class NoOutputTransform(DashTransform):
             self.initialized = True
         return layout
 
-    def apply(self, callbacks):
+    def _apply(self, callbacks):
         for callback in callbacks:
             if len(callback[dd.Output]) == 0:
                 output_id = str(uuid.uuid4())
@@ -612,6 +655,12 @@ class NoOutputTransform(DashTransform):
                 callback[dd.Output] = [dd.Output(output_id, "children")]
                 self.hidden_divs.append(hidden_div)
         return callbacks
+
+    def apply_serverside(self, callbacks):
+        return self._apply(callbacks)
+
+    def apply_clientside(self, callbacks):
+        return self._apply(callbacks)
 
 
 # endregion

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.52] - 24-04-21
+
+### Change
+
+- Added support for the `ALL` wildcard in `MultiplexerTransform`, and MATCH/ALLSMALLER now raises an appropriate error.
+- Added new proxy_wrapper feature (useful for e.g. the `Loading` component) in `MultiplexerTransform`.
+- Added support for client side callback transforms in `DashProxy`.
+- Added client side callback support in `MultiplexerTransform`, `PrefixIdTransform`, and `NoOutputTransform`.
+- Added automated modification of the `target` property of the `Tooltip` component in `PrefixIdTransform`.
+
 ## [0.0.51] - 07-04-21
 
 ### Change
