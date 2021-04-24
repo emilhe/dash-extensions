@@ -304,6 +304,20 @@ def _mp_id(output: Output, idx: int) -> Dict[str, str]:
     return dict(id=output.component_id, prop=output.component_property, idx=idx)
 
 
+def _escape_wildcards(mp_id):
+    if not isinstance(mp_id, dict):
+        return mp_id
+    for key in mp_id:
+        # The ALL wildcard is supported.
+        if mp_id[key] == ALL:
+            mp_id[key] = _wildcard_mappings[ALL]
+            continue
+        # Other ALL wildcards are NOT supported.
+        if mp_id[key] in _wildcard_mappings:
+            raise ValueError(f"Multiplexer does not support wildcard [{mp_id[key]}]")
+    return mp_id
+
+
 def _mp_element(mp_id: Dict[str, str]) -> dcc.Store:
     return dcc.Store(id=mp_id)
 
@@ -389,8 +403,7 @@ class MultiplexerTransform(DashTransform):
         proxies = []
         for i, callback in enumerate(callbacks):
             mp_id = _mp_id(output, i)
-            mp_id_escaped = {k: mp_id[k] if mp_id[k] not in _wildcard_mappings else _wildcard_mappings[mp_id[k]]
-                             for k in mp_id}
+            mp_id_escaped = _escape_wildcards(mp_id)
             # Create proxy element.
             proxies.append(_mp_element(mp_id_escaped))
             # Assign proxy element as output.
