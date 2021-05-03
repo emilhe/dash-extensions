@@ -38,8 +38,8 @@ class Namespace:
             f.write(jsbeautifier.beautify(content))
 
 
-def js_function(src):
-    name = _default_name_space.add(src)
+def assign(src, name=None):
+    name = _default_name_space.add(src, name)
     _default_name_space.dump()
     return _default_name_space(name)
 
