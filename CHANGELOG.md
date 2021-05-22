@@ -2,11 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.54] - 22-05-21
+## [0.0.55] - 22-05-21
 
 ### Added
 
 - A new `assign` function to the `javascript` module to enable writing inline JavaScript functions.
+
+### Change
+
+- Relaxed `WebSocket` proptype validation.
 
 ## [0.0.53] - 24-04-21
 
