@@ -36,6 +36,18 @@ the `pointToLayer` function of the `myNamespace.mySubNamespace` namespace can no
 
 Note that this approach is not limited to function handles, but can be applied for any data type.
 
+### Inline JavaScript
+
+The `assign` function of the `javascript` module provides a more compact syntax where the JavaScript code is written as a string directly in the Python file. The previous example is thus reduced to,
+
+    import dash_leaflet as dl
+    from dash_extensions.javascript import assign
+    ...
+    point_to_layer = assign("function(feature, latlng, context) {return L.circleMarker(latlng);}")
+    geojson = dl.GeoJSON(data=data, options=dict(pointToLayer=point_to_layer))
+
+without the need for creating any .js files manually. The syntax is particularly well suited for small JavaScript code snippets and/or examples. Note that under the hood, the inline functions are transpiled into a .js file, which is written to the assets folder.
+
 ### Arrow functions
 
 In some cases, it might be sufficient to wrap an object as an arrow function, i.e. a function that just returns the (constant) object. This behaviour can be achieved with the following syntax,

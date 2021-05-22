@@ -2,17 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.54] - 22-05-21
+
+### Added
+
+- A new `assign` function to the `javascript` module to enable writing inline JavaScript functions.
+
 ## [0.0.53] - 24-04-21
 
-### Change
+### Added
 
-- Added support for Redis in `ServersideOutputTransform` via a new `RedisStore` component (experimental).
-- Added `keyup`, `n_keyups`, and `keys_pressed` props to `Keyboard` component.
-- Added support for the `ALL` wildcard in `MultiplexerTransform`, and MATCH/ALLSMALLER now raises an appropriate error.
-- Added new proxy_wrapper feature (useful for e.g. the `Loading` component) in `MultiplexerTransform`.
-- Added support for client side callback transforms in `DashProxy`.
-- Added client side callback support in `MultiplexerTransform`, `PrefixIdTransform`, and `NoOutputTransform`.
-- Added automated modification of the `target` property of the `Tooltip` component in `PrefixIdTransform`.
+- Support for Redis in `ServersideOutputTransform` via a new `RedisStore` component (experimental).
+- New  `keyup`, `n_keyups`, and `keys_pressed` props to `Keyboard` component.
+- Support for the `ALL` wildcard in `MultiplexerTransform`, and MATCH/ALLSMALLER now raises an appropriate error.
+- New proxy_wrapper feature (useful for e.g. the `Loading` component) in `MultiplexerTransform`.
+- Support for client side callback transforms in `DashProxy`.
+- Client side callback support in `MultiplexerTransform`, `PrefixIdTransform`, and `NoOutputTransform`.
+- Automated modification of the `target` property of the `Tooltip` component in `PrefixIdTransform`.
 
 ## [0.0.51] - 07-04-21
 
