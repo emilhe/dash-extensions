@@ -5,7 +5,7 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 from dash.dependencies import Input, Output
 from dash_extensions.enrich import DashProxy
-from multipage import PageCollection, app_to_page, module_to_page, Page, CONTENT_ID, URL_ID
+from dash_extensions.multipage import PageCollection, app_to_page, module_to_page, Page, CONTENT_ID, URL_ID
 
 
 # region Page definition in current module
