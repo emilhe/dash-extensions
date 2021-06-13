@@ -10,7 +10,7 @@ import dash_html_components as html
 import dash.dependencies as dd
 import plotly
 
-from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER, _Wildcard
+from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER, _Wildcard, ClientsideFunction
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -76,13 +76,23 @@ class DashProxy(dash.Dash):
 
         def wrapper(f):
             callback["f"] = f
+            callback["hash"] = self._callback_hash(f"py:{f.__module__}.{f.__name__}")
 
         return wrapper
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
         callback = self._collect_callback(*args, **kwargs)
         callback["f"] = clientside_function
+        if isinstance(clientside_function, ClientsideFunction):
+            name = f"js:{clientside_function.namespace}.{clientside_function.function_name}"
+        else:
+            name = f"js:{clientside_function}"  # literal JS code
+        callback["hash"] = self._callback_hash(name)
         self.clientside_callbacks.append(callback)
+
+    @staticmethod
+    def _callback_hash(value):
+        return hashlib.md5(value.encode()).digest()
 
     def _register_callbacks(self, app=None):
         callbacks, clientside_callbacks = self._resolve_callbacks()
@@ -661,7 +671,7 @@ class NoOutputTransform(DashTransform):
     def _apply(self, callbacks):
         for callback in callbacks:
             if len(callback[dd.Output]) == 0:
-                output_id = str(uuid.uuid4())
+                output_id = str(uuid.UUID(bytes=callback["hash"], version=4))
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
                 callback[dd.Output] = [dd.Output(output_id, "children")]
                 self.hidden_divs.append(hidden_div)
