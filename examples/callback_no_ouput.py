@@ -4,6 +4,7 @@ from dash.dependencies import ClientsideFunction
 from dash_extensions.enrich import Dash, Input
 
 app = Dash(prevent_initial_callbacks=True)
+app = Dash(__name__, prevent_initial_callbacks=True)
 app.layout = html.Div([
     html.Button("Click me", id="btn")
 ])
