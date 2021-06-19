@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.56] - 19-06-21
+
+### Added
+
+- Added `arg_check` keyword argument to `ServersideOutput` and `ServersideOutputTransform` components. If set to false, the function arguments are not considered when updating the cache.
+
+### Change
+
+- Bugfix in `assign` functionality.
+
 ## [0.0.55] - 22-05-21
 
 ### Added

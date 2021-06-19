@@ -10,7 +10,7 @@ import dash_html_components as html
 import dash.dependencies as dd
 import plotly
 
-from dash.dependencies import Input, State, Output, MATCH, ALL, ALLSMALLER, _Wildcard, ClientsideFunction
+from dash.dependencies import Input, Output, MATCH, ALL, ALLSMALLER, _Wildcard
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -76,23 +76,13 @@ class DashProxy(dash.Dash):
 
         def wrapper(f):
             callback["f"] = f
-            callback["hash"] = self._callback_hash(f"py:{f.__module__}.{f.__name__}")
 
         return wrapper
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
         callback = self._collect_callback(*args, **kwargs)
         callback["f"] = clientside_function
-        if isinstance(clientside_function, ClientsideFunction):
-            name = f"js:{clientside_function.namespace}.{clientside_function.function_name}"
-        else:
-            name = f"js:{clientside_function}"  # literal JS code
-        callback["hash"] = self._callback_hash(name)
         self.clientside_callbacks.append(callback)
-
-    @staticmethod
-    def _callback_hash(value):
-        return hashlib.md5(value.encode()).digest()
 
     def _register_callbacks(self, app=None):
         callbacks, clientside_callbacks = self._resolve_callbacks()
@@ -451,10 +441,11 @@ class EnrichedOutput(Output):
      Like a normal Output, includes additional properties related to storing the data.
     """
 
-    def __init__(self, component_id, component_property, backend=None, session_check=None):
+    def __init__(self, component_id, component_property, backend=None, session_check=None, arg_check=True):
         super().__init__(component_id, component_property)
         self.backend = backend
         self.session_check = session_check
+        self.arg_check = arg_check
 
 
 class ServersideOutput(EnrichedOutput):
@@ -465,9 +456,10 @@ class ServersideOutput(EnrichedOutput):
 
 class ServersideOutputTransform(DashTransform):
 
-    def __init__(self, backend=None, session_check=True):
+    def __init__(self, backend=None, session_check=True, arg_check=True):
         self.backend = backend if backend is not None else FileSystemStore()
         self.session_check = session_check
+        self.arg_check = arg_check
 
     def init(self, dt):
         # Set session secret (if not already set).
@@ -493,6 +485,7 @@ class ServersideOutputTransform(DashTransform):
                 if not isinstance(output, ServersideOutput) and not memoize:
                     continue
                 output.backend = output.backend if output.backend is not None else self.backend
+                output.arg_check = output.arg_check if output.arg_check is not None else self.arg_check
                 output.session_check = output.session_check if output.session_check is not None else self.session_check
             # Keep track of server side callbacks.
             if serverside or memoize:
@@ -560,7 +553,7 @@ def _pack_outputs(callback):
                     is_trigger = trigger_filter(callback["sorted_args"])
                     filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     # Generate unique ID.
-                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
+                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
                     unique_ids.append(unique_id)
                     if not output.backend.has(unique_id):
                         update_needed = True
@@ -585,7 +578,7 @@ def _pack_outputs(callback):
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
                     is_trigger = trigger_filter(callback["sorted_args"])
                     filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
-                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check)
+                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
                     output.backend.set(unique_id, data[i])
                     # Replace only for server side outputs.
                     if serverside_output:
@@ -597,11 +590,22 @@ def _pack_outputs(callback):
     return packed_callback
 
 
-def _get_cache_id(func, output, args, session_check=None):
-    all_args = [func.__name__, _create_callback_id(output)] + list(args)
+def _get_cache_id(func, output, args, session_check=None, arg_check=True):
+    all_args = [func.__name__, _create_callback_id(output)]
+    if arg_check:
+        all_args += list(args)
     if session_check:
         all_args += [_get_session_id()]
     return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
+
+
+def _get_output_id(callback):
+    try:
+        f_repr = f"{callback['f'].__module__}.{callback['f'].__name__}"  # handles Python functions
+    except AttributeError:
+        f_repr = repr(callback['f'])  # handles clientside functions
+    f_hash = hashlib.md5(f_repr.encode()).digest()
+    return str(uuid.UUID(bytes=f_hash, version=4))
 
 
 # Interface definition for server stores.
@@ -671,7 +675,7 @@ class NoOutputTransform(DashTransform):
     def _apply(self, callbacks):
         for callback in callbacks:
             if len(callback[dd.Output]) == 0:
-                output_id = str(uuid.UUID(bytes=callback["hash"], version=4))
+                output_id = _get_output_id(callback)
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
                 callback[dd.Output] = [dd.Output(output_id, "children")]
                 self.hidden_divs.append(hidden_div)
