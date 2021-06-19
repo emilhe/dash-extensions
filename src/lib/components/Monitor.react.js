@@ -46,10 +46,16 @@ export default class Monitor extends Component {
         }
         const elements = this.props.probes[key];
         for (let i = 0; i < elements.length; i++) {
-            const id = elements[i].id ? elements[i].id : elements[i][0]
+            let id = elements[i].id ? elements[i].id : elements[i][0]
             const prop = elements[i].prop ? elements[i].prop : elements[i][1]
+            let compare_id = props.id
+
+            // If ids are objects, convert them to strings
+            if (typeof id === 'object'){id = JSON.stringify(id)}
+            if (typeof compare_id === 'object'){compare_id = JSON.stringify(compare_id)}
+
             // Check if there is a match.
-            if (props.id !== id || !(prop in props)) {
+            if (compare_id !== id || !(prop in props)) {
                 continue
             }
 
@@ -113,7 +119,7 @@ Monitor.propTypes = {
                 PropTypes.arrayOf(PropTypes.string),
                 // object notation, i.e. {"id": id, "prop": prop}
                 PropTypes.shape({
-                    id: PropTypes.string.isRequired,
+                    id: PropTypes.oneOfType([PropTypes.string.isRequired, PropTypes.object.isRequired]),
                     prop: PropTypes.any.isRequired,
                 })
             ])

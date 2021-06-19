@@ -2,9 +2,13 @@ import time
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
-from dash_extensions.enrich import Dash, Output, Input, State, ServersideOutput
 
-app = Dash(prevent_initial_callbacks=True)
+from dash_extensions.enrich import Output, Input, State, ServersideOutput, DashProxy, ServersideOutputTransform, \
+    RedisStore
+
+app = DashProxy(prevent_initial_callbacks=True, transforms=[
+    ServersideOutputTransform(backend=RedisStore())
+])
 app.layout = html.Div([
     html.Button("Query data", id="btn"), dcc.Dropdown(id="dd"), dcc.Graph(id="graph"),
     dcc.Loading(dcc.Store(id='store'), fullscreen=True, type="dot")
@@ -13,6 +17,7 @@ app.layout = html.Div([
 
 @app.callback(ServersideOutput("store", "data"), Input("btn", "n_clicks"))
 def query_data(n_clicks):
+    print("QUERY DATA")
     time.sleep(1)
     return px.data.gapminder()  # no JSON serialization here
 
@@ -29,4 +34,4 @@ def update_graph(value, df):
 
 
 if __name__ == '__main__':
-    app.run_server()
+    app.run_server(port=9999)

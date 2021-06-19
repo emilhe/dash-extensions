@@ -2,11 +2,114 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.39rc1] - 17-12-20
+## [0.0.56] - 19-06-21
 
 ### Added
 
 - Added `arg_check` keyword argument to `ServersideOutput` and `ServersideOutputTransform` components. If set to false, the function arguments not considered when updating the cache.
+
+## [0.0.55] - 22-05-21
+
+### Added
+
+- A new `assign` function to the `javascript` module to enable writing inline JavaScript functions.
+
+### Change
+
+- Relaxed `WebSocket` proptype validation.
+
+## [0.0.53] - 24-04-21
+
+### Added
+
+- Support for Redis in `ServersideOutputTransform` via a new `RedisStore` component (experimental).
+- New  `keyup`, `n_keyups`, and `keys_pressed` props to `Keyboard` component.
+- Support for the `ALL` wildcard in `MultiplexerTransform`, and MATCH/ALLSMALLER now raises an appropriate error.
+- New proxy_wrapper feature (useful for e.g. the `Loading` component) in `MultiplexerTransform`.
+- Support for client side callback transforms in `DashProxy`.
+- Client side callback support in `MultiplexerTransform`, `PrefixIdTransform`, and `NoOutputTransform`.
+- Automated modification of the `target` property of the `Tooltip` component in `PrefixIdTransform`.
+
+## [0.0.51] - 07-04-21
+
+### Change
+
+- Bugfix in `MultiplexerTransform` when `proxy_location='inplace'`.
+
+## [0.0.49] - 02-04-21
+
+### Change
+
+- Bugfix in `ServersideOutput` when using `dash.no_update`.
+
+## [0.0.48] - 02-04-21
+
+### Change
+
+- Bugfixes in `MultiplexerTransform`, both of dcc.Loading and of proxies firing unintentionally on load. 
+- Reintroduced the `TriggerTransform` based on community feedback.
+- Security fixes of underlying npm packages.
+
+## [0.0.47] - 21-03-21
+
+### Added
+
+- A new `MultiplexerTransform` that makes it possible to target an output multiple times.
+- A new `BeforeAfter` component to show before/after images.
+
+### Change
+
+- Updated `Burger` component; added new properties, added new example, slight changes to interface.
+- Updated `multipage_app.py` example; removed dependency on burger menu, removed burger helper function in `multipage.py`.
+- Added a `hijack` function to the `DashProxy` object. It can be used to inject app state into other app objects, typically used in frameworks such as dataiku 9.0 where the `Dash` object is constructed outside of the user code context. 
+
+### Remove
+
+- Removed the `GroupTransform` (not really necessary with the new `MultiplexerTransform`).
+- Removed the `TriggerTransform`.
+
+## [0.0.46] - 11-03-21
+
+### Change
+
+- Added a new function in the `dataiku` module.
+
+## [0.0.45] - 06-02-21
+
+### Change
+
+- Added support for dict IDs in the `Monitor` component thanks to [Yook74](https://github.com/thedirtyfew/dash-extensions/issues/45).
+
+## [0.0.44] - 12-01-21
+
+### Added
+
+- Added `dataiku` module (to ease integration of Dash apps in [dataiku](https://www.dataiku.com/)).
+
+## [0.0.42] - 09-01-21
+
+### Changes
+
+- Bugfix in `Burger` thanks to [JonThom](https://github.com/thedirtyfew/dash-extensions/issues/39).
+
+## [0.0.41] - 03-01-21
+
+### Changes
+
+- Bugfix in `NoOutputTransform`.
+
+## [0.0.40] - 31-12-20
+
+### Changes
+
+- Renaming of `websocket.py` to `websockets.py` to address a [Windows compatibility issue](https://github.com/thedirtyfew/dash-extensions/issues/38).
+
+## [0.0.39] - 28-12-20
+
+### Added
+
+- Added `WebSocket` component and `websocket.py` file with websocket utils.
+- Added `Ticker` component.
 
 ## [0.0.38] - 16-12-20
 

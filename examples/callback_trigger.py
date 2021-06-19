@@ -13,4 +13,5 @@ def func():  # argument is omitted from the function
 
 
 if __name__ == '__main__':
-    app.run_server()
+    app.run_server(port=9999
+                   )

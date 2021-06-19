@@ -3,7 +3,6 @@ import json
 import ntpath
 import base64
 import uuid
-
 import dash
 import dash_html_components as html
 
@@ -130,7 +129,7 @@ class Triggered(object):
             setattr(self, key, kwargs[key])
 
 
-def get_triggered():
+def get_triggered() -> Triggered:
     triggered = dash.callback_context.triggered
     if not triggered:
         return Triggered(None)

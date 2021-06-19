@@ -9,22 +9,45 @@ export default class Keyboard extends Component {
     constructor(props) {
         super(props);
         this.keydownHandler = this.keydownHandler.bind(this);
+        this.keyupHandler = this.keyupHandler.bind(this);
     }
 
     keydownHandler(event) {
         if(!this.props.captureKeys || this.props.captureKeys.indexOf(event.key) > -1){
-            this.props.setProps({keydown: this.props.eventProps.reduce(
-                function(o, k) { o[k] = event[k]; return o; }, {})})
+            const keydown = this.props.eventProps.reduce(
+                function(o, k) { o[k] = event[k]; return o; }, {})
+            this.props.setProps({keydown: keydown})
             this.props.setProps({n_keydowns: this.props.n_keydowns + 1})
+            if(keydown.key){
+                const keys_pressed = Object.assign(this.props.keys_pressed, {})
+                keys_pressed[keydown.key] = keydown
+                this.props.setProps({keys_pressed: keys_pressed})
+            }
+        }
+    }
+
+    keyupHandler(event) {
+        if(!this.props.captureKeys || this.props.captureKeys.indexOf(event.key) > -1){
+            const keyup = this.props.eventProps.reduce(
+            function(o, k) { o[k] = event[k]; return o; }, {})
+            this.props.setProps({keyup: keyup})
+            this.props.setProps({n_keyups: this.props.n_keyups + 1})
+            if(keyup.key){
+                const keys_pressed = Object.assign(this.props.keys_pressed, {})
+                delete keys_pressed[event.key];
+                this.props.setProps({keys_pressed: keys_pressed})
+            }
         }
     }
 
     componentDidMount() {
         document.addEventListener("keydown", this.keydownHandler, false);
+        document.addEventListener("keyup", this.keyupHandler, false);
     }
 
     componentWillUnmount() {
         document.removeEventListener("keydown", this.keydownHandler, false);
+        document.removeEventListener("keyup", this.keyupHandler, false);
     }
 
     render() {
@@ -34,7 +57,9 @@ export default class Keyboard extends Component {
 
 Keyboard.defaultProps = {
     eventProps: ["key", "altKey", "ctrlKey", "shiftKey","metaKey", "repeat"],
-    n_keydowns: 0
+    n_keydowns: 0,
+    n_keyups: 0,
+    keys_pressed: {}
 };
 
 
@@ -74,8 +99,24 @@ Keyboard.propTypes = {
     keydown: PropTypes.object,
 
      /**
+     * keyup (dict) the object that holds the result of the key up event. Structure like keydown.
+     */
+    keyup: PropTypes.object,
+
+    /**
+     * keys_pressed (dict) is a dict of objects like keydown for all keys currently pressed.
+     */
+    keys_pressed: PropTypes.object,
+
+     /**
      * A counter, which is incremented on each key down event, similar to n_clicks for buttons.
      */
-    n_keydowns: PropTypes.number
+     n_keydowns: PropTypes.number,
+
+     /**
+     * A counter, which is incremented on each key up event, similar to n_clicks for buttons.
+     */
+    n_keyups: PropTypes.number
+
 
 };
