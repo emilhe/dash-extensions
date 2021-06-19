@@ -10,7 +10,8 @@ All notable changes to this project will be documented in this file.
 
 ### Change
 
-- Bugfix in `assign` functionality.
+- Bugfix in `assign` functionality when multiple functions are assigned.
+- Bugfix in `NoOutputTransform` addressing an [issue](https://github.com/thedirtyfew/dash-extensions/issues/79) seen with multiple worker.
 
 ## [0.0.55] - 22-05-21
 
