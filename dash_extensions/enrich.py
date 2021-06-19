@@ -10,7 +10,7 @@ import dash_html_components as html
 import dash.dependencies as dd
 import plotly
 
-from dash.dependencies import Input, Output, MATCH, ALL, ALLSMALLER, _Wildcard
+from dash.dependencies import Input, Output, MATCH, ALL, ALLSMALLER, _Wildcard, ClientsideFunction
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -600,10 +600,10 @@ def _get_cache_id(func, output, args, session_check=None, arg_check=True):
 
 
 def _get_output_id(callback):
-    try:
-        f_repr = f"{callback['f'].__module__}.{callback['f'].__name__}"  # handles Python functions
-    except AttributeError:
+    if isinstance(callback['f'], (ClientsideFunction, str)):
         f_repr = repr(callback['f'])  # handles clientside functions
+    else:
+        f_repr = f"{callback['f'].__module__}.{callback['f'].__name__}"  # handles Python functions
     f_hash = hashlib.md5(f_repr.encode()).digest()
     return str(uuid.UUID(bytes=f_hash, version=4))
 
