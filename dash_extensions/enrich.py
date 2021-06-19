@@ -599,6 +599,15 @@ def _get_cache_id(func, output, args, session_check=None, arg_check=True):
     return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
 
 
+def _get_output_id(callback):
+    try:
+        f_repr = f"{callback['f'].__module__}.{callback['f'].__name__}"  # handles Python functions
+    except AttributeError:
+        f_repr = repr(callback['f'])  # handles clientside functions
+    f_hash = hashlib.md5(f_repr.encode()).digest()
+    return str(uuid.UUID(bytes=f_hash, version=4))
+
+
 # Interface definition for server stores.
 
 class ServerStore:
@@ -666,7 +675,7 @@ class NoOutputTransform(DashTransform):
     def _apply(self, callbacks):
         for callback in callbacks:
             if len(callback[dd.Output]) == 0:
-                output_id = str(uuid.uuid4())
+                output_id = _get_output_id(callback)
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
                 callback[dd.Output] = [dd.Output(output_id, "children")]
                 self.hidden_divs.append(hidden_div)
