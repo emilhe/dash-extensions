@@ -10,7 +10,7 @@ import dash_html_components as html
 import dash.dependencies as dd
 import plotly
 
-from dash.dependencies import Input, Output, MATCH, ALL, ALLSMALLER, _Wildcard, ClientsideFunction
+from dash.dependencies import Input, Output, State, MATCH, ALL, ALLSMALLER, _Wildcard, ClientsideFunction
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache

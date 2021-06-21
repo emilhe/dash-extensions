@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.57] - 21-06-21
+
+### Change
+
+- Fixed `State` missing in `enrich` import.
+
 ## [0.0.56] - 19-06-21
 
 ### Added
