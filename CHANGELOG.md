@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.58] - 30-06-21
+
+### Added
+
+- Added `Mermaid` component.
+- Added `DeferScript` component.
+
 ## [0.0.57] - 21-06-21
 
 ### Change

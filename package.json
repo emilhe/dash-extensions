@@ -1,6 +1,6 @@
 {
   "name": "dash-extensions",
-  "version": "0.0.57",
+  "version": "0.0.58",
   "description": "Extensions for Plotly Dash.",
   "main": "build/index.js",
   "scripts": {
@@ -44,6 +44,7 @@
     "react": "^16.8.6",
     "react-docgen": "^4.1.1",
     "react-dom": "^16.8.6",
+    "react-mermaid2": "^0.1.4",
     "style-loader": "^0.23.1",
     "styled-jsx": "^3.2.1",
     "webpack": "^4.36.1",
