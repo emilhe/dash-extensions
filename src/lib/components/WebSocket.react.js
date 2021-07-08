@@ -93,22 +93,22 @@ DashWebSocket.propTypes = {
     /**
      * This websocket state (in the readyState prop) and associated information.
      */
-    state: PropTypes.object,
+    state: PropTypes.oneOfType([PropTypes.object, PropTypes.string]),
 
     /**
      * When messages are received, this property is updated with the message content.
      */
-    message: PropTypes.object,
+    message: PropTypes.oneOfType([PropTypes.object, PropTypes.string]),
 
     /**
      * This property is set with the content of the onerror event.
      */
-    error: PropTypes.object,
+    error: PropTypes.oneOfType([PropTypes.object, PropTypes.string]),
 
     /**
      * When this property is set, a message is sent with its content.
      */
-    send: PropTypes.object,
+    send: PropTypes.oneOfType([PropTypes.object, PropTypes.string]),
 
     /**
      * The websocket endpoint (e.g. wss://echo.websocket.org).

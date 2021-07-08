@@ -1,4 +1,4 @@
-from enrich import Input, Output
+from dash_extensions.enrich import Input, Output
 
 import dash_html_components as html
 import dash_core_components as dcc

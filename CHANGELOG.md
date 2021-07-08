@@ -2,17 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.53] - 24-04-21
+## [0.0.58] - 30-06-21
+
+### Added
+
+- Added `Mermaid` component.
+- Added `DeferScript` component.
+
+## [0.0.57] - 21-06-21
 
 ### Change
 
-- Added support for Redis in `ServersideOutputTransform` via a new `RedisStore` component (experimental).
-- Added `keyup`, `n_keyups`, and `keys_pressed` props to `Keyboard` component.
-- Added support for the `ALL` wildcard in `MultiplexerTransform`, and MATCH/ALLSMALLER now raises an appropriate error.
-- Added new proxy_wrapper feature (useful for e.g. the `Loading` component) in `MultiplexerTransform`.
-- Added support for client side callback transforms in `DashProxy`.
-- Added client side callback support in `MultiplexerTransform`, `PrefixIdTransform`, and `NoOutputTransform`.
-- Added automated modification of the `target` property of the `Tooltip` component in `PrefixIdTransform`.
+- Fixed `State` missing in `enrich` import.
+
+## [0.0.56] - 19-06-21
+
+### Added
+
+- Added `arg_check` keyword argument to `ServersideOutput` and `ServersideOutputTransform` components. If set to false, the function arguments are not considered when updating the cache.
+
+### Change
+
+- Bugfix in `assign` functionality when multiple functions are assigned.
+- Bugfix in `NoOutputTransform` addressing an [issue](https://github.com/thedirtyfew/dash-extensions/issues/79) seen with multiple workers.
+
+## [0.0.55] - 22-05-21
+
+### Added
+
+- A new `assign` function to the `javascript` module to enable writing inline JavaScript functions.
+
+### Change
+
+- Relaxed `WebSocket` proptype validation.
+
+## [0.0.53] - 24-04-21
+
+### Added
+
+- Support for Redis in `ServersideOutputTransform` via a new `RedisStore` component (experimental).
+- New  `keyup`, `n_keyups`, and `keys_pressed` props to `Keyboard` component.
+- Support for the `ALL` wildcard in `MultiplexerTransform`, and MATCH/ALLSMALLER now raises an appropriate error.
+- New proxy_wrapper feature (useful for e.g. the `Loading` component) in `MultiplexerTransform`.
+- Support for client side callback transforms in `DashProxy`.
+- Client side callback support in `MultiplexerTransform`, `PrefixIdTransform`, and `NoOutputTransform`.
+- Automated modification of the `target` property of the `Tooltip` component in `PrefixIdTransform`.
 
 ## [0.0.51] - 07-04-21
 
