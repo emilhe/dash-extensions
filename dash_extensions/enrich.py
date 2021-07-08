@@ -9,7 +9,6 @@ import dash
 import dash_html_components as html
 import dash.dependencies as dd
 import plotly
-
 from dash.dependencies import Input, Output, State, MATCH, ALL, ALLSMALLER, _Wildcard, ClientsideFunction
 from dash.development.base_component import Component
 from flask import session
@@ -29,9 +28,11 @@ class DashProxy(dash.Dash):
     def __init__(self, *args, transforms=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.callbacks = []
+        self.reactive_variables = []
         self.clientside_callbacks = []
         self.arg_types = [dd.Output, dd.Input, dd.State]
         self.transforms = transforms if transforms is not None else []
+        self.layout_extension = LayoutExtension()
         # Do the transform initialization.
         for transform in self.transforms:
             transform.init(self)
@@ -84,6 +85,23 @@ class DashProxy(dash.Dash):
         callback["f"] = clientside_function
         self.clientside_callbacks.append(callback)
 
+    def reactive(self, *args, **kwargs):
+        """
+         This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
+        """
+        output = Output(None, "data")
+        callback = self._collect_callback(output, *args, **kwargs)
+        self.callbacks.append(callback)
+        
+        def wrapper(f):
+            component_id = f.__name__
+            output.component_id = component_id
+            self.reactive_variables.append(component_id)
+            self.layout_extension.components.append(dcc.Store(component_id, "data"))
+            callback["f"] = f
+
+        return wrapper
+        
     def _register_callbacks(self, app=None):
         callbacks, clientside_callbacks = self._resolve_callbacks()
         app = super() if app is None else app
@@ -98,7 +116,7 @@ class DashProxy(dash.Dash):
         layout = self._layout() if self._layout_is_function else self._layout
         for transform in self.transforms:
             layout = transform.layout(layout, self._layout_is_function)
-        return layout
+        return self.layout_extension.layout(layout, self._layout_is_function)
 
     def _setup_server(self):
         """
@@ -192,6 +210,19 @@ class DashTransform:
     def layout(self, layout, layout_is_function):
         return layout
 
+
+class LayoutExtension:
+    
+    def __init__(self):
+        self.initialized = False
+        self.components = []
+        
+    def layout(self, layout, layout_is_function):
+        if layout_is_function or not self.initialized:
+            children = _as_list(layout.children) + self.components
+            layout.children = children
+            self.initialized = True
+        return layout
 
 # endregion
 
@@ -662,15 +693,10 @@ class RedisStore(RedisCache):
 class NoOutputTransform(DashTransform):
 
     def __init__(self):
-        self.initialized = False
-        self.hidden_divs = []
+        self.layout_extension = LayoutExtension()
 
     def layout(self, layout, layout_is_function):
-        if layout_is_function or not self.initialized:
-            children = _as_list(layout.children) + self.hidden_divs
-            layout.children = children
-            self.initialized = True
-        return layout
+        return self.layout_extension.layout(layout, layout_is_function)
 
     def _apply(self, callbacks):
         for callback in callbacks:
@@ -678,7 +704,7 @@ class NoOutputTransform(DashTransform):
                 output_id = _get_output_id(callback)
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
                 callback[dd.Output] = [dd.Output(output_id, "children")]
-                self.hidden_divs.append(hidden_div)
+                self.layout_extension.components.append(hidden_div)
         return callbacks
 
     def apply_serverside(self, callbacks):
