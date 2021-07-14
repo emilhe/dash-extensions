@@ -1,8 +1,11 @@
-import uuid
 import json
 import secrets
-from flask_sockets import Sockets
+import urllib.parse
+import uuid
+
 from flask import session
+from flask_sockets import Sockets
+
 
 
 def ensure_session_id():
@@ -29,7 +32,7 @@ class SocketPool:
         self.sockets = Sockets(app.server)
         self.pool = {}
         # Add endpoint.
-        add_ws_endpoint(self.sockets, self.pool, handler, endpoint)
+        add_ws_endpoint(self.sockets, self.pool, handler, urllib.parse.urljoin(app.config.url_base_pathname, endpoint.strip("/")))
 
     def send(self, message):
         self._try_send(message, session["socket_id"])

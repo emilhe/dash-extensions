@@ -10,7 +10,7 @@ export default class DashWebSocket extends Component {
         // Create a new client.
         let {url} = this.props;
         const {protocols} = this.props;
-        url = url? url : "ws://" + location.host + "/ws";
+        url = url? url : "ws://" + location.host + location.pathname + "ws";
         this.client = new WebSocket(url, protocols);
         // Listen for events.
         this.client.onopen = (e) => {
