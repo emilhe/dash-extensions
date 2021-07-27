@@ -1,18 +1,53 @@
-import React, {Component} from 'react';
+import React from "react";
 import PropTypes from 'prop-types';
-import Mermaid2 from 'react-mermaid2';
+import mermaidAPI from "mermaid";
 
-/**
- * A light wrapper of https://github.com/e-attestations/react-mermaid2.
- */
-export default class Mermaid extends Component {
+const DEFAULT_CONFIG = {
+  startOnLoad: true,
+  theme: "forest",
+  logLevel: "fatal",
+  securityLevel: "strict",
+  arrowMarkerAbsolute: false,
+  flowchart: {
+    htmlLabels: true,
+    curve: "linear",
+  },
+  sequence: {
+    diagramMarginX: 50,
+    diagramMarginY: 10,
+    actorMargin: 50,
+    width: 150,
+    height: 65,
+    boxMargin: 10,
+    boxTextMargin: 5,
+    noteMargin: 10,
+    messageMargin: 35,
+    mirrorActors: true,
+    bottomMarginAdj: 1,
+    useMaxWidth: true,
+    rightAngles: false,
+    showSequenceNumbers: false,
+  },
+  gantt: {
+    titleTopMargin: 25,
+    barHeight: 20,
+    barGap: 4,
+    topPadding: 50,
+    leftPadding: 75,
+    gridLineStartPadding: 35,
+    fontSize: 11,
+    fontFamily: '"Open-Sans", "sans-serif"',
+    numberSectionStyles: 4,
+    axisFormat: "%Y-%m-%d",
+  },
+}
 
-    render() {
-        return (
-            <Mermaid2 {...this.props}/>
-        );
+const Mermaid = ({chart, config, name, className}) => {
+    mermaidAPI.initialize({...DEFAULT_CONFIG, ...config})
+    if (!chart) {
+        return null
     }
-
+    return <div className={className} dangerouslySetInnerHTML={{__html: mermaidAPI.render(name, chart)}}/>;
 }
 
 Mermaid.propTypes = {
@@ -40,13 +75,10 @@ Mermaid.propTypes = {
     id: PropTypes.string,
 
     /**
-     * The children of this component
-     */
-    children: PropTypes.node,
-
-    /**
      * The class of the component
      */
     className: PropTypes.string,
 
 };
+
+export default Mermaid
