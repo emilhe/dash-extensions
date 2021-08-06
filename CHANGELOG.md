@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `Html` component.
+- Added `Purify` component to enable rendering of sanitized html.
 
 ### Change
 
