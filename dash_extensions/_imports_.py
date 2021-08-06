@@ -1,5 +1,5 @@
 from .BeforeAfter import BeforeAfter
-from .Burger import Burger
+from .BurgerMenu import BurgerMenu
 from .DeferScript import DeferScript
 from .Download import Download
 from .Keyboard import Keyboard
@@ -11,7 +11,7 @@ from .WebSocket import WebSocket
 
 __all__ = [
     "BeforeAfter",
-    "Burger",
+    "BurgerMenu",
     "DeferScript",
     "Download",
     "Keyboard",

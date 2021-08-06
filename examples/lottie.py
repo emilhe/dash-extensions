@@ -1,8 +1,8 @@
 import dash
 import dash_html_components as html
-import dash_extensions as de
 import dash_core_components as dcc
 
+from dash_extensions import Lottie
 from dash.dependencies import Input, Output
 
 # Setup options.
@@ -11,7 +11,7 @@ options = dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRat
 # Create example app.
 app = dash.Dash(__name__)
 app.layout = html.Div([
-    de.Lottie(options=options, width="25%", height="25%", url=url, id="lottie", speed=2),
+    Lottie(options=options, width="25%", height="25%", url=url, id="lottie", speed=2),
     dcc.Slider(id="slider", value=20, min=0, max=100, step=1)
 ])
 
@@ -24,4 +24,4 @@ def set_speed(value):
 
 
 if __name__ == '__main__':
-    app.run_server(port=7879)
+    app.run_server(port=7879, debug=False)

@@ -1,5 +1,8 @@
 const path = require('path');
+const webpack = require('webpack');
 const packagejson = require('./package.json');
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
+const WebpackDashDynamicImport = require('@plotly/webpack-dash-dynamic-import');
 
 const dashLibraryName = packagejson.name.replace(/-/g, '_');
 
@@ -46,6 +49,7 @@ module.exports = (env, argv) => {
         entry,
         output: {
             path: path.resolve(__dirname, dashLibraryName),
+            chunkFilename: '[name].js',
             filename,
             library: dashLibraryName,
             libraryTarget: 'window',
@@ -77,5 +81,33 @@ module.exports = (env, argv) => {
                 },
             ],
         },
+        optimization: {
+            splitChunks: {
+                name: '[name].js',
+                cacheGroups: {
+                    async: {
+                        chunks: 'async',
+                        minSize: 0,
+                        name(module, chunks, cacheGroupKey) {
+                            return `${cacheGroupKey}-${chunks[0].name}`;
+                        }
+                    },
+                    // shared: {
+                    //     chunks: 'all',
+                    //     minSize: 0,
+                    //     minChunks: 2,
+                    //     name: 'dash_core_components-shared'
+                    // }
+                }
+            }
+        },
+        plugins: [
+            new WebpackDashDynamicImport(),
+            new webpack.SourceMapDevToolPlugin({
+                filename: '[file].map',
+                exclude: ['async-plotlyjs']
+            }),
+            new NodePolyfillPlugin()
+        ]
     }
 };
