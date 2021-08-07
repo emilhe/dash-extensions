@@ -1,7 +1,7 @@
 import React, {Suspense} from 'react';
 import PropTypes from 'prop-types';
 
-const LazyBurger = React.lazy(() => import(/* webpackChunkName: "burger" */ '../fragments/BurgerMenu.react'));
+const LazyBurger = React.lazy(() => import(/* webpackChunkName: "burger" */ '../fragments/Burger.react'));
 
 const Burger = (props) => {
   return (

@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Change
 
 - The `Mermaid` components now supports dynamic rendering (the component was rewritten completely from scratch).
-- Changed `Mermaid`, `Lottie`, and `Burger` components to use async loading. As a result, the size of the main `dash-extensions` bundle was reduced from > 1 MB to < 50 kB (!).
+- Changed `Mermaid`, `Lottie`, and `BurgerReact` components to use async loading. As a result, the size of the main `dash-extensions` bundle was reduced from > 1 MB to < 50 kB (!).
 
 ## [0.0.58] - 30-06-21
 
@@ -88,7 +88,7 @@ All notable changes to this project will be documented in this file.
 
 ### Change
 
-- Updated `Burger` component; added new properties, added new example, slight changes to interface.
+- Updated `BurgerReact` component; added new properties, added new example, slight changes to interface.
 - Updated `multipage_app.py` example; removed dependency on burger menu, removed burger helper function in `multipage.py`.
 - Added a `hijack` function to the `DashProxy` object. It can be used to inject app state into other app objects, typically used in frameworks such as dataiku 9.0 where the `Dash` object is constructed outside of the user code context. 
 
@@ -119,7 +119,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changes
 
-- Bugfix in `Burger` thanks to [JonThom](https://github.com/thedirtyfew/dash-extensions/issues/39).
+- Bugfix in `BurgerReact` thanks to [JonThom](https://github.com/thedirtyfew/dash-extensions/issues/39).
 
 ## [0.0.41] - 03-01-21
 
@@ -150,7 +150,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `Burger` component and `multipage` module.
+- Added `BurgerReact` component and `multipage` module.
 
 ### Changed
 
