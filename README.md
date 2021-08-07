@@ -237,6 +237,21 @@ After clicking save, you should see the text `Hello from Dash!` in the preview w
 
 The components listed here can be used in the `layout` of your Dash app. 
 
+### Purify
+
+The `Purify` component makes it possible to render HTML, MathML, and SVG. Typically, such rendering is prone to XSS vulnerabilities. These risks are mitigated by sanitizing the html input using the [DOMPurify](https://github.com/cure53/DOMPurify) library. Here is a minimal example,
+
+```python
+import dash
+from dash_extensions import Purify
+
+app = dash.Dash()
+app.layout = Purify("This is <b>html</b>")
+
+if __name__ == "__main__":
+    app.run_server()
+```
+
 ### WebSocket
 
 The `WebSocket` component enables communication via _websockets_ in Dash. Simply add the `WebSocket` component to the layout and set the `url` property to the websocket endpoint. Messages can be send by writing to the `send` property, and received messages are written to the `message` property. Here is a small example,

@@ -1,19 +1,31 @@
-import React, {Component} from 'react';
+import React, {Suspense} from "react";
 import PropTypes from 'prop-types';
-import Mermaid2 from 'react-mermaid2';
 
-/**
- * A light wrapper of https://github.com/e-attestations/react-mermaid2.
- */
-export default class Mermaid extends Component {
+const LazyMermaid = React.lazy(() => import(/* webpackChunkName: "mermaid" */ '../fragments/Mermaid.react'));
 
-    render() {
-        return (
-            <Mermaid2 {...this.props}/>
-        );
-    }
-
+const Mermaid = (props) => {
+  return (
+    <div>
+      <Suspense fallback={<div>Loading...</div>}>
+        <LazyMermaid {...props} />
+      </Suspense>
+    </div>
+  );
 }
+
+const makeId = (length) => {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
+
+Mermaid.defaultProps = {
+    name: makeId(5)
+};
 
 Mermaid.propTypes = {
 
@@ -40,13 +52,12 @@ Mermaid.propTypes = {
     id: PropTypes.string,
 
     /**
-     * The children of this component
-     */
-    children: PropTypes.node,
-
-    /**
      * The class of the component
      */
     className: PropTypes.string,
 
 };
+
+export default Mermaid
+export const propTypes = Mermaid.propTypes;
+export const defaultProps = Mermaid.defaultProps;

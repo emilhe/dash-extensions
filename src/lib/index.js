@@ -9,6 +9,7 @@ import WebSocket from './components/WebSocket.react';
 import BeforeAfter from './components/BeforeAfter.react';
 import Mermaid from './components/Mermaid.react';
 import DeferScript from './components/DeferScript.react';
+import Purify from './components/Purify.react';
 
 export {
     Download,
@@ -21,4 +22,5 @@ export {
     BeforeAfter,
     Mermaid,
     DeferScript,
+    Purify
 };

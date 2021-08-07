@@ -6,6 +6,7 @@ from .Keyboard import Keyboard
 from .Lottie import Lottie
 from .Mermaid import Mermaid
 from .Monitor import Monitor
+from .Purify import Purify
 from .Ticker import Ticker
 from .WebSocket import WebSocket
 
@@ -18,6 +19,7 @@ __all__ = [
     "Lottie",
     "Mermaid",
     "Monitor",
+    "Purify",
     "Ticker",
     "WebSocket"
 ]

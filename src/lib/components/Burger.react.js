@@ -1,42 +1,25 @@
-import React, {Component} from 'react';
+import React, {Suspense} from 'react';
 import PropTypes from 'prop-types';
-import * as rbm from 'react-burger-menu';
 
-/**
- * A light wrapper of BurgerMenu.
- */
-export default class BurgerMenu extends Component {
+const LazyBurger = React.lazy(() => import(/* webpackChunkName: "burger" */ '../fragments/Burger.react'));
 
-    constructor(props) {
-        super(props);
-    }
-
-    render() {
-        const {width, height, pageWrapId, outerContainerId, right, disableCloseOnEsc, noOverlay, disableOverlayClick,
-            noTransition, customBurgerIcon, customCrossIcon, disableAutoFocus, style, id, className, effect, children}
-            = this.props;
-        const props = {
-            width: width, height: height, pageWrapId: pageWrapId, outerContainerId: outerContainerId, right: right,
-            disableCloseOnEsc: disableCloseOnEsc, noOverlay: noOverlay, disableOverlayClick: disableOverlayClick,
-            noTransition: noTransition, customBurgerIcon: customBurgerIcon, customCrossIcon: customCrossIcon,
-            disableAutoFocus: disableAutoFocus, style: style, id:id, className: className}
-        const Menu = rbm.default[effect]
-        return (
-            <Menu {...props}>
-                {children}
-            </Menu>
-        );
-    }
-
+const Burger = (props) => {
+  return (
+    <div>
+      <Suspense fallback={<div>Loading...</div>}>
+        <LazyBurger {...props} />
+      </Suspense>
+    </div>
+  );
 }
 
-BurgerMenu.defaultProps = {
+Burger.defaultProps = {
     width: "300px",
     height: "100%",
     effect: "slide"
 };
 
-BurgerMenu.propTypes = {
+Burger.propTypes = {
 
     width: PropTypes.string,
 
@@ -89,3 +72,7 @@ BurgerMenu.propTypes = {
     className: PropTypes.string,
 
 };
+
+export default Burger;
+export const propTypes = Burger.propTypes;
+export const defaultProps = Burger.defaultProps;
