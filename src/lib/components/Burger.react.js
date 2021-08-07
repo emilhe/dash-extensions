@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 
 const LazyBurger = React.lazy(() => import(/* webpackChunkName: "burger" */ '../fragments/BurgerMenu.react'));
 
-const BurgerMenu = (props) => {
+const Burger = (props) => {
   return (
     <div>
       <Suspense fallback={<div>Loading...</div>}>
@@ -13,13 +13,13 @@ const BurgerMenu = (props) => {
   );
 }
 
-BurgerMenu.defaultProps = {
+Burger.defaultProps = {
     width: "300px",
     height: "100%",
     effect: "slide"
 };
 
-BurgerMenu.propTypes = {
+Burger.propTypes = {
 
     width: PropTypes.string,
 
@@ -73,6 +73,6 @@ BurgerMenu.propTypes = {
 
 };
 
-export default BurgerMenu;
-export const propTypes = BurgerMenu.propTypes;
-export const defaultProps = BurgerMenu.defaultProps;
+export default Burger;
+export const propTypes = Burger.propTypes;
+export const defaultProps = Burger.defaultProps;

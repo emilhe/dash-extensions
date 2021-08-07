@@ -6,12 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added `Purify` component to enable rendering of sanitized html.
+- Added `Purify` component to enable rendering of (sanitized) html.
 
 ### Change
 
 - The `Mermaid` components now supports dynamic rendering (the component was rewritten completely from scratch).
-- Changed `Mermaid`, `Lottie`, and `BurgerMenu` components to use async loading. As a result, the size of the main `dash-extensions` bundle was reduced from > 1 MB to < 50 kB (!).
+- Changed `Mermaid`, `Lottie`, and `Burger` components to use async loading. As a result, the size of the main `dash-extensions` bundle was reduced from > 1 MB to < 50 kB (!).
 
 ## [0.0.58] - 30-06-21
 
