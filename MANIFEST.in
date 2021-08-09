@@ -1,5 +1,11 @@
 include dash_extensions/dash_extensions.min.js
 include dash_extensions/dash_extensions.min.js.map
+include dash_extensions/async-burger.js
+include dash_extensions/async-burger.js.map
+include dash_extensions/async-lottie.js
+include dash_extensions/async-lottie.js.map
+include dash_extensions/async-mermaid.js
+include dash_extensions/async-mermaid.js.map
 include dash_extensions/metadata.json
 include dash_extensions/package-info.json
 include README.md
