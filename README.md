@@ -70,7 +70,7 @@ geojson = dl.GeoJSON(hoverStyle=arrow_function(dict(weight=5, color='#666', dash
 The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transforms` keyword argument, 
 
 ```python
-from enrich import DashProxy, TriggerTransform, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform
+from dash_extensions.enrich import DashProxy, TriggerTransform, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform
 
 app = DashProxy(transforms=[
     TriggerTransform(),  # enable use of Trigger objects
