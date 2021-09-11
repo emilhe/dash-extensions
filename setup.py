@@ -25,7 +25,7 @@ setup(
     long_description=README,
     long_description_content_type="text/markdown",
     description=package.get('description', package_name),
-    install_requires=["dash", "more_itertools", "Flask-Caching"],
+    install_requires=["dash", "more_itertools", "Flask-Caching", "jsbeautifier"],
     classifiers=[
         "Programming Language :: Python :: 3",
         'Framework :: Dash',

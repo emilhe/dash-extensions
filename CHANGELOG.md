@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.61] - UNRELEASED
+
+### Change
+
+- Added `jsbeautifier` package as install dependency.
+
 ## [0.0.60] - 09-08-21
 
 ### Added
