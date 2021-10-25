@@ -241,10 +241,10 @@ The components listed here can be used in the `layout` of your Dash app.
 The `Purify` component makes it possible to render HTML, MathML, and SVG. Typically, such rendering is prone to XSS vulnerabilities. These risks are mitigated by sanitizing the html input using the [DOMPurify](https://github.com/cure53/DOMPurify) library. Here is a minimal example,
 
 ```python
-import dash
+from dash import Dash
 from dash_extensions import Purify
 
-app = dash.Dash()
+app = Dash()
 app.layout = Purify("This is <b>html</b>")
 
 if __name__ == "__main__":
