@@ -221,7 +221,7 @@ and clear the JS and CSS tabs (unless you the JS/CSS code). Finally, go to the P
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 from dash_extensions.dataiku import setup_dataiku
 
 # Path for storing app configuration (must be writeable).
@@ -257,8 +257,8 @@ if __name__ == "__main__":
 The `WebSocket` component enables communication via _websockets_ in Dash. Simply add the `WebSocket` component to the layout and set the `url` property to the websocket endpoint. Messages can be send by writing to the `send` property, and received messages are written to the `message` property. Here is a small example,
 
 ```python
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc
+from dash import html
 from dash import Dash
 from dash.dependencies import Input, Output
 from dash_extensions import WebSocket
@@ -296,7 +296,7 @@ The `Download` component provides an easy way to download data from a Dash appli
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 from dash.dependencies import Output, Input
 from dash_extensions import Download
 
@@ -315,7 +315,7 @@ To ease downloading files, a `send_file` utility method is included,
 
 ```python
 import dash
-import dash_html_components as html  
+from dash import html  
 from dash.dependencies import Output, Input
 from dash_extensions import Download
 from dash_extensions.snippets import send_file
@@ -336,7 +336,7 @@ To ease downloading data frames (which seems to be a common use case for Dash us
 ```python
 import dash
 import pandas as pd
-import dash_html_components as html 
+from dash import html 
 from dash.dependencies import Output, Input
 from dash_extensions import Download
 from dash_extensions.snippets import send_data_frame
@@ -359,7 +359,7 @@ Finally, a `send_bytes`  utility method is included to make it easy to download 
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 import numpy as np
 import pandas as pd
 from dash.dependencies import Output, Input
@@ -392,7 +392,7 @@ and figure objects,
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output
 from dash_extensions import Download
@@ -438,7 +438,7 @@ The `DeferScript` component makes it possible to defer the loading of javascript
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 from html import unescape
 from dash_extensions import DeferScript
 
@@ -459,7 +459,7 @@ if __name__ == '__main__':
 The `BeforeAfter` component is a light wrapper of [react-before-after-slider](https://github.com/transitive-bullshit/react-before-after-slider/), which makes it possible to [highlight differences between two images](https://transitive-bullshit.github.io/react-before-after-slider/). Here is a small example,
 
 ```python
-import dash_html_components as html
+from dash import html
 from dash import Dash
 from dash_extensions import BeforeAfter
 
@@ -478,7 +478,7 @@ The `Ticker` component is a light wrapper of [react-ticker](https://github.com/A
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 from dash_extensions import Ticker
 
 app = dash.Dash(__name__)
@@ -494,7 +494,7 @@ The `Lottie` component makes it possible to run Lottie animations in Dash. Here 
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 import dash_extensions as de
 
 # Setup options.
@@ -513,7 +513,7 @@ if __name__ == '__main__':
 The `Burger` component is a light wrapper of [react-burger-menu](https://github.com/negomi/react-burger-menu), which enables [cool interactive burger menus](https://negomi.github.io/react-burger-menu/). Here is a small example,
 
 ```python
-import dash_html_components as html
+from dash import html
 from dash import Dash
 from dash_extensions import Burger
 
@@ -555,7 +555,7 @@ The `Keyboard` component makes it possible to capture keyboard events at the doc
 
 ```python
 import dash
-import dash_html_components as html
+from dash import html
 import json
 from dash.dependencies import Output, Input
 from dash_extensions import Keyboard
@@ -581,8 +581,8 @@ if __name__ == '__main__':
 The `Monitor` component makes it possible to monitor the state of child components. The most typical use case for this component is bi-directional synchronization of component properties. Here is a small example,
 
 ```python
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc
+from dash import html
 from dash import Dash, no_update
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
