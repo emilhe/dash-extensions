@@ -1,4 +1,4 @@
-dash~=1.20.0
+dash~=2.0.0
 more-itertools
 pyyaml
 Flask-Caching

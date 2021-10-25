@@ -3,11 +3,9 @@ import json
 import ntpath
 import base64
 import uuid
-import dash
 import dash_html_components as html
 
-from dash.dependencies import Output, Input
-
+from dash import html, Output, Input, callback_context
 
 # region Utils for Download component
 
@@ -130,7 +128,7 @@ class Triggered(object):
 
 
 def get_triggered() -> Triggered:
-    triggered = dash.callback_context.triggered
+    triggered = callback_context.triggered
     if not triggered:
         return Triggered(None)
     # Collect trigger ids and values.

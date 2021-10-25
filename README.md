@@ -220,14 +220,13 @@ Replace the content of the HTML tab with
 and clear the JS and CSS tabs (unless you the JS/CSS code). Finally, go to the Python tab and replace the content with
 
 ```python
-import dash
-from dash import html
+from dash import Dash, html
 from dash_extensions.dataiku import setup_dataiku
 
 # Path for storing app configuration (must be writeable).
 config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config.json")
 # Create a small example app.
-dash_app = dash.Dash(__name__, **setup_dataiku(app, config_path))
+dash_app = Dash(__name__, **setup_dataiku(app, config_path))
 dash_app.layout = html.Div("Hello from Dash!")
 ```
 
@@ -257,10 +256,7 @@ if __name__ == "__main__":
 The `WebSocket` component enables communication via _websockets_ in Dash. Simply add the `WebSocket` component to the layout and set the `url` property to the websocket endpoint. Messages can be send by writing to the `send` property, and received messages are written to the `message` property. Here is a small example,
 
 ```python
-from dash import dcc
-from dash import html
-from dash import Dash
-from dash.dependencies import Input, Output
+from dash import Dash, html, dcc, Input, Output
 from dash_extensions import WebSocket
 
 # Create example app.
@@ -295,12 +291,10 @@ Examples can be found in the `examples` folder.
 The `Download` component provides an easy way to download data from a Dash application. Simply add the `Download` component to the app layout, and add a callback which targets its `data` property. Here is a small example,
 
 ```python
-import dash
-from dash import html
-from dash.dependencies import Output, Input
+from dash import Dash, html, Output, Input
 from dash_extensions import Download
 
-app = dash.Dash(prevent_initial_callbacks=True)
+app = Dash(prevent_initial_callbacks=True)
 app.layout = html.Div([html.Button("Download", id="btn"), Download(id="download")])
 
 @app.callback(Output("download", "data"), [Input("btn", "n_clicks")])
@@ -314,13 +308,11 @@ if __name__ == '__main__':
 To ease downloading files, a `send_file` utility method is included,
 
 ```python
-import dash
-from dash import html  
-from dash.dependencies import Output, Input
+from dash import Dash, html, Output, Input
 from dash_extensions import Download
 from dash_extensions.snippets import send_file
 
-app = dash.Dash(prevent_initial_callbacks=True)
+app = Dash(prevent_initial_callbacks=True)
 app.layout = html.Div([html.Button("Download", id="btn"), Download(id="download")])
 
 @app.callback(Output("download", "data"), [Input("btn", "n_clicks")])
@@ -334,17 +326,15 @@ if __name__ == '__main__':
 To ease downloading data frames (which seems to be a common use case for Dash users), a `send_data_frame` utility method is also included,
 
 ```python
-import dash
 import pandas as pd
-from dash import html 
-from dash.dependencies import Output, Input
+from dash import Dash, html, Input, Output
 from dash_extensions import Download
 from dash_extensions.snippets import send_data_frame
 
 # Example data.
 df = pd.DataFrame({'a': [1, 2, 3, 4], 'b': [2, 1, 5, 6], 'c': ['x', 'x', 'y', 'y']})
 # Create example app.
-app = dash.Dash(prevent_initial_callbacks=True)
+app = Dash(prevent_initial_callbacks=True)
 app.layout = html.Div([html.Button("Download", id="btn"), Download(id="download")])
 
 @app.callback(Output("download", "data"), [Input("btn", "n_clicks")])
@@ -358,11 +348,9 @@ if __name__ == '__main__':
 Finally, a `send_bytes`  utility method is included to make it easy to download in-memory objects that support writing to BytesIO. Typical use cases are excel files,
 
 ```python
-import dash
-from dash import html
 import numpy as np
 import pandas as pd
-from dash.dependencies import Output, Input
+from dash import Dash, html, Output, Input
 from dash_extensions import Download
 from dash_extensions.snippets import send_bytes
 
@@ -370,7 +358,7 @@ from dash_extensions.snippets import send_bytes
 data = np.column_stack((np.arange(10), np.arange(10) * 2))
 df = pd.DataFrame(columns=["a column", "another column"], data=data)
 # Create example app.
-app = dash.Dash(prevent_initial_callbacks=True)
+app = Dash(prevent_initial_callbacks=True)
 app.layout = html.Div([html.Button("Download xlsx", id="btn"), Download(id="download")])
 
 @app.callback(Output("download", "data"), [Input("btn", "n_clicks")])
@@ -391,14 +379,12 @@ if __name__ == '__main__':
 and figure objects,
 
 ```python
-import dash
-from dash import html
 import plotly.graph_objects as go
-from dash.dependencies import Input, Output
+from dash import Dash, html, Input, Output
 from dash_extensions import Download
 from dash_extensions.snippets import send_bytes
 
-app = dash.Dash()
+app = Dash()
 app.layout = html.Div([html.Button("Download", id="btn"), Download(id="download")])
 
 @app.callback(Output("download", "data"), [Input("btn", "n_clicks")])
@@ -415,7 +401,7 @@ if __name__ == '__main__':
 The `Mermaid` component is a light wrapper of [react-mermaid2](https://github.com/e-attestations/react-mermaid2), which makes it possible to [draw flow diagrams](https://github.com/mermaid-js/mermaid). Here is a small example,
 
 ```python
-import dash
+from dash import Dash
 from dash_extensions import Mermaid
 
 chart = """
@@ -425,7 +411,7 @@ A-->C;
 B-->D;
 C-->D;
 """
-app = dash.Dash()
+app = Dash()
 app.layout = Mermaid(chart=chart)
 
 if __name__ == "__main__":
@@ -437,14 +423,13 @@ if __name__ == "__main__":
 The `DeferScript` component makes it possible to defer the loading of javascript code, which is often required to render dynamic content. One such example is [draw.io](https://app.diagrams.net/),
 
 ```python
-import dash
-from dash import html
+from dash import Dash, html
 from html import unescape
 from dash_extensions import DeferScript
 
 
 mxgraph = r'{&quot;highlight&quot;:&quot;#0000ff&quot;,&quot;nav&quot;:true,&quot;resize&quot;:true,&quot;toolbar&quot;:&quot;zoom layers lightbox&quot;,&quot;edit&quot;:&quot;_blank&quot;,&quot;xml&quot;:&quot;&lt;mxfile host=\&quot;app.diagrams.net\&quot; modified=\&quot;2021-06-07T06:06:13.695Z\&quot; agent=\&quot;5.0 (Windows)\&quot; etag=\&quot;4lPJKNab0_B4ArwMh0-7\&quot; version=\&quot;14.7.6\&quot;&gt;&lt;diagram id=\&quot;YgMnHLNxFGq_Sfquzsd6\&quot; name=\&quot;Page-1\&quot;&gt;jZJNT4QwEIZ/DUcToOriVVw1JruJcjDxYho60iaFIaUs4K+3yJSPbDbZSzN95qPTdyZgadm/GF7LAwrQQRyKPmBPQRzvktidIxgmwB4IFEaJCUULyNQvEAyJtkpAswm0iNqqegtzrCrI7YZxY7Dbhv2g3r5a8wLOQJZzfU4/lbByoslduPBXUIX0L0cheUrugwk0kgvsVojtA5YaRDtZZZ+CHrXzukx5zxe8c2MGKntNgknk8bs8fsj3+KtuDhxP+HZDVU5ct/RhatYOXgGDbSVgLBIG7LGTykJW83z0dm7kjklbaneLnEnlwFjoL/YZzb93WwNYgjWDC6EEdkuC0cZEO7p3i/6RF1WutL8nxmnkxVx6UcUZJIy/LgP49622mO3/AA==&lt;/diagram&gt;&lt;/mxfile&gt;&quot;}'
-app = dash.Dash(__name__)
+app = Dash(__name__)
 app.layout = html.Div([
     html.Div(className='mxgraph', style={"maxWidth": "100%"}, **{'data-mxgraph': unescape(mxgraph)}),
     DeferScript(src='https://viewer.diagrams.net/js/viewer-static.min.js')
@@ -459,8 +444,7 @@ if __name__ == '__main__':
 The `BeforeAfter` component is a light wrapper of [react-before-after-slider](https://github.com/transitive-bullshit/react-before-after-slider/), which makes it possible to [highlight differences between two images](https://transitive-bullshit.github.io/react-before-after-slider/). Here is a small example,
 
 ```python
-from dash import html
-from dash import Dash
+from dash import Dash, html
 from dash_extensions import BeforeAfter
 
 app = Dash()
@@ -477,11 +461,10 @@ if __name__ == '__main__':
 The `Ticker` component is a light wrapper of [react-ticker](https://github.com/AndreasFaust/react-ticker), which makes it easy to show [moving text](https://andreasfaust.github.io/react-ticker/). Here is a small example,
 
 ```python
-import dash
-from dash import html
+from dash import Dash, html
 from dash_extensions import Ticker
 
-app = dash.Dash(__name__)
+app = Dash(__name__)
 app.layout = html.Div(Ticker([html.Div("Some text")], direction="toRight"))
 
 if __name__ == '__main__':
@@ -493,15 +476,14 @@ if __name__ == '__main__':
 The `Lottie` component makes it possible to run Lottie animations in Dash. Here is a small example,
 
 ```python
-import dash
-from dash import html
+from dash import Dash, html
 import dash_extensions as de
 
 # Setup options.
 url = "https://assets9.lottiefiles.com/packages/lf20_YXD37q.json"
 options = dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRatio='xMidYMid slice'))
 # Create example app.
-app = dash.Dash(__name__)
+app = Dash(__name__)
 app.layout = html.Div(de.Lottie(options=options, width="25%", height="25%", url=url))
 
 if __name__ == '__main__':
@@ -513,8 +495,7 @@ if __name__ == '__main__':
 The `Burger` component is a light wrapper of [react-burger-menu](https://github.com/negomi/react-burger-menu), which enables [cool interactive burger menus](https://negomi.github.io/react-burger-menu/). Here is a small example,
 
 ```python
-from dash import html
-from dash import Dash
+from dash import Dash, html
 from dash_extensions import Burger
 
 
@@ -554,13 +535,11 @@ if __name__ == '__main__':
 The `Keyboard` component makes it possible to capture keyboard events at the document level. Here is a small example,
 
 ```python
-import dash
-from dash import html
 import json
-from dash.dependencies import Output, Input
+from dash import Dash, html, Output, Input, State
 from dash_extensions import Keyboard
 
-app = dash.Dash()
+app = Dash()
 app.layout = html.Div([Keyboard(id="keyboard"), html.Div(id="output")])
 
 @app.callback(
@@ -581,10 +560,7 @@ if __name__ == '__main__':
 The `Monitor` component makes it possible to monitor the state of child components. The most typical use case for this component is bi-directional synchronization of component properties. Here is a small example,
 
 ```python
-from dash import dcc
-from dash import html
-from dash import Dash, no_update
-from dash.dependencies import Input, Output
+from dash import Dash, html, dcc, no_update, Input, Output
 from dash.exceptions import PreventUpdate
 from dash_extensions import Monitor
 

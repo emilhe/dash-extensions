@@ -1,8 +1,8 @@
 import os
 import re
 import json
-import dash
 
+from dash import Dash
 from distutils.dir_util import copy_tree
 from flask import request, jsonify, make_response
 
@@ -62,7 +62,7 @@ def setup_dataiku(server, config_path):
         return {'server': server}
 
 
-def bind_assets_folder(app: dash.Dash, app_id: str, assets_folder: str):
+def bind_assets_folder(app: Dash, app_id: str, assets_folder: str):
     # Create assets container folder for the app.
     dst_assets_folder = os.path.join(app.config.assets_folder, app_id)
     os.makedirs(dst_assets_folder, exist_ok=True)

@@ -4,13 +4,11 @@ import json
 import pickle
 import secrets
 import uuid
-import dash_core_components as dcc
-import dash
-import dash_html_components as html
 import dash.dependencies as dd
 import plotly
 
-from dash.dependencies import Input, Output, State, MATCH, ALL, ALLSMALLER, _Wildcard, ClientsideFunction
+from dash import Input, Output, State, MATCH, ALL, ALLSMALLER, ClientsideFunction, dcc, html, Dash, no_update
+from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -24,7 +22,7 @@ _wildcard_values = list(_wildcard_mappings.values())
 
 # region Dash proxy
 
-class DashProxy(dash.Dash):
+class DashProxy(Dash):
 
     def __init__(self, *args, transforms=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -121,7 +119,7 @@ class DashProxy(dash.Dash):
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
         return callbacks, clientside_callbacks
 
-    def hijack(self, app: dash.Dash):
+    def hijack(self, app: Dash):
         # Change properties.
         app.config.update(self.config)
         app.title = self.title
@@ -570,7 +568,7 @@ def _pack_outputs(callback):
                 data = memoize(data)
             for i, output in enumerate(callback[Output]):
                 # Skip no_update updates.
-                if isinstance(data[i], type(dash.no_update)):
+                if isinstance(data[i], type(no_update)):
                     continue
                 # Replace only for server side outputs.
                 serverside_output = isinstance(callback[Output][i], ServersideOutput)
