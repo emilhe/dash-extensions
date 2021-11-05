@@ -1,10 +1,9 @@
 import examples.pages.module as module
 import examples.pages.app as sub_app
-import dash_html_components as html
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-from dash.dependencies import Input, Output
-from dash_extensions.enrich import DashProxy
+
+from dash import dcc, html
+from dash_extensions.enrich import DashProxy, Input, Output
 from dash_extensions.multipage import PageCollection, app_to_page, module_to_page, Page, CONTENT_ID, URL_ID
 
 

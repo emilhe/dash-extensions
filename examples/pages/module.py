@@ -1,8 +1,7 @@
-from dash_extensions.enrich import Input, Output
-
-import dash_html_components as html
-import dash_core_components as dcc
 import dash_bootstrap_components as dbc
+
+from dash_extensions.enrich import Input, Output
+from dash import html, dcc
 
 
 def layout(*args, **kwargs):

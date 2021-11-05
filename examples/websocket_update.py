@@ -1,11 +1,9 @@
 import json
-import dash_html_components as html
 import random
-import dash_core_components as dcc
 import plotly.graph_objects as go
+
 from gevent import sleep
-from dash import Dash
-from dash.dependencies import Input, Output, State
+from dash import html, dcc, Dash, Input, Output, State
 from dash_extensions import WebSocket
 from dash_extensions.websockets import SocketPool, run_server
 

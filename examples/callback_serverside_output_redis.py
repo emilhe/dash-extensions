@@ -1,8 +1,7 @@
 import time
-import dash_core_components as dcc
-import dash_html_components as html
 import plotly.express as px
 
+from dash import dcc, html
 from dash_extensions.enrich import Output, Input, State, ServersideOutput, DashProxy, ServersideOutputTransform, \
     RedisStore
 

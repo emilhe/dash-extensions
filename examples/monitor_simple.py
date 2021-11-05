@@ -1,5 +1,4 @@
-import dash_core_components as dcc
-from dash import Dash
+from dash import Dash, dcc
 from dash.dependencies import Input, Output
 from dash_extensions import Monitor
 

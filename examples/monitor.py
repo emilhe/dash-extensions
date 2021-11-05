@@ -1,6 +1,4 @@
-import dash_core_components as dcc
-import dash_html_components as html
-from dash import Dash, no_update
+from dash import Dash, no_update, dcc, html
 from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
 from dash_extensions import Monitor

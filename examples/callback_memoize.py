@@ -1,7 +1,7 @@
 import time
-import dash_core_components as dcc
-import dash_html_components as html
 import plotly.express as px
+
+from dash import html, dcc
 from dash_extensions.enrich import Dash, Output, Input, Trigger, ServersideOutput
 
 app = Dash(prevent_initial_callbacks=True)

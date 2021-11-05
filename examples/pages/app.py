@@ -1,8 +1,6 @@
-from dash_extensions.enrich import DashProxy
-from dash_extensions.enrich import Input, Output
+from dash_extensions.enrich import DashProxy, Input, Output
+from dash import html, dcc
 
-import dash_html_components as html
-import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 
 # Create app.
