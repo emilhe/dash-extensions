@@ -2,11 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.61] - UNRELEASED
+## [0.0.61] - 05-11-21
 
 ### Change
 
 - Added `jsbeautifier` package as install dependency.
+- Updates code and example to Dash 2.0 syntax.
 
 ## [0.0.60] - 09-08-21
 
