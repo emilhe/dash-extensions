@@ -121,7 +121,7 @@ class DashProxy(dash.Dash):
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
         return callbacks, clientside_callbacks
 
-    def hijack(self, app: Dash):
+    def hijack(self, app: dash.Dash):
         # Change properties.
         app.config.update(self.config)
         app.title = self.title
