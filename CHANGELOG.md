@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.62] - 06-11-21
+
+### Change
+
+- Added all `dash` elements to `enrich` module (e.g. `html` and `dcc`) to enable drop-in replacement.
+
 ## [0.0.61] - 05-11-21
 
 ### Change

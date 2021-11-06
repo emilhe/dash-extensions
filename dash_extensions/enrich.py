@@ -4,10 +4,12 @@ import json
 import pickle
 import secrets
 import uuid
-import dash.dependencies as dd
 import plotly
+import dash
 
-from dash import Input, Output, State, MATCH, ALL, ALLSMALLER, ClientsideFunction, dcc, html, Dash, no_update
+# Enable enrich as drop-in replacement for dash
+from dash import no_update, Input, Output, State, ClientsideFunction, MATCH, ALL, ALLSMALLER, development, exceptions, \
+    resources, dcc, html, dash_table, callback_context, callback, clientside_callback
 from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
 from flask import session
@@ -22,13 +24,13 @@ _wildcard_values = list(_wildcard_mappings.values())
 
 # region Dash proxy
 
-class DashProxy(Dash):
+class DashProxy(dash.Dash):
 
     def __init__(self, *args, transforms=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.callbacks = []
         self.clientside_callbacks = []
-        self.arg_types = [dd.Output, dd.Input, dd.State]
+        self.arg_types = [Output, Input, State]
         self.transforms = transforms if transforms is not None else []
         # Do the transform initialization.
         for transform in self.transforms:
@@ -50,14 +52,14 @@ class DashProxy(Dash):
                 for key in callback:
                     if isinstance(element, key):
                         # Check if this is a wild card output.
-                        if not multi_output and isinstance(element, dd.Output):
+                        if not multi_output and isinstance(element, Output):
                             component_id = element.component_id
                             if isinstance(component_id, dict):
-                                multi_output = any([component_id[k] in [dd.ALLSMALLER, dd.ALL] for k in component_id])
+                                multi_output = any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
                         callback[key].append(element)
                         arg_order.append(element)
         if not multi_output:
-            multi_output = len(callback[dd.Output]) > 1
+            multi_output = len(callback[Output]) > 1
         # Save the kwargs for later.
         callback["kwargs"] = kwargs
         callback["sorted_args"] = arg_order
@@ -86,11 +88,11 @@ class DashProxy(Dash):
         callbacks, clientside_callbacks = self._resolve_callbacks()
         app = super() if app is None else app
         for cb in callbacks:
-            outputs = cb[dd.Output][0] if len(cb[dd.Output]) == 1 else cb[dd.Output]
-            app.callback(outputs, cb[dd.Input], cb[dd.State], **cb["kwargs"])(cb["f"])
+            outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
+            app.callback(outputs, cb[Input], cb[State], **cb["kwargs"])(cb["f"])
         for cb in clientside_callbacks:
-            outputs = cb[dd.Output][0] if len(cb[dd.Output]) == 1 else cb[dd.Output]
-            app.clientside_callback(cb["f"], outputs, cb[dd.Input], cb[dd.State], **cb["kwargs"])
+            outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
+            app.clientside_callback(cb["f"], outputs, cb[Input], cb[State], **cb["kwargs"])
 
     def _layout_value(self):
         layout = self._layout() if self._layout_is_function else self._layout
@@ -298,7 +300,7 @@ def filter_args(args_filter):
 
 
 def trigger_filter(args):
-    inputs_args = [item for item in args if isinstance(item, dd.Input) or isinstance(item, dd.State)]
+    inputs_args = [item for item in args if isinstance(item, Input) or isinstance(item, State)]
     is_trigger = [isinstance(item, Trigger) for item in inputs_args]
     return is_trigger
 
@@ -475,7 +477,7 @@ class ServersideOutputTransform(DashTransform):
             memoize = callback["kwargs"].get("memoize", None)
             serverside = False
             # Keep tract of which outputs are server side outputs.
-            for output in callback[dd.Output]:
+            for output in callback[Output]:
                 if isinstance(output, ServersideOutput):
                     serverside_output_map[_create_callback_id(output)] = output
                     serverside = True
@@ -491,7 +493,7 @@ class ServersideOutputTransform(DashTransform):
         # 2) Inject cached data into callbacks.
         for callback in callbacks:
             # Figure out which args need loading.
-            items = callback[dd.Input] + callback[dd.State]
+            items = callback[Input] + callback[State]
             item_ids = [_create_callback_id(item) for item in items]
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
@@ -672,10 +674,10 @@ class NoOutputTransform(DashTransform):
 
     def _apply(self, callbacks):
         for callback in callbacks:
-            if len(callback[dd.Output]) == 0:
+            if len(callback[Output]) == 0:
                 output_id = _get_output_id(callback)
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
-                callback[dd.Output] = [dd.Output(output_id, "children")]
+                callback[Output] = [Output(output_id, "children")]
                 self.hidden_divs.append(hidden_div)
         return callbacks
 
