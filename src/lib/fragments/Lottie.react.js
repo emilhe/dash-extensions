@@ -1,5 +1,4 @@
 import React, {Component} from 'react';
-import PropTypes from 'prop-types';
 import {propTypes} from '../components/Lottie.react';
 import L from 'react-lottie';
 

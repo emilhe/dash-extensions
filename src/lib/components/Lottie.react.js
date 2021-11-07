@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import PropTypes from "prop-types";
 
+// eslint-disable-next-line no-inline-comments
 const LazyLottie = React.lazy(() => import(/* webpackChunkName: "lottie" */ '../fragments/Lottie.react'));
 
 const Lottie = (props) => {

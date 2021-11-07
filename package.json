@@ -1,6 +1,6 @@
 {
   "name": "dash-extensions",
-  "version": "0.0.63",
+  "version": "0.0.64",
   "description": "Extensions for Plotly Dash.",
   "main": "build/index.js",
   "scripts": {
@@ -32,12 +32,14 @@
     "ssri": ">=8.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.5.4",
-    "@babel/plugin-proposal-object-rest-spread": "^7.5.4",
-    "@babel/preset-env": "^7.5.4",
-    "@babel/preset-react": "^7.0.0",
+    "@babel/core": "^7.16.0",
+    "@babel/plugin-syntax-class-properties": "^7.12.13",
+    "@babel/preset-env": "^7.16.0",
+    "@babel/preset-react": "^7.16.0",
     "babel-eslint": "^10.0.2",
-    "babel-loader": "^8.0.6",
+    "babel-loader": "^8.2.3",
+    "babel-plugin-transform-class-properties": "^6.24.1",
+    "@babel/plugin-proposal-object-rest-spread": "^7.5.4",
     "copyfiles": "^2.1.1",
     "css-loader": "^5.2.5",
     "eslint": "^6.0.1",

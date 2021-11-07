@@ -29,7 +29,7 @@ _current_path = _os.path.dirname(_os.path.abspath(__file__))
 
 _this_module = _sys.modules[__name__]
 
-
+_css_dist = []
 _js_dist = [
     {
         'relative_package_path': 'dash_extensions.min.js',
@@ -41,22 +41,35 @@ _js_dist = [
         'dynamic': True
     }
 ]
-for chunk in ["lottie", "mermaid", "burger"]:
-    _js_dist += [
-        {
-            'relative_package_path': f'async-{chunk}.js',
-            'namespace': package_name
-        },
-        {
-            'relative_package_path': f'async-{chunk}.js.map',
-            'namespace': package_name,
-            'dynamic': True
-        }
-    ]
 
-_css_dist = []
+# Prepare per-chunk js imports.
+_chunk_map = {
+    "Lottie": ["lottie"],
+    "Burger": ["burger"],
+    "Mermaid": ["mermaid"]
+}
+_chunk_js_dist_map = {}
+for _component in _chunk_map:
+    _chunk_js_dist_map[_component] = []
+    for entry in _chunk_map[_component]:
+        _chunk_js_dist_map[_component] += [
+            {
+                'relative_package_path': f'async-{entry}.js',
+                'namespace': package_name
+            },
+            {
+                'relative_package_path': f'async-{entry}.js.map',
+                'namespace': package_name,
+                'dynamic': True
+            }
+        ]
 
-
+# Add chunks to respective components so that they only load when the component is imported.
 for _component in __all__:
-    setattr(locals()[_component], '_js_dist', _js_dist)
+    _component_js_dist = _js_dist if _component not in _chunk_map else _js_dist + _chunk_js_dist_map[_component]
+    setattr(locals()[_component], '_js_dist', _component_js_dist)
     setattr(locals()[_component], '_css_dist', _css_dist)
+
+# Update _js_dist to hold ALL chunks to ensure Dash can load them.
+for _component in _chunk_js_dist_map:
+    _js_dist += _chunk_js_dist_map[_component]
