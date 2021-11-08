@@ -5,13 +5,12 @@ import sys as _sys
 import json
 
 import dash as _dash
-# from . import assets  # noqa
 
 # noinspection PyUnresolvedReferences
 from ._imports_ import *
 from ._imports_ import __all__
 
-if not hasattr(_dash, 'development'):
+if not hasattr(_dash, '__plotly_dash') and not hasattr(_dash, 'development'):
     print('Dash was not successfully imported. '
           'Make sure you don\'t have a file '
           'named \n"dash.py" in your current directory.', file=_sys.stderr)
@@ -29,47 +28,61 @@ _current_path = _os.path.dirname(_os.path.abspath(__file__))
 
 _this_module = _sys.modules[__name__]
 
+async_resources = ["lottie", "burger", "mermaid"]
+
+_js_dist = []
+
+_js_dist.extend(
+    [
+        {
+            "relative_package_path": "async-{}.js".format(async_resource),
+            "external_url": (
+                "https://unpkg.com/{0}@{2}"
+                "/{1}/async-{3}.js"
+            ).format(package_name, __name__, __version__, async_resource),
+            "namespace": package_name,
+            "async": True,
+        }
+        for async_resource in async_resources
+    ]
+)
+
+# TODO: Figure out if unpkg link works
+_js_dist.extend(
+    [
+        {
+            "relative_package_path": "async-{}.js.map".format(async_resource),
+            "external_url": (
+                "https://unpkg.com/{0}@{2}"
+                "/{1}/async-{3}.js.map"
+            ).format(package_name, __name__, __version__, async_resource),
+            "namespace": package_name,
+            "dynamic": True,
+        }
+        for async_resource in async_resources
+    ]
+)
+
+_js_dist.extend(
+    [
+        {
+            'relative_package_path': 'dash_extensions.min.js',
+            'external_url': 'https://unpkg.com/{0}@{2}/{1}/{1}.min.js'.format(
+                package_name, __name__, __version__),
+            'namespace': package_name
+        },
+        {
+            'relative_package_path': 'dash_extensions.min.js.map',
+            'external_url': 'https://unpkg.com/{0}@{2}/{1}/{1}.min.js.map'.format(
+                package_name, __name__, __version__),
+            'namespace': package_name,
+            'dynamic': True
+        }
+    ]
+)
+
 _css_dist = []
-_js_dist = [
-    {
-        'relative_package_path': 'dash_extensions.min.js',
-        'namespace': package_name
-    },
-    {
-        'relative_package_path': 'dash_extensions.min.js.map',
-        'namespace': package_name,
-        'dynamic': True
-    }
-]
 
-# Prepare per-chunk js imports.
-_chunk_map = {
-    "Lottie": ["lottie"],
-    "Burger": ["burger"],
-    "Mermaid": ["mermaid"]
-}
-_chunk_js_dist_map = {}
-for _component in _chunk_map:
-    _chunk_js_dist_map[_component] = []
-    for entry in _chunk_map[_component]:
-        _chunk_js_dist_map[_component] += [
-            {
-                'relative_package_path': f'async-{entry}.js',
-                'namespace': package_name
-            },
-            {
-                'relative_package_path': f'async-{entry}.js.map',
-                'namespace': package_name,
-                'dynamic': True
-            }
-        ]
-
-# Add chunks to respective components so that they only load when the component is imported.
 for _component in __all__:
-    _component_js_dist = _js_dist if _component not in _chunk_map else _js_dist + _chunk_js_dist_map[_component]
-    setattr(locals()[_component], '_js_dist', _component_js_dist)
+    setattr(locals()[_component], '_js_dist', _js_dist)
     setattr(locals()[_component], '_css_dist', _css_dist)
-
-# Update _js_dist to hold ALL chunks to ensure Dash can load them.
-for _component in _chunk_js_dist_map:
-    _js_dist += _chunk_js_dist_map[_component]
