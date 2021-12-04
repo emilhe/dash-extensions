@@ -82,6 +82,8 @@ app = DashProxy(transforms=[
 
 The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to load only the transforms are that actually used.
 
+NB: Transforms are not (yet) compatible with Dash 2.0 callbacks that attach directly to the `dash` module (rather than the app object), nor with the `long_callback` decorator. 
+
 #### TriggerTransform
 
 Makes it possible to use the `Trigger` component. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
