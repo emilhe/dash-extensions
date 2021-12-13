@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.66] - 13-12-21
+
+### Change
+
+- Added support in the `enrich` module for Dash 2.0 style callbacks that don't use the app object.
+
 ## [0.0.65] - 08-11-21
 
 ### Change

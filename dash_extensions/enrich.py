@@ -117,6 +117,11 @@ class DashProxy(dash.Dash):
          This method resolves the callbacks, i.e. it applies the callback injections.
         """
         callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
+        # Add any global callbacks.
+        callbacks += GLOBAL_PROXY.callbacks
+        clientside_callbacks += GLOBAL_PROXY.clientside_callbacks
+        GLOBAL_PROXY.clear()
+        # Proceed as before.
         for transform in self.transforms:
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
         return callbacks, clientside_callbacks
@@ -134,6 +139,12 @@ class DashProxy(dash.Dash):
         # Setup secret.
         if not app.server.secret_key:
             app.server.secret_key = secrets.token_urlsafe(16)
+
+    def clear(self):
+        self.callbacks = []
+        self.clientside_callbacks = []
+        self.arg_types = [Output, Input, State]
+        self.transforms = []
 
 
 def _get_session_id(session_key=None):
@@ -191,6 +202,21 @@ class DashTransform:
 
     def layout(self, layout, layout_is_function):
         return layout
+
+
+# endregion
+
+# region Global app object (to emulate Dash 2.0 import syntax)
+
+GLOBAL_PROXY = DashProxy()
+
+
+def callback(*args, **kwargs):
+    return GLOBAL_PROXY.callback(*args, **kwargs)
+
+
+def clientside_callback(clientside_function, *args, **kwargs):
+    return GLOBAL_PROXY.clientside_callback(clientside_function, *args, **kwargs)
 
 
 # endregion
