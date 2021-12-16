@@ -11,7 +11,6 @@ import Mermaid from './components/Mermaid.react';
 import DeferScript from './components/DeferScript.react';
 import Purify from './components/Purify.react';
 import EventListener from './components/EventListener.react';
-import Transform from './components/Transform.react';
 
 export {
     Download,
@@ -25,6 +24,5 @@ export {
     Mermaid,
     DeferScript,
     Purify,
-    EventListener,
-    Transform,
+    EventListener
 };

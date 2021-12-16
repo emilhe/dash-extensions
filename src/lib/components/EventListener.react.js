@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import PropTypes from 'prop-types';
-//import {getDescendantProp} from 'dash-extensions'
+import {getDescendantProp} from 'dash-extensions-js'
 
 /**
  * The EventListener component listens for events from the document object or children if provided.
@@ -16,7 +16,7 @@ export default class EventListener extends Component {
 
     getSources(){
         const sources = [...this.myRef.current.children];
-        if(sources.length == 0){
+        if(sources.length === 0){
             sources.push(document);  // if no children are provided, attach to the document object.
         }
         return sources;
@@ -26,13 +26,6 @@ export default class EventListener extends Component {
         if(this.props.logging){
             console.log(e);
         }
-        // TODO: Import from dash-extensions-js
-        const getDescendantProp = (obj, desc) => {
-            const arr = desc.split(".");
-            while(arr.length && (obj = obj[arr.shift()]));
-            return obj;
-        }
-
         const eventProps = this.props.events.filter(o => o["event"] === e.type).map(o => o["props"]? o["props"] : [])[0];
         const eventData = eventProps.reduce(function(o, k) { o[k] = getDescendantProp(e, k); return o; }, {});
 //        eventData.id = e.srcElement.id;
