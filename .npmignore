@@ -23,3 +23,19 @@ config
 .travis.yml
 CHANGELOG.md
 README.md
+
+# python stuff
+/venv
+/examples
+/file_system_store
+/dist
+/dash_extensions.egg.info
+/dash_extensions
+/dist
+/tests
+*.py
+
+# ide stuff
+/.vscode
+/.idea
+/.github
