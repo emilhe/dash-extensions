@@ -6,6 +6,7 @@ import secrets
 import uuid
 import plotly
 import dash
+import inspect
 
 # Enable enrich as drop-in replacement for dash
 from dash import no_update, Input, Output, State, ClientsideFunction, MATCH, ALL, ALLSMALLER, development, exceptions, \
@@ -16,11 +17,46 @@ from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Annotated, get_args, get_origin, Callable
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
+
+# region Annotation stuff
+
+def prop(component_id, component_property, property_type=any, trigger=True, serverside=False):
+    kwargs = dict(component_id=component_id, component_property=component_property)
+    options = dict(trigger=trigger, serverside=serverside)
+    return Annotated[property_type, kwargs, options]
+
+
+def _get_output(annotation):
+    kwargs, options = annotation.__metadata__[0], annotation.__metadata__[1]
+    return ServersideOutput(**kwargs) if options["serverside"] else Output(**kwargs)
+
+
+def _get_input_state(annotation):
+    kwargs, options = annotation.__metadata__[0], annotation.__metadata__[1]
+    return Input(**kwargs) if options["trigger"] else State(**kwargs)
+
+
+def _derive_args(f):
+    derived_args = []
+    for name, annotation in inspect.getfullargspec(f).annotations.items():
+        if name == "return":
+            if get_origin(annotation) == tuple:
+                # Multi valued output
+                for return_value in get_args(annotation):
+                    derived_args.append(_get_output(return_value))
+            else:
+                derived_args.append(_get_output(annotation))
+        else:
+            derived_args.append(_get_input_state(annotation))
+    return derived_args
+
+
+# endregion
 
 # region Dash proxy
 
@@ -36,47 +72,57 @@ class DashProxy(dash.Dash):
         for transform in self.transforms:
             transform.init(self)
 
-    def _collect_callback(self, *args, **kwargs):
+    def _collect_callback(self, *args, cb=None, **kwargs):
         """
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         # Parse Output/Input/State (could be made simpler by enforcing input structure)
         keys = ['output', 'inputs', 'state']
         args = list(args) + list(flatten([_extract_list_from_kwargs(kwargs, key) for key in keys]))
-        callback = {arg_type: [] for arg_type in self.arg_types}
+        cb = {arg_type: [] for arg_type in self.arg_types} if cb is None else cb
         arg_order = []
         multi_output = False
         for arg in args:
             elements = _as_list(arg)
             for element in elements:
-                for key in callback:
+                for key in self.arg_types:
                     if isinstance(element, key):
                         # Check if this is a wild card output.
                         if not multi_output and isinstance(element, Output):
                             component_id = element.component_id
                             if isinstance(component_id, dict):
                                 multi_output = any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
-                        callback[key].append(element)
+                        cb[key].append(element)
                         arg_order.append(element)
         if not multi_output:
-            multi_output = len(callback[Output]) > 1
+            multi_output = len(cb[Output]) > 1
         # Save the kwargs for later.
-        callback["kwargs"] = kwargs
-        callback["sorted_args"] = arg_order
-        callback["multi_output"] = multi_output
+        cb["kwargs"] = kwargs
+        cb["sorted_args"] = arg_order
+        cb["multi_output"] = multi_output
 
-        return callback
+        return cb
 
     def callback(self, *args, **kwargs):
         """
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
-        callback = self._collect_callback(*args, **kwargs)
-        self.callbacks.append(callback)
+        # Detect new, experimental syntax.
+        new_syntax = isinstance(args[0], Callable)
+        if new_syntax:
+            func = args[0]
+            args = args[1:]
+        # Collect callback.
+        cb = self._collect_callback(*args, **kwargs)
+        self.callbacks.append(cb)
 
         def wrapper(f):
-            callback["f"] = f
+            if new_syntax:
+                self._collect_callback(*_derive_args(f), cb=cb)  # TODO: Enable old syntax also
+            cb["f"] = f
 
+        if new_syntax:
+            return wrapper(func)
         return wrapper
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
