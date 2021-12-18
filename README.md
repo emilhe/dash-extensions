@@ -238,6 +238,36 @@ After clicking save, you should see the text `Hello from Dash!` in the preview w
 
 The components listed here can be used in the `layout` of your Dash app. 
 
+### EventListener
+
+The `EventListener` component makes it possible to listen to (arbitrary) JavaScript events. Simply wrap the relevant components in an `EventListener` component, specify which event to subscribe to, and what event properties to send back to Dash,
+
+```python
+from dash import Dash, html, Input, Output, State
+from dash_extensions import EventListener
+
+# JavaScript event(s) that we want to listen to and what properties to collect.
+event = {"event": "click", "props": ["srcElement.className", "srcElement.innerText"]}
+# Create small example app
+app = Dash(prevent_initial_callbacks=True)
+app.layout = html.Div([
+    EventListener(
+        html.Div("Click here!", id="click_here", className="stuff"),
+        events=[event], logging=True, id="el"
+    ),
+    html.Div(id="log")
+])
+
+@app.callback(Output("log", "children"), Input("el", "n_events"), State("el", "event"))
+def click_event(n_events, e):
+    return ",".join(f"{prop} is '{e[prop]}' " for prop in event["props"]) + f" (number of clicks is {n_events})"
+
+if __name__ == "__main__":
+    app.run_server()
+```
+
+Note that if the relevant events are already exposed as properties in Dash, there is no benefit of using the `EventListener` component. The intended usage of the `EventListener` component is when this is _not_ the case. Say that you need to listen to double-click events, but the Dash component only exposes a (single) click property; or some data that you need is not propagated from the JavaScript layer. In this case, the `EventListener` component makes it possible to achieve the desired behaviour without editing the component source code (i.e. the JavaScript code).
+
 ### Purify
 
 The `Purify` component makes it possible to render HTML, MathML, and SVG. Typically, such rendering is prone to XSS vulnerabilities. These risks are mitigated by sanitizing the html input using the [DOMPurify](https://github.com/cure53/DOMPurify) library. Here is a minimal example,
