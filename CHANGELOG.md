@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.67] - 13-12-21
+## [0.0.67] - 18-12-21
 
-### Change
+### Added
 
 - Added `EventListener` component.
 
