@@ -2,6 +2,7 @@ from .BeforeAfter import BeforeAfter
 from .Burger import Burger
 from .DeferScript import DeferScript
 from .Download import Download
+from .EventListener import EventListener
 from .Keyboard import Keyboard
 from .Lottie import Lottie
 from .Mermaid import Mermaid
@@ -15,6 +16,7 @@ __all__ = [
     "Burger",
     "DeferScript",
     "Download",
+    "EventListener",
     "Keyboard",
     "Lottie",
     "Mermaid",

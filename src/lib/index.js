@@ -10,6 +10,7 @@ import BeforeAfter from './components/BeforeAfter.react';
 import Mermaid from './components/Mermaid.react';
 import DeferScript from './components/DeferScript.react';
 import Purify from './components/Purify.react';
+import EventListener from './components/EventListener.react';
 
 export {
     Download,
@@ -22,5 +23,6 @@ export {
     BeforeAfter,
     Mermaid,
     DeferScript,
-    Purify
+    Purify,
+    EventListener
 };
