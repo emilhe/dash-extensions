@@ -11,7 +11,7 @@ import Mermaid from "./components/Mermaid.react";
 import DeferScript from "./components/DeferScript.react";
 import Purify from "./components/Purify.react";
 import EventListener from "./components/EventListener.react";
-import DashEventSource from "./components/DashEventSource.react";
+import EventSource from "./components/EventSource.react";
 
 export {
     Download,
@@ -26,5 +26,5 @@ export {
     DeferScript,
     Purify,
     EventListener,
-    DashEventSource,
+    EventSource,
 };

@@ -3,6 +3,7 @@ from .Burger import Burger
 from .DeferScript import DeferScript
 from .Download import Download
 from .EventListener import EventListener
+from .EventSource import EventSource
 from .Keyboard import Keyboard
 from .Lottie import Lottie
 from .Mermaid import Mermaid
@@ -17,6 +18,7 @@ __all__ = [
     "DeferScript",
     "Download",
     "EventListener",
+    "EventSource",
     "Keyboard",
     "Lottie",
     "Mermaid",
