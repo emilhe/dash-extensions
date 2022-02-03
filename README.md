@@ -240,7 +240,7 @@ The components listed here can be used in the `layout` of your Dash app.
 
 ### EventSource
 
-The `EventSource` component makes it possible to liten to [server sent events (SSE)](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Simply point the component to via the `url` prop, and create a callback targeting the `message` property,
+The `EventSource` component makes it possible to liten to [server sent events (SSE)](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Simply point the component to the appropriate server via the `url` prop, and create a callback targeting the `message` property,
 
 ```python
 from dash import Dash, html, Input, Output, dcc
