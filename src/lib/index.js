@@ -11,6 +11,7 @@ import Mermaid from './components/Mermaid.react';
 import DeferScript from './components/DeferScript.react';
 import Purify from './components/Purify.react';
 import EventListener from './components/EventListener.react';
+import ServerSentEvents from './components/ServerSentEvents.react';
 
 export {
     Download,
@@ -24,5 +25,6 @@ export {
     Mermaid,
     DeferScript,
     Purify,
-    EventListener
+    EventListener,
+    ServerSentEvents
 };
