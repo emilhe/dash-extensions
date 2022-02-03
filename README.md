@@ -238,6 +238,64 @@ After clicking save, you should see the text `Hello from Dash!` in the preview w
 
 The components listed here can be used in the `layout` of your Dash app. 
 
+### DashEventSource
+
+The `DashEventSource` component is a wrapper of the JavaScript `EventSource` object, which makes it possible to liten to [server sent events (SSE)](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Simply point the component to via the `url` prop, and create a callback targeting the `message` property,
+
+```python
+from dash import Dash, html, Input, Output, dcc
+from dash_extensions import DashEventSource
+
+# The url of server that emits the events.
+sse_url = "http://127.0.0.1:8000"
+# Create small example app.
+app = Dash(__name__)
+app.layout = html.Div([dcc.Graph(id="graph"), DashEventSource(id="sse", url=sse_url)])
+# You could also use a normal callback, but client side callbacks yield better performance.
+app.clientside_callback(
+    """
+    function(val) {
+        values = val ? JSON.parse(val) : []
+        return {data: [{y: values , type: "scatter"}]}
+    }
+    """,
+    Output("graph", "figure"),
+    Input("sse", "message"),
+)
+
+if __name__ == "__main__":
+    app.run_server()
+```
+
+The above example assumed that a server running on `http://127.0.0.1:8000` is emitting events to populate the graph. There is no specific requirement on the type of server, but here is a small example in Python,
+
+```
+import asyncio
+import random
+import uvicorn
+from sse_starlette.sse import EventSourceResponse
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
+
+app = Starlette(middleware=[Middleware(CORSMiddleware, allow_origins=['*'])])
+
+async def numbers():
+    while True:
+        await asyncio.sleep(1)
+        yield [random.randrange(200, 1000) for _ in range(10)]
+
+@app.route("/")
+async def sse(request):
+    generator = numbers()
+    return EventSourceResponse(generator)
+
+if __name__ == "__main__":
+    uvicorn.run(app, port=8000)
+```
+
+there yields random numbers in a format compatible with the client example app above.
+
 ### EventListener
 
 The `EventListener` component makes it possible to listen to (arbitrary) JavaScript events. Simply wrap the relevant components in an `EventListener` component, specify which event(s) to subscribe to, and what event properties to send back to Dash,

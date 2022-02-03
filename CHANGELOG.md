@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.68] - 03-02-22
+
+### Added
+
+- Added `DashEventSource` component.
+
 ## [0.0.67] - 18-12-21
 
 ### Added
