@@ -158,13 +158,13 @@ Used with a normal `Output`, this keyword is essentially equivalent to the `@fla
 
 #### BlockingCallbackTransform
 
-Makes it avoid invoking a callback _if it is already running_. The most typical use case is when polling data at an interval (say 1s) that is longer than the time it takes the callback to execute (say, 5s). Simply pass the `blocking` flag,
+Makes it possible to avoid invoking a callback _if it is already running_. A typical use case is while polling data at an interval (say 1s) that is longer than the time it takes the callback to execute (say, 5s). Simply pass the `blocking` flag,
 
 ```python
 @app.callback(Output("output", "children"), Input("trigger", "n_intervals"), blocking=True)
 ```
 
-Under the hood, hidden dummy elements (client side) and client side callbacks keep track of whether a callback is already running or not. If it is already running, the Python callback is not invoked.
+Under the hood, hidden dummy elements (client side) and client side callbacks keep track of whether a callback is already running or not. If it is already running, the Python callback invocation is skipped.
 
 #### TriggerTransform
 
