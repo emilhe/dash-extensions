@@ -294,7 +294,7 @@ if __name__ == "__main__":
     uvicorn.run(app, port=8000)
 ```
 
-that yields random numbers in a format compatible with the client example app above.
+that yields random numbers in a format compatible with the client example app above. The `EventSource` component has been contributed by [snehilvj](https://github.com/snehilvj).
 
 ### EventListener
 
