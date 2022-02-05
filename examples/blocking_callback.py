@@ -3,7 +3,7 @@ import time
 from dash_extensions.enrich import DashProxy, dcc, html, Output, Input, BlockingCallbackTransform
 
 
-app = DashProxy(transforms=[BlockingCallbackTransform(timeout=2)])
+app = DashProxy(transforms=[BlockingCallbackTransform(timeout=10)])
 app.layout = html.Div([
     html.Div(id="output"),
     dcc.Interval(id="trigger")
