@@ -79,6 +79,18 @@ class DashProxy(dash.Dash):
 
         return wrapper
 
+    def blocking_callback(self, *args, **kwargs):
+        """
+         This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
+        """
+        callback = self._collect_callback(*args, **kwargs)
+        self.callbacks.append(callback)
+
+        def wrapper(f):
+            callback["f"] = f
+
+        return wrapper
+
     def clientside_callback(self, clientside_function, *args, **kwargs):
         callback = self._collect_callback(*args, **kwargs)
         callback["f"] = clientside_function
@@ -188,6 +200,9 @@ def plotly_jsonify(data):
 
 class DashTransform:
 
+    def __init__(self):
+        self.layout_initialized = False
+
     def init(self, dt):
         pass
 
@@ -201,7 +216,13 @@ class DashTransform:
         return callbacks  # per default do nothing
 
     def layout(self, layout, layout_is_function):
+        if layout_is_function or not self.layout_initialized:
+            self.extend_layout(layout)
+            self.layout_initialized = True
         return layout
+
+    def extend_layout(self, layout):
+        return layout  # per default, do nothing
 
 
 # endregion
@@ -226,6 +247,7 @@ def clientside_callback(clientside_function, *args, **kwargs):
 class PrefixIdTransform(DashTransform):
 
     def __init__(self, prefix, prefix_func=None):
+        super().__init__()
         self.prefix = prefix
         self.prefix_func = prefix_func if prefix_func is not None else prefix_component
         self.initialized = False
@@ -242,12 +264,8 @@ class PrefixIdTransform(DashTransform):
     def apply_clientside(self, callbacks):
         return self._apply(callbacks)
 
-    def layout(self, layout, layout_is_function):
-        # TODO: Will this work with layout functions?
-        if layout_is_function or not self.initialized:
-            prefix_recursively(layout, self.prefix, self.prefix_func)
-            self.initialized = True
-        return layout
+    def extend_layout(self, layout):
+        prefix_recursively(layout, self.prefix, self.prefix_func)
 
 
 def apply_prefix(prefix, component_id):
@@ -395,29 +413,26 @@ class MultiplexerTransform(DashTransform):
     """
 
     def __init__(self, proxy_location=None, proxy_wrapper_map=None):
-        self.initialized = False
+        super().__init__()
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
         self.proxy_wrapper_map = proxy_wrapper_map
         self.app = DashProxy()
 
-    def layout(self, layout, layout_is_function):
-        if layout_is_function or not self.initialized:
-            # Apply wrappers if needed.
-            if self.proxy_wrapper_map:
-                for key in self.proxy_wrapper_map:
-                    if key in self.proxy_map:
-                        self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
-            # Inject proxies in a user defined component.
-            if self.proxy_location == "inplace":
-                inject_proxies_recursively(layout, self.proxy_map)
-            # Inject proxies in a component, either user defined or top level.
-            else:
-                target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
-                proxies = list(flatten(list(self.proxy_map.values())))
-                target.children = _as_list(target.children) + proxies
-            self.initialized = True
-        return layout
+    def extend_layout(self, layout):
+        # Apply wrappers if needed.
+        if self.proxy_wrapper_map:
+            for key in self.proxy_wrapper_map:
+                if key in self.proxy_map:
+                    self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
+        # Inject proxies in a user defined component.
+        if self.proxy_location == "inplace":
+            inject_proxies_recursively(layout, self.proxy_map)
+        # Inject proxies in a component, either user defined or top level.
+        else:
+            target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
+            proxies = list(flatten(list(self.proxy_map.values())))
+            target.children = _as_list(target.children) + proxies
 
     def apply(self, callbacks, clientside_callbacks):
         all_callbacks = callbacks + clientside_callbacks
@@ -483,6 +498,7 @@ class ServersideOutput(EnrichedOutput):
 class ServersideOutputTransform(DashTransform):
 
     def __init__(self, backend=None, session_check=True, arg_check=True):
+        super().__init__()
         self.backend = backend if backend is not None else FileSystemStore()
         self.session_check = session_check
         self.arg_check = arg_check
@@ -685,18 +701,16 @@ class RedisStore(RedisCache):
 
 # region No output transform
 
+
 class NoOutputTransform(DashTransform):
 
     def __init__(self):
-        self.initialized = False
-        self.hidden_divs = []
+        super().__init__()
+        self.components = []
 
-    def layout(self, layout, layout_is_function):
-        if layout_is_function or not self.initialized:
-            children = _as_list(layout.children) + self.hidden_divs
-            layout.children = children
-            self.initialized = True
-        return layout
+    def extend_layout(self, layout):
+        children = _as_list(layout.children) + self.hidden_divs
+        layout.children = children
 
     def _apply(self, callbacks):
         for callback in callbacks:
@@ -704,7 +718,7 @@ class NoOutputTransform(DashTransform):
                 output_id = _get_output_id(callback)
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
                 callback[Output] = [Output(output_id, "children")]
-                self.hidden_divs.append(hidden_div)
+                self.components.append(hidden_div)
         return callbacks
 
     def apply_serverside(self, callbacks):
