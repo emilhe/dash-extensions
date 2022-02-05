@@ -160,7 +160,11 @@ def _get_session_id(session_key=None):
 def _as_list(item):
     if item is None:
         return []
-    return item if isinstance(item, list) else [item]
+    if isinstance(item, tuple):
+        return list(item)
+    if isinstance(item, list):
+        return item
+    return [item]
 
 
 def _create_callback_id(item):
@@ -220,10 +224,11 @@ class DashTransform:
 # region Blocking callback transform
 
 class BlockingCallbackTransform(DashTransform):
-    def __init__(self):
+    def __init__(self, timeout=60):
         super().__init__()
         self.components = []
         self.app = DashProxy()
+        self.timeout = timeout
 
     def transform_layout(self, layout):
         children = _as_list(layout.children) + self.components
@@ -237,6 +242,8 @@ class BlockingCallbackTransform(DashTransform):
         for callback in callbacks:
             if not callback["kwargs"].get("blocking", None):
                 continue
+
+            timeout = callback["kwargs"].get("blocking_timeout", self.timeout)
             callback_id = _get_output_id(callback)
             # Bind proxy components.
             start_client_id = f"{callback_id}_start_client"
@@ -248,22 +255,26 @@ class BlockingCallbackTransform(DashTransform):
                 dcc.Store(id=end_client_id)
             ])
             # Bind start signal callback.
-            start_callback = """function()
-            {
+            start_callback = f"""function()
+            {{
                 const start = arguments[arguments.length-2];
                 const end = arguments[arguments.length-1];
                 const now = new Date().getTime();
-                if(!end & !start){
+                if(!end & !start){{
                     return now;
-                }
-                if(!end){
+                }}
+                if((now - start)/1000 > {timeout}){{              
+                    console.log("HITTING TIMEOUT");  
+                    return now;
+                }}
+                if(!end){{
                     return window.dash_clientside.no_update;
-                }
-                if(end > start){
+                }}
+                if(end > start){{
                     return now;
-                }
+                }}
                 return window.dash_clientside.no_update;
-            }"""
+            }}"""
             self.app.clientside_callback(start_callback,
                                          Output(start_client_id, "data"),
                                          callback[Input],

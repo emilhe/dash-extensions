@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.69] - 05-02-22
+
+### Added
+
+- Added `BlockingCallbackTransform`, which enables the callback `blocking` keyword.
+
 ## [0.0.68] - 03-02-22
 
 ### Added
