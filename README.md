@@ -70,13 +70,15 @@ geojson = dl.GeoJSON(hoverStyle=arrow_function(dict(weight=5, color='#666', dash
 The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transforms` keyword argument, 
 
 ```python
-from dash_extensions.enrich import DashProxy, TriggerTransform, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform
+from dash_extensions.enrich import DashProxy, TriggerTransform, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform, BlockingCallbackTransform
+
 
 app = DashProxy(transforms=[
     TriggerTransform(),  # enable use of Trigger objects
     MultiplexerTransform(),  # makes it possible to target an output multiple times in callbacks
     ServersideOutputTransform(),  # enable use of ServersideOutput objects
     NoOutputTransform(),  # enable callbacks without output
+    BlockingCallbackTransform(),  # makes it possible to skip callback invocations while a callback is running 
 ])
 ```
 
@@ -126,7 +128,7 @@ app = DashProxy(transforms=[MultiplexerTransform(proxy_wrapper_map)])
 
 ##### Know limitations
 
-The `MultiplexerTransform` does not support the `MATCH` and `ALLSMALLER` wildcards.  
+The `MultiplexerTransform` does not support the `MATCH` and `ALLSMALLER` wildcards. The `MultiplexerTransform` does not support `ServersideOutput`.
 
 #### ServersideOutputTransform
 
@@ -154,15 +156,24 @@ def query(_):
 
 Used with a normal `Output`, this keyword is essentially equivalent to the `@flask_caching.memoize` decorator. For a `ServersideOutput`, the backend to do server side storage will also be used for memoization. Hence, you avoid saving each object two times, which would happen if the `@flask_caching.memoize` decorator was used with a `ServersideOutput`.
 
-#### NoOutputTransform
+#### BlockingCallbackTransform
 
-Makes it possible to write callbacks without an `Output`,
+Makes it avoid invoking a callback _if it is already running_. The most typical use case is when polling data at an interval (say 1s) that is longer than the time it takes the callback to execute (say, 5s). Simply pass the `blocking` flag,
 
 ```python
-@app.callback(Input("button", "n_clicks"))  # note that the callback has no output
+@app.callback(Output("output", "children"), Input("trigger", "n_intervals"), blocking=True)
 ```
 
-Under the hood, a (hidden) dummy `Output` element is assigned and added to the app layout.
+Under the hood, hidden dummy elements (client side) and client side callbacks keep track of whether a callback is already running or not. If it is already running, the Python callback is not invoked.
+
+#### TriggerTransform
+
+Makes it possible to use the `Trigger` component. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
+
+```python
+@app.callback(Output("output_id", "output_prop"), Trigger("button", "n_clicks"))
+def func():  # note that "n_clicks" is not included as an argument 
+```
 
 ## Multipage
 

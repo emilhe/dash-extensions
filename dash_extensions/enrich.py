@@ -4,6 +4,8 @@ import json
 import pickle
 import secrets
 import uuid
+from datetime import datetime
+
 import plotly
 import dash
 
@@ -158,7 +160,11 @@ def _get_session_id(session_key=None):
 def _as_list(item):
     if item is None:
         return []
-    return item if isinstance(item, list) else [item]
+    if isinstance(item, tuple):
+        return list(item)
+    if isinstance(item, list):
+        return item
+    return [item]
 
 
 def _create_callback_id(item):
@@ -188,6 +194,9 @@ def plotly_jsonify(data):
 
 class DashTransform:
 
+    def __init__(self):
+        self.layout_initialized = False
+
     def init(self, dt):
         pass
 
@@ -201,7 +210,102 @@ class DashTransform:
         return callbacks  # per default do nothing
 
     def layout(self, layout, layout_is_function):
+        if layout_is_function or not self.layout_initialized:
+            self.transform_layout(layout)
+            self.layout_initialized = True
         return layout
+
+    def transform_layout(self, layout):
+        return layout  # per default, do nothing
+
+
+# endregion
+
+# region Blocking callback transform
+
+class BlockingCallbackTransform(DashTransform):
+    def __init__(self, timeout=60):
+        super().__init__()
+        self.components = []
+        self.app = DashProxy()
+        self.timeout = timeout
+
+    def transform_layout(self, layout):
+        children = _as_list(layout.children) + self.components
+        layout.children = children
+
+    def apply(self, callbacks, clientside_callbacks):
+        callbacks = self.apply_serverside(callbacks)
+        return callbacks, clientside_callbacks + self.app.clientside_callbacks
+
+    def apply_serverside(self, callbacks):
+        for callback in callbacks:
+            if not callback["kwargs"].get("blocking", None):
+                continue
+
+            timeout = callback["kwargs"].get("blocking_timeout", self.timeout)
+            callback_id = _get_output_id(callback)
+            # Bind proxy components.
+            start_client_id = f"{callback_id}_start_client"
+            end_server_id = f"{callback_id}_end_server"
+            end_client_id = f"{callback_id}_end_client"
+            self.components.extend([
+                dcc.Store(id=start_client_id),
+                dcc.Store(id=end_server_id),
+                dcc.Store(id=end_client_id)
+            ])
+            # Bind start signal callback.
+            start_callback = f"""function()
+            {{
+                const start = arguments[arguments.length-2];
+                const end = arguments[arguments.length-1];
+                const now = new Date().getTime();
+                if(!end & !start){{
+                    return now;
+                }}
+                if((now - start)/1000 > {timeout}){{              
+                    console.log("HITTING TIMEOUT");  
+                    return now;
+                }}
+                if(!end){{
+                    return window.dash_clientside.no_update;
+                }}
+                if(end > start){{
+                    return now;
+                }}
+                return window.dash_clientside.no_update;
+            }}"""
+            self.app.clientside_callback(start_callback,
+                                         Output(start_client_id, "data"),
+                                         callback[Input],
+                                         [State(start_client_id, "data"), State(end_client_id, "data")])
+            # Bind end signal callback.
+            self.app.clientside_callback("function(){return new Date().getTime();}",
+                                         Output(end_client_id, "data"),
+                                         Input(end_server_id, "data"))
+            # Modify the original callback to send finished signal.
+            callback[Output].append(Output(end_server_id, "data"))
+            # Modify the original callback to not trigger on inputs, but the new special trigger.
+            new_state = [State(item.component_id, item.component_property) for item in callback[Input]]
+            callback[State] = new_state + callback[State]
+            callback[Input] = [Input(start_client_id, "data")]
+            # Modify the callback function accordingly.
+            f = callback["f"]
+            callback["f"] = skip_input_signal_add_output_signal()(f)
+
+        return callbacks
+
+
+def skip_input_signal_add_output_signal():
+    def wrapper(f):
+        @functools.wraps(f)
+        def decorated_function(*args):
+            value = f(*args[1:])
+            return _as_list(value) + [datetime.utcnow().timestamp()]
+
+        return decorated_function
+
+    return wrapper
 
 
 # endregion
@@ -226,9 +330,9 @@ def clientside_callback(clientside_function, *args, **kwargs):
 class PrefixIdTransform(DashTransform):
 
     def __init__(self, prefix, prefix_func=None):
+        super().__init__()
         self.prefix = prefix
         self.prefix_func = prefix_func if prefix_func is not None else prefix_component
-        self.initialized = False
 
     def _apply(self, callbacks):
         for callback in callbacks:
@@ -242,12 +346,8 @@ class PrefixIdTransform(DashTransform):
     def apply_clientside(self, callbacks):
         return self._apply(callbacks)
 
-    def layout(self, layout, layout_is_function):
-        # TODO: Will this work with layout functions?
-        if layout_is_function or not self.initialized:
-            prefix_recursively(layout, self.prefix, self.prefix_func)
-            self.initialized = True
-        return layout
+    def transform_layout(self, layout):
+        prefix_recursively(layout, self.prefix, self.prefix_func)
 
 
 def apply_prefix(prefix, component_id):
@@ -395,29 +495,26 @@ class MultiplexerTransform(DashTransform):
     """
 
     def __init__(self, proxy_location=None, proxy_wrapper_map=None):
-        self.initialized = False
+        super().__init__()
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
         self.proxy_wrapper_map = proxy_wrapper_map
         self.app = DashProxy()
 
-    def layout(self, layout, layout_is_function):
-        if layout_is_function or not self.initialized:
-            # Apply wrappers if needed.
-            if self.proxy_wrapper_map:
-                for key in self.proxy_wrapper_map:
-                    if key in self.proxy_map:
-                        self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
-            # Inject proxies in a user defined component.
-            if self.proxy_location == "inplace":
-                inject_proxies_recursively(layout, self.proxy_map)
-            # Inject proxies in a component, either user defined or top level.
-            else:
-                target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
-                proxies = list(flatten(list(self.proxy_map.values())))
-                target.children = _as_list(target.children) + proxies
-            self.initialized = True
-        return layout
+    def transform_layout(self, layout):
+        # Apply wrappers if needed.
+        if self.proxy_wrapper_map:
+            for key in self.proxy_wrapper_map:
+                if key in self.proxy_map:
+                    self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
+        # Inject proxies in a user defined component.
+        if self.proxy_location == "inplace":
+            inject_proxies_recursively(layout, self.proxy_map)
+        # Inject proxies in a component, either user defined or top level.
+        else:
+            target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
+            proxies = list(flatten(list(self.proxy_map.values())))
+            target.children = _as_list(target.children) + proxies
 
     def apply(self, callbacks, clientside_callbacks):
         all_callbacks = callbacks + clientside_callbacks
@@ -483,6 +580,7 @@ class ServersideOutput(EnrichedOutput):
 class ServersideOutputTransform(DashTransform):
 
     def __init__(self, backend=None, session_check=True, arg_check=True):
+        super().__init__()
         self.backend = backend if backend is not None else FileSystemStore()
         self.session_check = session_check
         self.arg_check = arg_check
@@ -685,18 +783,16 @@ class RedisStore(RedisCache):
 
 # region No output transform
 
+
 class NoOutputTransform(DashTransform):
 
     def __init__(self):
-        self.initialized = False
-        self.hidden_divs = []
+        super().__init__()
+        self.components = []
 
-    def layout(self, layout, layout_is_function):
-        if layout_is_function or not self.initialized:
-            children = _as_list(layout.children) + self.hidden_divs
-            layout.children = children
-            self.initialized = True
-        return layout
+    def transform_layout(self, layout):
+        children = _as_list(layout.children) + self.components
+        layout.children = children
 
     def _apply(self, callbacks):
         for callback in callbacks:
@@ -704,7 +800,7 @@ class NoOutputTransform(DashTransform):
                 output_id = _get_output_id(callback)
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
                 callback[Output] = [Output(output_id, "children")]
-                self.hidden_divs.append(hidden_div)
+                self.components.append(hidden_div)
         return callbacks
 
     def apply_serverside(self, callbacks):
