@@ -4,6 +4,8 @@ import json
 import pickle
 import secrets
 import uuid
+from datetime import datetime
+
 import plotly
 import dash
 
@@ -68,18 +70,6 @@ class DashProxy(dash.Dash):
         return callback
 
     def callback(self, *args, **kwargs):
-        """
-         This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
-        """
-        callback = self._collect_callback(*args, **kwargs)
-        self.callbacks.append(callback)
-
-        def wrapper(f):
-            callback["f"] = f
-
-        return wrapper
-
-    def blocking_callback(self, *args, **kwargs):
         """
          This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
@@ -217,12 +207,94 @@ class DashTransform:
 
     def layout(self, layout, layout_is_function):
         if layout_is_function or not self.layout_initialized:
-            self.extend_layout(layout)
+            self.transform_layout(layout)
             self.layout_initialized = True
         return layout
 
-    def extend_layout(self, layout):
+    def transform_layout(self, layout):
         return layout  # per default, do nothing
+
+
+# endregion
+
+# region Blocking callback transform
+
+class BlockingCallbackTransform(DashTransform):
+    def __init__(self):
+        super().__init__()
+        self.components = []
+        self.app = DashProxy()
+
+    def transform_layout(self, layout):
+        children = _as_list(layout.children) + self.components
+        layout.children = children
+
+    def apply(self, callbacks, clientside_callbacks):
+        callbacks = self.apply_serverside(callbacks)
+        return callbacks, clientside_callbacks + self.app.clientside_callbacks
+
+    def apply_serverside(self, callbacks):
+        for callback in callbacks:
+            if not callback["kwargs"].get("blocking", None):
+                continue
+            callback_id = _get_output_id(callback)
+            # Bind proxy components.
+            start_client_id = f"{callback_id}_start_client"
+            end_server_id = f"{callback_id}_end_server"
+            end_client_id = f"{callback_id}_end_client"
+            self.components.extend([
+                dcc.Store(id=start_client_id),
+                dcc.Store(id=end_server_id),
+                dcc.Store(id=end_client_id)
+            ])
+            # Bind start signal callback.
+            start_callback = """function()
+            {
+                const start = arguments[arguments.length-2];
+                const end = arguments[arguments.length-1];
+                const now = new Date().getTime();
+                if(!end & !start){
+                    return now;
+                }
+                if(!end){
+                    return window.dash_clientside.no_update;
+                }
+                if(end > start){
+                    return now;
+                }
+                return window.dash_clientside.no_update;
+            }"""
+            self.app.clientside_callback(start_callback,
+                                         Output(start_client_id, "data"),
+                                         callback[Input],
+                                         [State(start_client_id, "data"), State(end_client_id, "data")])
+            # Bind end signal callback.
+            self.app.clientside_callback("function(){return new Date().getTime();}",
+                                         Output(end_client_id, "data"),
+                                         Input(end_server_id, "data"))
+            # Modify the original callback to send finished signal.
+            callback[Output].append(Output(end_server_id, "data"))
+            # Modify the original callback to not trigger on inputs, but the new special trigger.
+            new_state = [State(item.component_id, item.component_property) for item in callback[Input]]
+            callback[State] = new_state + callback[State]
+            callback[Input] = [Input(start_client_id, "data")]
+            # Modify the callback function accordingly.
+            f = callback["f"]
+            callback["f"] = skip_input_signal_add_output_signal()(f)
+
+        return callbacks
+
+
+def skip_input_signal_add_output_signal():
+    def wrapper(f):
+        @functools.wraps(f)
+        def decorated_function(*args):
+            value = f(*args[1:])
+            return _as_list(value) + [datetime.utcnow().timestamp()]
+
+        return decorated_function
+
+    return wrapper
 
 
 # endregion
@@ -250,7 +322,6 @@ class PrefixIdTransform(DashTransform):
         super().__init__()
         self.prefix = prefix
         self.prefix_func = prefix_func if prefix_func is not None else prefix_component
-        self.initialized = False
 
     def _apply(self, callbacks):
         for callback in callbacks:
@@ -264,7 +335,7 @@ class PrefixIdTransform(DashTransform):
     def apply_clientside(self, callbacks):
         return self._apply(callbacks)
 
-    def extend_layout(self, layout):
+    def transform_layout(self, layout):
         prefix_recursively(layout, self.prefix, self.prefix_func)
 
 
@@ -419,7 +490,7 @@ class MultiplexerTransform(DashTransform):
         self.proxy_wrapper_map = proxy_wrapper_map
         self.app = DashProxy()
 
-    def extend_layout(self, layout):
+    def transform_layout(self, layout):
         # Apply wrappers if needed.
         if self.proxy_wrapper_map:
             for key in self.proxy_wrapper_map:
@@ -708,8 +779,8 @@ class NoOutputTransform(DashTransform):
         super().__init__()
         self.components = []
 
-    def extend_layout(self, layout):
-        children = _as_list(layout.children) + self.hidden_divs
+    def transform_layout(self, layout):
+        children = _as_list(layout.children) + self.components
         layout.children = children
 
     def _apply(self, callbacks):
