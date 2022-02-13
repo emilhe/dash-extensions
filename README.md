@@ -166,15 +166,6 @@ Makes it possible to avoid invoking a callback _if it is already running_. A typ
 
 Under the hood, hidden dummy elements (client side) and client side callbacks keep track of whether a callback is already running or not. If it is already running, the Python callback invocation is skipped.
 
-#### TriggerTransform
-
-Makes it possible to use the `Trigger` component. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
-
-```python
-@app.callback(Output("output_id", "output_prop"), Trigger("button", "n_clicks"))
-def func():  # note that "n_clicks" is not included as an argument 
-```
-
 ## Multipage
 
 The `multipage` module makes it easy to create multipage apps. Pages can be constructed explicitly with the following syntax,
