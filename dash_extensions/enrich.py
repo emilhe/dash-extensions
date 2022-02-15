@@ -1,6 +1,7 @@
 import functools
 import hashlib
 import json
+import logging
 import pickle
 import secrets
 import uuid
@@ -18,7 +19,7 @@ from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, Callable, List
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -218,6 +219,9 @@ class DashTransform:
     def transform_layout(self, layout):
         return layout  # per default, do nothing
 
+    def get_dependent_transforms(self):
+        return []
+
 
 # endregion
 
@@ -309,6 +313,127 @@ def skip_input_signal_add_output_signal():
 
 
 # endregion
+
+# region Blocking callback transform
+
+class LogConfig:
+    def __init__(self, log_output, log_writer_map: Dict[int, Callable]):
+        self.log_output = log_output
+        self.log_writer_map = log_writer_map
+
+
+def setup_notifications_log_config(layout: List[Component]):
+    import dash_mantine_components as dmc
+    layout.append(dmc.NotificationsProvider(id="notifications_provider"))
+    log_output = Output("notifications_provider", "children")
+    return LogConfig(log_output, get_notification_log_writers())
+
+
+def setup_div_log_config(layout: List[Component]):
+    layout.append(html.Div(id="log"))
+    log_output = Output("log", "children")
+    return LogConfig(log_output, get_default_log_writers())
+
+
+def get_default_log_writers():
+    return {
+        logging.INFO: lambda x, **kwargs: html.Div(f"INFO: {x}", **kwargs),
+        logging.WARNING: lambda x, **kwargs: html.Div(f"WARNING: {x}", **kwargs),
+        logging.ERROR: lambda x, **kwargs: html.Div(f"ERROR: {x}", **kwargs),
+    }
+
+
+def get_notification_log_writers():
+    import dash_mantine_components as dmc
+
+    def _default_kwargs(color, title, message):
+        return dict(color=color, title=title, message=message, id=str(uuid.uuid4()), action="show", autoClose=False)
+
+    def log_info(message, **kwargs):
+        return dmc.Notification(**{**_default_kwargs("blue", "Info", message), **kwargs})
+
+    def log_warning(message, **kwargs):
+        return dmc.Notification(**{**_default_kwargs("yellow", "Warning", message), **kwargs})
+
+    def log_error(message, **kwargs):
+        return dmc.Notification(**{**_default_kwargs("red", "Error", message), **kwargs})
+
+    return {logging.INFO: log_info, logging.WARNING: log_warning, logging.ERROR: log_error}
+
+
+class DashLogger:
+    def __init__(self, log_writers: Dict[int, Callable]):
+        self.log_writers = log_writers
+        self.output = []
+
+    def info(self, message, **kwargs):
+        self.log(logging.INFO, message, **kwargs)
+
+    def warning(self, message, **kwargs):
+        self.log(logging.WARNING, message, **kwargs)
+
+    def error(self, message, **kwargs):
+        self.log(logging.ERROR, message, **kwargs)
+
+    def log(self, level, message, **kwargs):
+        self.output.append(self.log_writers[level](message, **kwargs))
+
+    def get_output(self):
+        return self.output if self.output else dash.no_update
+
+
+class LogTransform(DashTransform):
+    def __init__(self, log_config=None):
+        super().__init__()
+        self.components = []
+        if log_config is None:
+            # If no config is provided, try to use dmc notification system.
+            try:
+                #raise ImportError
+                log_config = setup_notifications_log_config(self.components)
+            # If dmc is not installed, use a div.
+            except ImportError:
+                msg = "Failed to import dash-mantine-components, falling back to simple div for log output."
+                logging.warning(msg)
+                log_config = setup_div_log_config(self.components)
+        self.log_config = log_config
+
+    def transform_layout(self, layout):
+        children = _as_list(layout.children) + self.components
+        layout.children = children
+
+    def apply(self, callbacks, clientside_callbacks):
+        callbacks = self.apply_serverside(callbacks)
+        return callbacks, clientside_callbacks
+
+    def apply_serverside(self, callbacks):
+        for callback in callbacks:
+            if not callback["kwargs"].get("log", None):
+                continue
+            # Add the log component as output.
+            callback[Output].append(self.log_config.log_output)
+            # Modify the callback function accordingly.
+            f = callback["f"]
+            logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
+            callback["f"] = bind_logger(logger)(f)
+
+        return callbacks
+
+
+def bind_logger(logger):
+    def wrapper(f):
+        @functools.wraps(f)
+        def decorated_function(*args):
+            value = f(*args, logger)
+            return _as_list(value) + [logger.get_output()]
+
+        return decorated_function
+
+    return wrapper
+
+
+# endregion
+
 
 # region Global app object (to emulate Dash 2.0 import syntax)
 
