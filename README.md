@@ -70,8 +70,7 @@ geojson = dl.GeoJSON(hoverStyle=arrow_function(dict(weight=5, color='#666', dash
 The `enrich` module provides a number of enrichments of the `Dash` object that can be enabled in a modular fashion. To get started, replace the `Dash` object by a `DashProxy` object and pass the desired transformations via the `transforms` keyword argument, 
 
 ```python
-from dash_extensions.enrich import DashProxy, TriggerTransform, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform, BlockingCallbackTransform
-
+from dash_extensions.enrich import DashProxy, TriggerTransform, MultiplexerTransform, ServersideOutputTransform, NoOutputTransform, BlockingCallbackTransform, LogTransform
 
 app = DashProxy(transforms=[
     TriggerTransform(),  # enable use of Trigger objects
@@ -79,12 +78,13 @@ app = DashProxy(transforms=[
     ServersideOutputTransform(),  # enable use of ServersideOutput objects
     NoOutputTransform(),  # enable callbacks without output
     BlockingCallbackTransform(),  # makes it possible to skip callback invocations while a callback is running 
+    LogTransform()  # makes it possible to write log messages to a Dash component
 ])
 ```
 
 The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to load only the transforms are that actually used.
 
-NB: Transforms are not (yet) compatible the `long_callback` decorator. 
+NB: Transforms are not (yet) compatible the `long_callback` decorator.
 
 #### TriggerTransform
 
@@ -129,6 +129,21 @@ app = DashProxy(transforms=[MultiplexerTransform(proxy_wrapper_map)])
 ##### Know limitations
 
 The `MultiplexerTransform` does not support the `MATCH` and `ALLSMALLER` wildcards. The `MultiplexerTransform` does not support `ServersideOutput`.
+
+#### LogTransform
+
+Makes it possible to direct logs to a Dash component. When `log=True` is passed as a keyword argument to a callback, a `DashLogger` object is passed to the callback,
+
+```python
+@app.callback(Output("txt", "children"), Input("btn", "n_clicks"), log=True)
+def do_stuff(n_clicks, logger: DashLogger):
+    logger.info("Here goes some info")
+    logger.warning("This is a warning")
+    logger.error("Some error occurred")
+    ...
+```
+
+The component to which the logs are sent as well as the log formatting can be customized by passing a `LogConfig` object to the `LogTransform`. Per default, the [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) notification system is used if the library is available, otherwise logs are directed to a `Div` element, which is appended to the layout. 
 
 #### ServersideOutputTransform
 
