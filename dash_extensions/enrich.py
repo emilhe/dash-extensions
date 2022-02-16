@@ -439,9 +439,6 @@ class LogTransform(DashTransform):
     def get_dependent_transforms(self):
         return [MultiplexerTransform()]
 
-    def sort_key(self):
-        return 10
-
 
 def bind_logger(logger):
     def wrapper(f):
@@ -702,6 +699,8 @@ class MultiplexerTransform(DashTransform):
             }
         """, output, inputs, prevent_initial_call=True)
 
+    def sort_key(self):
+        return 10
 
 # endregion
 
@@ -965,7 +964,7 @@ class NoOutputTransform(DashTransform):
 class Dash(DashProxy):
     def __init__(self, *args, output_defaults=None, **kwargs):
         output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
-        transforms = [TriggerTransform(), MultiplexerTransform(), NoOutputTransform(),
+        transforms = [TriggerTransform(), LogTransform(), MultiplexerTransform(), NoOutputTransform(),
                       ServersideOutputTransform(**output_defaults)]
         super().__init__(*args, transforms=transforms, **kwargs)
 
