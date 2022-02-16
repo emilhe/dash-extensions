@@ -1,8 +1,7 @@
 import dash_mantine_components as dmc
-from dash_extensions.enrich import Output, Input, html, DashProxy, MultiplexerTransform, LogTransform, DashLogger
+from dash_extensions.enrich import Output, Input, html, DashProxy, LogTransform, DashLogger
 
-app = DashProxy(transforms=[MultiplexerTransform(), LogTransform()],
-                prevent_initial_callbacks=True)
+app = DashProxy(transforms=[LogTransform()], prevent_initial_callbacks=True)
 app.layout = html.Div([dmc.Button("Run", id="btn"), dmc.Text(id="txt")])
 
 

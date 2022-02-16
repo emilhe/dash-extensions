@@ -34,7 +34,7 @@ class DashProxy(dash.Dash):
         self.callbacks = []
         self.clientside_callbacks = []
         self.arg_types = [Output, Input, State]
-        self.transforms = transforms if transforms is not None else []
+        self.transforms = _resolve_transforms(transforms)
         # Do the transform initialization.
         for transform in self.transforms:
             transform.init(self)
@@ -222,6 +222,23 @@ class DashTransform:
     def get_dependent_transforms(self):
         return []
 
+    def sort_key(self):
+        return 1
+
+
+def _resolve_transforms(transforms: List[DashTransform]) -> List[DashTransform]:
+    # Resolve transforms.
+    transforms = [] if transforms is None else transforms
+    dependent_transforms = []
+    for transform in transforms:
+        for dependent_transform in transform.get_dependent_transforms():
+            # Check if the dependent transform is already there.
+            if any([isinstance(t, dependent_transform.__class__) for t in transforms]):
+                continue
+                # Otherwise, add it.
+            dependent_transforms.append(dependent_transform)
+    return sorted(transforms + dependent_transforms, key=lambda t: t.sort_key())
+
 
 # endregion
 
@@ -314,7 +331,7 @@ def skip_input_signal_add_output_signal():
 
 # endregion
 
-# region Blocking callback transform
+# region Log transform
 
 class LogConfig:
     def __init__(self, log_output, log_writer_map: Dict[int, Callable]):
@@ -389,7 +406,7 @@ class LogTransform(DashTransform):
         if log_config is None:
             # If no config is provided, try to use dmc notification system.
             try:
-                #raise ImportError
+                # raise ImportError
                 log_config = setup_notifications_log_config(self.components)
             # If dmc is not installed, use a div.
             except ImportError:
@@ -418,6 +435,12 @@ class LogTransform(DashTransform):
             callback["f"] = bind_logger(logger)(f)
 
         return callbacks
+
+    def get_dependent_transforms(self):
+        return [MultiplexerTransform()]
+
+    def sort_key(self):
+        return 10
 
 
 def bind_logger(logger):
