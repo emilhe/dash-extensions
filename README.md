@@ -84,22 +84,7 @@ app = DashProxy(transforms=[
 
 The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object with all transformations loaded, i.e. a batteries included approach. However, it is recommended to load only the transforms are that actually used.
 
-NB: Transforms are not (yet) compatible the `long_callback` decorator. 
-
-#### LogTransform
-
-Makes it possible to direct logs to a Dash component. When `log=True` is passed as a keyword argument to a callback, a `DashLogger` object is passed to the callback,
-
-```python
-@app.callback(Output("txt", "children"), Input("btn", "n_clicks"), log=True)
-def do_stuff(n_clicks, logger: DashLogger):
-    logger.info("Here goes some info")
-    logger.warning("This is a warning")
-    logger.error("Some error occurred")
-    ...
-```
-
-The log output (i.e. the component to which the logs are sent) as well as the formatting of logs can be customized by passing a custom `LogConfig` object to the `LogTransform`. Per default, the [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) notification system is used if the library is available, otherwise logs are directed to a `Div` element, which is appended to the layout. 
+NB: Transforms are not (yet) compatible the `long_callback` decorator.
 
 #### TriggerTransform
 
@@ -144,6 +129,21 @@ app = DashProxy(transforms=[MultiplexerTransform(proxy_wrapper_map)])
 ##### Know limitations
 
 The `MultiplexerTransform` does not support the `MATCH` and `ALLSMALLER` wildcards. The `MultiplexerTransform` does not support `ServersideOutput`.
+
+#### LogTransform
+
+Makes it possible to direct logs to a Dash component. When `log=True` is passed as a keyword argument to a callback, a `DashLogger` object is passed to the callback,
+
+```python
+@app.callback(Output("txt", "children"), Input("btn", "n_clicks"), log=True)
+def do_stuff(n_clicks, logger: DashLogger):
+    logger.info("Here goes some info")
+    logger.warning("This is a warning")
+    logger.error("Some error occurred")
+    ...
+```
+
+The log output (i.e. the component to which the logs are sent) as well as the formatting of logs can be customized by passing a custom `LogConfig` object to the `LogTransform`. Per default, the [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) notification system is used if the library is available, otherwise logs are directed to a `Div` element, which is appended to the layout. 
 
 #### ServersideOutputTransform
 
