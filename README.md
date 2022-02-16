@@ -143,7 +143,7 @@ def do_stuff(n_clicks, logger: DashLogger):
     ...
 ```
 
-The the component to which the logs are sent as well as the log formatting can be customized by passing a `LogConfig` object to the `LogTransform`. Per default, the [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) notification system is used if the library is available, otherwise logs are directed to a `Div` element, which is appended to the layout. 
+The component to which the logs are sent as well as the log formatting can be customized by passing a `LogConfig` object to the `LogTransform`. Per default, the [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) notification system is used if the library is available, otherwise logs are directed to a `Div` element, which is appended to the layout. 
 
 #### ServersideOutputTransform
 
