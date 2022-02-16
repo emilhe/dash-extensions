@@ -86,6 +86,21 @@ The `enrich` module also exposes a `Dash` object, which is a `DashProxy` object 
 
 NB: Transforms are not (yet) compatible the `long_callback` decorator. 
 
+#### LogTransform
+
+Makes it possible to direct logs to a Dash component. When `log=True` is passed as a keyword argument to a callback, a `DashLogger` object is passed to the callback,
+
+```python
+@app.callback(Output("txt", "children"), Input("btn", "n_clicks"), log=True)
+def do_stuff(n_clicks, logger: DashLogger):
+    logger.info("Here goes some info")
+    logger.warning("This is a warning")
+    logger.error("Some error occurred")
+    ...
+```
+
+Per default, the logs are displayed using the notification system of [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) if this library is installed, otherwise they are directed to a `Div` element, which is appended to the layout. However, the component as well as the formatting og of logs can be customized by passing a custom `LogConfig` object to the `LogTransform`.
+
 #### TriggerTransform
 
 Makes it possible to use the `Trigger` component. Like an `Input`, it can trigger callbacks, but its value is not passed on to the callback,
