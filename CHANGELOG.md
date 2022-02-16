@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.70] - UNRELEASED
+
+### Added
+
+- Added `LogTransform`, which enables the callback `log` keyword.
+
+
 ## [0.0.69] - 05-02-22
 
 ### Added
