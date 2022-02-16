@@ -99,7 +99,7 @@ def do_stuff(n_clicks, logger: DashLogger):
     ...
 ```
 
-Per default, the logs are displayed using the notification system of [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) if this library is installed, otherwise they are directed to a `Div` element, which is appended to the layout. However, the component as well as the formatting og of logs can be customized by passing a custom `LogConfig` object to the `LogTransform`.
+The log output (i.e. the component to which the logs are sent) as well as the formatting og of logs can be customized by passing a custom `LogConfig` object to the `LogTransform`. Per default, the [dash-mantine-components](https://github.com/snehilvj/dash-mantine-components) notification system is used if the library is available, otherwise logs are directed to a `Div` element, which is appended to the layout. 
 
 #### TriggerTransform
 
