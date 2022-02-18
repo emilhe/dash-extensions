@@ -1,9 +1,7 @@
-import dash
-from dash.dependencies import Input, Output, dcc
+from dash import Dash, Input, Output, dcc
 import dash_html_components as html
 
-app = dash.Dash(__name__)
-
+app = Dash(__name__)
 app.layout = html.Div([
     dcc.Input(
         id='input',
@@ -16,7 +14,7 @@ app.layout = html.Div([
 
 @app.callback(Output('output', 'children'), [Input('input', 'value')])
 def display_output(value):
-    return 'You have entered {}'.format(value)
+    return f'You have entered {value}'
 
 
 if __name__ == '__main__':
