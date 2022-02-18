@@ -31,7 +31,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov selenium pytest-selenium
+        pip install pytest pytest-cov selenium pytest-selenium dash[testing]
     - name: Test with pytest
       run: |
         pytest --cov=dash_extensions --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov-report=xml tests
