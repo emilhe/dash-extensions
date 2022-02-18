@@ -1,32 +1,25 @@
-import os
-from dash import Dash, Input, Output, dcc, html
-
-from dash.testing.wait import until
+from dash.testing.application_runners import import_app
 
 
-def test_dltx001_download_text(dash_dcc):
-    text = "Hello, world!"
-    filename = "hello.txt"
-    # Create app.
-    app = Dash(__name__, prevent_initial_callbacks=True)
-    app.layout = html.Div([html.Button("Click", id="btn"), dcc.Download(id="download")])
+# Basic test for the component rendering.
+# The dash_duo pytest fixture is installed with dash (v1.0+)
+def test_render_component(dash_duo):
+    # Start a dash app contained as the variable `app` in `usage.py`
+    app = import_app('usage')
+    dash_duo.start_server(app)
 
-    @app.callback(Output("download", "data"), Input("btn", "n_clicks"))
-    def download(_):
-        return dcc.send_string(text, filename)
+    # Get the generated component input with selenium
+    # The html input will be a children of the #input dash component
+    my_component = dash_duo.find_element('#input > input')
 
-    dash_dcc.start_server(app)
+    assert 'my-value' == my_component.get_attribute('value')
 
-    # Check that there is nothing before clicking
-    fp = os.path.join(dash_dcc.download_path, filename)
-    assert not os.path.isfile(fp)
+    # Clear the input
+    dash_duo.clear_input(my_component)
 
-    dash_dcc.find_element("#btn").click()
+    # Send keys to the custom input.
+    my_component.send_keys('Hello dash')
 
-    # Check that a file has been download, and that it's content matches the original text.
-    until(lambda: os.path.exists(fp), 10)
-    with open(fp, "r") as f:
-        content = f.read()
-    assert content == text
-
-    assert dash_dcc.get_logs() == []
+    # Wait for the text to equal, if after the timeout (default 10 seconds)
+    # the text is not equal it will fail the test.
+    dash_duo.wait_for_text_to_equal('#output', 'You have entered Hello dash')
