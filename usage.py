@@ -3,7 +3,7 @@ import dash_html_components as html
 
 app = Dash(__name__)
 app.layout = html.Div([
-    dcc.Input(id='input'),
+    dcc.Input(id='input', value='my-value'),
     html.Div(id='output')
 ])
 
