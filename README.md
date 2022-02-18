@@ -1,3 +1,10 @@
+[![PyPI Latest Release](https://img.shields.io/pypi/v/dash-extensions.svg)](https://pypi.org/project/dash-extensions/)
+![support-version](https://img.shields.io/pypi/pyversions/dash-extensions)
+[![codecov](https://img.shields.io/codecov/c/github/thedirtyfew/dash-extensions?logo=codecov)](https://codecov.io/gh/thedirtyfew/dash-extensions)
+[![Code quality](https://img.shields.io/lgtm/grade/python/github/thedirtyfew/dash-extensions?label=code%20quality&logo=lgtm)](https://lgtm.com/projects/g/thedirtyfew/dash-extensions/context:python)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?)](http://makeapullrequest.com)
+[![Testing](https://github.com/thedirtyfew/dash-extensions/actions/workflows/test.yml/badge.svg)](https://github.com/thedirtyfew/dash-extensions/actions/workflows/test.yml)
+
 The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into five main blocks, 
 
 * The `snippets` module, which contains a collection of utility functions
