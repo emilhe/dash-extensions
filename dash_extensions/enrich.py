@@ -383,6 +383,9 @@ class DashLogger:
         self.log_writers = log_writers
         self.output = []
 
+    def clear(self):
+        self.output.clear()
+
     def info(self, message, **kwargs):
         self.log(logging.INFO, message, **kwargs)
 
@@ -444,6 +447,7 @@ def bind_logger(logger):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
+            logger.clear()
             value = f(*args, logger)
             return _as_list(value) + [logger.get_output()]
 
@@ -562,7 +566,9 @@ def filter_args(args_filter):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]]
+            post_args = list(args[len(args_filter):])
+            args = list(args[:len(args_filter)])
+            filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]] + post_args
             return f(*filtered_args)
 
         return decorated_function
@@ -956,6 +962,8 @@ class NoOutputTransform(DashTransform):
     def apply_clientside(self, callbacks):
         return self._apply(callbacks)
 
+    def sort_key(self):
+        return 0
 
 # endregion
 
