@@ -20,18 +20,21 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.7'
+        python-version: '3.9'
+    - name: Install poetry
+      uses: Gr1N/setup-poetry@v4
+    - name: Cache poetry
+      id: cached-poetry-dependencies
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pypoetry/virtualenvs
+        key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}-python-${{ matrix.python-version }}
+    - run: poetry --version
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install setuptools wheel twine
-        pip install -r requirements.txt
+      run: poetry install
     - name: Build and publish
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
         npm install | echo "Ignore npm install error"
         npm run build_no_r
-        python setup.py sdist bdist_wheel
-        twine upload dist/*
+        poetry build
+        poetry publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}
