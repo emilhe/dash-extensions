@@ -1,4 +1,4 @@
-import React, {Component} from 'react';
+import {Component} from 'react';
 import PropTypes from 'prop-types';
 import {toByteArray} from 'base64-js';
 
@@ -29,13 +29,13 @@ export default class Download extends Component {
                 setTimeout(() => {
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
-                }, 0)
+                }, 0);
             }
         }
     }
 
     render() {
-        return (null);
+        return null;
     }
 }
 

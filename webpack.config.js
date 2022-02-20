@@ -109,5 +109,5 @@ module.exports = (env, argv) => {
             }),
             new NodePolyfillPlugin()
         ]
-    }
+    };
 };
