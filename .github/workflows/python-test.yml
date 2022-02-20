@@ -42,7 +42,7 @@ jobs:
 
     - name: Test with pytest
       run: |
-        pytest --cov=dash_extensions --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov-report=xml tests
+        poetry run pytest --cov=dash_extensions --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov-report=xml tests
 
     - name: Upload pytest test results
       uses: actions/upload-artifact@v2
