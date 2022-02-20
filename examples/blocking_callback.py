@@ -4,10 +4,7 @@ from dash_extensions.enrich import DashProxy, dcc, html, Output, Input, Blocking
 
 
 app = DashProxy(transforms=[BlockingCallbackTransform(timeout=10)])
-app.layout = html.Div([
-    html.Div(id="output"),
-    dcc.Interval(id="trigger")
-])
+app.layout = html.Div([html.Div(id="output"), dcc.Interval(id="trigger")])
 
 
 @app.callback(Output("output", "children"), Input("trigger", "n_intervals"), blocking=True)
@@ -17,5 +14,5 @@ def update(n_intervals):
     return f"Hello! (n_intervals is {n_intervals})"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(debug=False)

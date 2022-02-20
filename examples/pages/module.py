@@ -5,11 +5,14 @@ from dash import html, dcc
 
 
 def layout(*args, **kwargs):
-    return dbc.Container([
-        dbc.Row(html.Br()),
-        dbc.Row(dcc.Input(id="input"), justify="around"),
-        dbc.Row(html.Div(id="output"), justify="around"),
-    ], fluid=True)
+    return dbc.Container(
+        [
+            dbc.Row(html.Br()),
+            dbc.Row(dcc.Input(id="input"), justify="around"),
+            dbc.Row(html.Div(id="output"), justify="around"),
+        ],
+        fluid=True,
+    )
 
 
 def callbacks(app):

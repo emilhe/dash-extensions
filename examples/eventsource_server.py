@@ -6,7 +6,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
-app = Starlette(middleware=[Middleware(CORSMiddleware, allow_origins=['*'])])
+app = Starlette(middleware=[Middleware(CORSMiddleware, allow_origins=["*"])])
 
 
 async def numbers():

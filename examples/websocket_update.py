@@ -29,9 +29,9 @@ app.layout = html.Div([dcc.Graph(id="graph", figure=go.Figure(go.Scatter(x=[], y
 
 @app.callback(Output("graph", "figure"), [Input("ws", "message")], [State("graph", "figure")])
 def update_graph(msg, figure):
-    x, y = figure['data'][0]['x'], figure['data'][0]['y']
-    return go.Figure(data=go.Scatter(x=x + [len(x)], y=y + [float(msg['data'])]))
+    x, y = figure["data"][0]["x"], figure["data"][0]["y"]
+    return go.Figure(data=go.Scatter(x=x + [len(x)], y=y + [float(msg["data"])]))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_server(app, port=5000)  # 5000 if the default port

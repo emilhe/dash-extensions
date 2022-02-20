@@ -5,6 +5,9 @@ import base64
 import uuid
 
 from dash import html, Output, Input, callback_context
+from dash.development.base_component import Component
+from typing import List, Union
+
 
 # region Utils for Download component
 
@@ -21,7 +24,7 @@ def send_file(path, filename=None, mime_type=None):
     if filename is None:
         filename = ntpath.basename(path)
     # Read the file into a base64 string.
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         content = base64.b64encode(f.read()).decode()
     # Wrap in dict.
     return dict(content=content, filename=filename, mime_type=mime_type, base64=True)
@@ -105,8 +108,9 @@ def send_data_frame(writer, filename, mime_type=None, **kwargs):
     name = writer.__name__
     # Check if the provided writer is known.
     if name not in known_pandas_writers.keys():
-        raise ValueError("The provided writer ({}) is not supported, "
-                         "try calling send_string or send_bytes directly.".format(name))
+        raise ValueError(
+            "The provided writer ({}) is not supported, " "try calling send_string or send_bytes directly.".format(name)
+        )
     # If binary, use send_bytes.
     if known_pandas_writers[name]:
         return send_bytes(writer, filename, mime_type, **kwargs)
@@ -135,7 +139,7 @@ def get_triggered() -> Triggered:
     triggered_values = {}
     for entry in triggered:
         # TODO: Test this part.
-        elements = entry['prop_id'].split(".")
+        elements = entry["prop_id"].split(".")
         current_id = ".".join(elements[:-1])
         current_prop = elements[-1]
         # Determine the trigger object.
@@ -144,7 +148,7 @@ def get_triggered() -> Triggered:
         # TODO: Should all properties of the trigger be registered, or only one?
         if triggered_id != current_id:
             continue
-        triggered_values[current_prop] = entry['value']
+        triggered_values[current_prop] = entry["value"]
     # Now, create an object.
     try:
         triggered_id = json.loads(triggered_id)
@@ -154,6 +158,32 @@ def get_triggered() -> Triggered:
 
 
 # endregion
+
+# region Utils for html tables
+
+Node = Union[str, float, int, Component]
+
+
+def generate_html_table(
+    columns: List[Node], rows=List[List[Node]], footers=List[Node], caption=Node
+) -> List[Component]:
+    rows = [] if rows is None else rows
+    # Create table structure.
+    html_header = [html.Tr([html.Th(col) for col in columns])]
+    html_rows = [html.Tr([html.Td(children=cell) for cell in row]) for row in rows]
+    html_table = [html.Thead(html_header), html.Tbody(html_rows)]
+    # Add (optional) caption.
+    if caption is not None:
+        html_table = [html.Caption(caption)] + html_table
+    # Add (optional) footer.
+    if footers is not None:
+        html_footer = [html.Tr([html.Th(col) for col in footers])]
+        html_table += html.Tfoot(html_footer)
+    return html_table
+
+
+# endregion
+
 
 def fix_page_load_anchor_issue(app, delay=None):
     """
@@ -175,6 +205,11 @@ def fix_page_load_anchor_issue(app, delay=None):
                 match.scrollIntoView();
             }}, {});
         }}
-        """.format(delay),
-        Output(output_id, "children"), [Input(input_id, "children")], prevent_initial_call=False)
+        """.format(
+            delay
+        ),
+        Output(output_id, "children"),
+        [Input(input_id, "children")],
+        prevent_initial_call=False,
+    )
     return [dummy_input, dummy_output]

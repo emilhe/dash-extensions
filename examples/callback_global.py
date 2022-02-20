@@ -14,5 +14,5 @@ def right(_):
 app = DashProxy(prevent_initial_callbacks=True, transforms=[MultiplexerTransform()])
 app.layout = html.Div([html.Button("left", id="left"), html.Button("right", id="right"), html.Div(id="log")])
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(debug=True, port=7777)

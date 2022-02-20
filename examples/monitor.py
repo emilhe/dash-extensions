@@ -5,16 +5,19 @@ from dash_extensions import Monitor
 
 # Example app.
 app = Dash()
-app.layout = html.Div(Monitor([
-    dcc.Input(id="deg-fahrenheit", autoComplete="off", type="number"),
-    dcc.Input(id="deg-celsius", autoComplete="off", type="number")],
-    probes=dict(deg=[dict(id="deg-fahrenheit", prop="value"),
-                     dict(id="deg-celsius", prop="value")]), id="monitor")
+app.layout = html.Div(
+    Monitor(
+        [
+            dcc.Input(id="deg-fahrenheit", autoComplete="off", type="number"),
+            dcc.Input(id="deg-celsius", autoComplete="off", type="number"),
+        ],
+        probes=dict(deg=[dict(id="deg-fahrenheit", prop="value"), dict(id="deg-celsius", prop="value")]),
+        id="monitor",
+    )
 )
 
 
-@app.callback([Output("deg-fahrenheit", "value"), Output("deg-celsius", "value")],
-              [Input("monitor", "data")])
+@app.callback([Output("deg-fahrenheit", "value"), Output("deg-celsius", "value")], [Input("monitor", "data")])
 def sync_inputs(data):
     # Get value and trigger id from monitor.
     try:
@@ -29,5 +32,5 @@ def sync_inputs(data):
         return value * 9 / 5 + 32, no_update
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(debug=False)

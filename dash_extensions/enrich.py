@@ -11,8 +11,25 @@ import plotly
 import dash
 
 # Enable enrich as drop-in replacement for dash
-from dash import no_update, Input, Output, State, ClientsideFunction, MATCH, ALL, ALLSMALLER, development, exceptions, \
-    resources, dcc, html, dash_table, callback_context, callback, clientside_callback
+from dash import (
+    no_update,
+    Input,
+    Output,
+    State,
+    ClientsideFunction,
+    MATCH,
+    ALL,
+    ALLSMALLER,
+    development,
+    exceptions,
+    resources,
+    dcc,
+    html,
+    dash_table,
+    callback_context,
+    callback,
+    clientside_callback,
+)
 from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
 from flask import session
@@ -27,8 +44,8 @@ _wildcard_values = list(_wildcard_mappings.values())
 
 # region Dash proxy
 
-class DashProxy(dash.Dash):
 
+class DashProxy(dash.Dash):
     def __init__(self, *args, transforms=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.callbacks = []
@@ -41,10 +58,10 @@ class DashProxy(dash.Dash):
 
     def _collect_callback(self, *args, **kwargs):
         """
-         This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
+        This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         # Parse Output/Input/State (could be made simpler by enforcing input structure)
-        keys = ['output', 'inputs', 'state']
+        keys = ["output", "inputs", "state"]
         args = list(args) + list(flatten([_extract_list_from_kwargs(kwargs, key) for key in keys]))
         callback = {arg_type: [] for arg_type in self.arg_types}
         arg_order = []
@@ -72,7 +89,7 @@ class DashProxy(dash.Dash):
 
     def callback(self, *args, **kwargs):
         """
-         This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
+        This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
         """
         callback = self._collect_callback(*args, **kwargs)
         self.callbacks.append(callback)
@@ -105,7 +122,7 @@ class DashProxy(dash.Dash):
 
     def _setup_server(self):
         """
-         This method registers the callbacks on the Dash app and injects a session secret.
+        This method registers the callbacks on the Dash app and injects a session secret.
         """
         # Register the callbacks.
         self._register_callbacks()
@@ -117,7 +134,7 @@ class DashProxy(dash.Dash):
 
     def _resolve_callbacks(self):
         """
-         This method resolves the callbacks, i.e. it applies the callback injections.
+        This method resolves the callbacks, i.e. it applies the callback injections.
         """
         callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
         # Add any global callbacks.
@@ -194,7 +211,6 @@ def plotly_jsonify(data):
 
 
 class DashTransform:
-
     def __init__(self):
         self.layout_initialized = False
 
@@ -244,6 +260,7 @@ def _resolve_transforms(transforms: List[DashTransform]) -> List[DashTransform]:
 
 # region Blocking callback transform
 
+
 class BlockingCallbackTransform(DashTransform):
     def __init__(self, timeout=60):
         super().__init__()
@@ -270,11 +287,9 @@ class BlockingCallbackTransform(DashTransform):
             start_client_id = f"{callback_id}_start_client"
             end_server_id = f"{callback_id}_end_server"
             end_client_id = f"{callback_id}_end_client"
-            self.components.extend([
-                dcc.Store(id=start_client_id),
-                dcc.Store(id=end_server_id),
-                dcc.Store(id=end_client_id)
-            ])
+            self.components.extend(
+                [dcc.Store(id=start_client_id), dcc.Store(id=end_server_id), dcc.Store(id=end_client_id)]
+            )
             # Bind start signal callback.
             start_callback = f"""function()
             {{
@@ -296,14 +311,16 @@ class BlockingCallbackTransform(DashTransform):
                 }}
                 return window.dash_clientside.no_update;
             }}"""
-            self.app.clientside_callback(start_callback,
-                                         Output(start_client_id, "data"),
-                                         callback[Input],
-                                         [State(start_client_id, "data"), State(end_client_id, "data")])
+            self.app.clientside_callback(
+                start_callback,
+                Output(start_client_id, "data"),
+                callback[Input],
+                [State(start_client_id, "data"), State(end_client_id, "data")],
+            )
             # Bind end signal callback.
-            self.app.clientside_callback("function(){return new Date().getTime();}",
-                                         Output(end_client_id, "data"),
-                                         Input(end_server_id, "data"))
+            self.app.clientside_callback(
+                "function(){return new Date().getTime();}", Output(end_client_id, "data"), Input(end_server_id, "data")
+            )
             # Modify the original callback to send finished signal.
             callback[Output].append(Output(end_server_id, "data"))
             # Modify the original callback to not trigger on inputs, but the new special trigger.
@@ -333,6 +350,7 @@ def skip_input_signal_add_output_signal():
 
 # region Log transform
 
+
 class LogConfig:
     def __init__(self, log_output, log_writer_map: Dict[int, Callable]):
         self.log_output = log_output
@@ -341,6 +359,7 @@ class LogConfig:
 
 def setup_notifications_log_config(layout: List[Component]):
     import dash_mantine_components as dmc
+
     layout.append(dmc.NotificationsProvider(id="notifications_provider"))
     log_output = Output("notifications_provider", "children")
     return LogConfig(log_output, get_notification_log_writers())
@@ -476,8 +495,8 @@ def clientside_callback(clientside_function, *args, **kwargs):
 
 # region Prefix ID transform
 
-class PrefixIdTransform(DashTransform):
 
+class PrefixIdTransform(DashTransform):
     def __init__(self, prefix, prefix_func=None):
         super().__init__()
         self.prefix = prefix
@@ -537,9 +556,10 @@ def prefix_component(key, component):
 
 # region Trigger transform (the only default transform)
 
+
 class Trigger(Input):
     """
-     Like an Input, a trigger can trigger a callback, but it's values it not included in the resulting function call.
+    Like an Input, a trigger can trigger a callback, but it's values it not included in the resulting function call.
     """
 
     def __init__(self, component_id, component_property):
@@ -566,8 +586,8 @@ def filter_args(args_filter):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            post_args = list(args[len(args_filter):])
-            args = list(args[:len(args_filter)])
+            post_args = list(args[len(args_filter) :])
+            args = list(args[: len(args_filter)])
             filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]] + post_args
             return f(*filtered_args)
 
@@ -585,6 +605,7 @@ def trigger_filter(args):
 # endregion
 
 # region Multiplexer transform
+
 
 def _mp_id(output: Output, idx: int) -> Dict[str, str]:
     if isinstance(output.component_id, dict):
@@ -698,23 +719,30 @@ class MultiplexerTransform(DashTransform):
         # Collect proxy elements to add to layout.
         self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
-        self.app.clientside_callback("""
+        self.app.clientside_callback(
+            """
             function(){
                 const ts = dash_clientside.callback_context.triggered;
                 return ts[0].value;
             }
-        """, output, inputs, prevent_initial_call=True)
+        """,
+            output,
+            inputs,
+            prevent_initial_call=True,
+        )
 
     def sort_key(self):
         return 10
+
 
 # endregion
 
 # region Server side output transform
 
+
 class EnrichedOutput(Output):
     """
-     Like a normal Output, includes additional properties related to storing the data.
+    Like a normal Output, includes additional properties related to storing the data.
     """
 
     def __init__(self, component_id, component_property, backend=None, session_check=None, arg_check=True):
@@ -726,12 +754,11 @@ class EnrichedOutput(Output):
 
 class ServersideOutput(EnrichedOutput):
     """
-     Like a normal Output, but with the content stored only server side.
+    Like a normal Output, but with the content stored only server side.
     """
 
 
 class ServersideOutputTransform(DashTransform):
-
     def __init__(self, backend=None, session_check=True, arg_check=True):
         super().__init__()
         self.backend = backend if backend is not None else FileSystemStore()
@@ -837,8 +864,12 @@ def _pack_outputs(callback):
                         break
                 # If not update is needed, just return the ids (or values, if not serverside output).
                 if not update_needed:
-                    results = [uid if isinstance(callback[Output][i], ServersideOutput) else
-                               callback[Output][i].backend.get(uid) for i, uid in enumerate(unique_ids)]
+                    results = [
+                        uid
+                        if isinstance(callback[Output][i], ServersideOutput)
+                        else callback[Output][i].backend.get(uid)
+                        for i, uid in enumerate(unique_ids)
+                    ]
                     return results if multi_output else results[0]
             # Do the update.
             data = f(*args)
@@ -877,8 +908,8 @@ def _get_cache_id(func, output, args, session_check=None, arg_check=True):
 
 
 def _get_output_id(callback):
-    if isinstance(callback['f'], (ClientsideFunction, str)):
-        f_repr = repr(callback['f'])  # handles clientside functions
+    if isinstance(callback["f"], (ClientsideFunction, str)):
+        f_repr = repr(callback["f"])  # handles clientside functions
     else:
         f_repr = f"{callback['f'].__module__}.{callback['f'].__name__}"  # handles Python functions
     f_hash = hashlib.md5(f_repr.encode()).digest()
@@ -887,8 +918,8 @@ def _get_output_id(callback):
 
 # Interface definition for server stores.
 
-class ServerStore:
 
+class ServerStore:
     def get(self, key, ignore_expired=False):
         raise NotImplementedError()
 
@@ -901,8 +932,8 @@ class ServerStore:
 
 # Place store implementations here.
 
-class FileSystemStore(FileSystemCache):
 
+class FileSystemStore(FileSystemCache):
     def __init__(self, cache_dir="file_system_store", **kwargs):
         super().__init__(cache_dir, **kwargs)
 
@@ -920,11 +951,12 @@ class FileSystemStore(FileSystemCache):
 
 
 class RedisStore(RedisCache):
+    """
+    Store that uses Redis as backend. Note, that the timeout must be large enough that a (k,v) pair NEVER expires
+    during a user session. If it does, the user experience for those sessions will be degraded.
+    """
 
     def __init__(self, default_timeout=24 * 3600, **kwargs):
-        """
-        The timeout must be large enough that a (k,v) pair NEVER expires during a user session.
-        """
         super().__init__(default_timeout=default_timeout, **kwargs)
 
     def get(self, key, ignore_expired=False):
@@ -938,7 +970,6 @@ class RedisStore(RedisCache):
 
 
 class NoOutputTransform(DashTransform):
-
     def __init__(self):
         super().__init__()
         self.components = []
@@ -965,15 +996,23 @@ class NoOutputTransform(DashTransform):
     def sort_key(self):
         return 0
 
+
 # endregion
 
 # region Transformer implementations
 
+
 class Dash(DashProxy):
     def __init__(self, *args, output_defaults=None, **kwargs):
         output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
-        transforms = [TriggerTransform(), LogTransform(), MultiplexerTransform(), NoOutputTransform(),
-                      ServersideOutputTransform(**output_defaults)]
+        transforms = [
+            TriggerTransform(),
+            LogTransform(),
+            MultiplexerTransform(),
+            NoOutputTransform(),
+            ServersideOutputTransform(**output_defaults),
+        ]
         super().__init__(*args, transforms=transforms, **kwargs)
+
 
 # endregion

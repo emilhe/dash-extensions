@@ -13,5 +13,5 @@ def func(n_clicks):
     return dict(content="Hello world!", filename="hello.txt")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server()

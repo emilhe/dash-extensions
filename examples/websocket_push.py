@@ -10,8 +10,9 @@ app = Dash(prevent_initial_callbacks=True)
 socket_pool = SocketPool(app)
 app.layout = html.Div([html.Div(id="msg"), WebSocket(id="ws")])
 # Update div using websocket.
-app.clientside_callback("function(msg){return \"Response from websocket: \" + msg.data;}",
-                        Output("msg", "children"), [Input("ws", "message")])
+app.clientside_callback(
+    'function(msg){return "Response from websocket: " + msg.data;}', Output("msg", "children"), [Input("ws", "message")]
+)
 
 
 # End point to send message to current session.
@@ -28,5 +29,5 @@ def broadcast_message(message):
     return f"Message [{message}] broadcast."
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_server(app)

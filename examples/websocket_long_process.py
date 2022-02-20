@@ -31,5 +31,5 @@ def show_result(result):
     return json.dumps(result)  # the "message" prop of ws triggers this callback when "ws_handler" invokes "send"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_server(app)

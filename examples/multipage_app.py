@@ -9,12 +9,16 @@ from dash_extensions.multipage import PageCollection, app_to_page, module_to_pag
 
 # region Page definition in current module
 
+
 def layout(*args, **kwargs):
-    return dbc.Container([
-        dbc.Row(html.Br()),
-        dbc.Row(dcc.Input(id="input"), justify="around"),
-        dbc.Row(html.Div(id="output"), justify="around"),
-    ], fluid=True)
+    return dbc.Container(
+        [
+            dbc.Row(html.Br()),
+            dbc.Row(dcc.Input(id="input"), justify="around"),
+            dbc.Row(html.Div(id="output"), justify="around"),
+        ],
+        fluid=True,
+    )
 
 
 def callbacks(app):
@@ -28,6 +32,7 @@ page = Page(id="page", label="A page", layout=layout, callbacks=callbacks)
 
 # endregion
 
+
 def simple_menu(page_collection):
     children = []
     pages = page_collection.pages
@@ -39,11 +44,13 @@ def simple_menu(page_collection):
 
 
 # Create pages.
-pc = PageCollection(pages=[
-    page,  # page defined in current module
-    module_to_page(module, "module", "A module"),  # page defined in another module
-    app_to_page(sub_app.app, "app", "An app")  # app loaded as a page
-])
+pc = PageCollection(
+    pages=[
+        page,  # page defined in current module
+        module_to_page(module, "module", "A module"),  # page defined in another module
+        app_to_page(sub_app.app, "app", "An app"),  # app loaded as a page
+    ]
+)
 # Create app.
 app = DashProxy(suppress_callback_exceptions=True)
 app.layout = html.Div(simple_menu(pc) + [html.Div(id=CONTENT_ID), dcc.Location(id=URL_ID)])
@@ -51,5 +58,5 @@ app.layout = html.Div(simple_menu(pc) + [html.Div(id=CONTENT_ID), dcc.Location(i
 pc.navigation(app)
 pc.callbacks(app)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server()

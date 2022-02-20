@@ -57,8 +57,11 @@ class PageCollection:
     def __init__(self, pages, default_page_id=None, path_to_page=None, is_authorized=None, unauthorized_layout=None):
         self._pages = pages
         self.is_authorized = is_authorized
-        self.unauthorized_layout = unauthorized_layout \
-            if unauthorized_layout is not None else lambda x, *args, **kwargs: html.Div("Unauthorized.")
+        self.unauthorized_layout = (
+            unauthorized_layout
+            if unauthorized_layout is not None
+            else lambda x, *args, **kwargs: html.Div("Unauthorized.")
+        )
         self.path_to_page = path_to_page
         self.default_page_id = default_page_id if default_page_id is not None else pages[0].id
 
@@ -97,6 +100,7 @@ class PageCollection:
 
 # region Conversions
 
+
 def app_to_page(app, id, label):
     app.transforms.append(PrefixIdTransform(id))
     return Page(id=id, label=label, proxy=app)
@@ -110,7 +114,9 @@ def module_to_page(module, id, label, **kwargs):
 
 # region Example layouts
 
+
 def default_layout(*args):
     return html.Div([html.Div(id=CONTENT_ID), dcc.Location(id=URL_ID)] + list(args))
+
 
 # endregion

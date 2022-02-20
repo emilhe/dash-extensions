@@ -5,9 +5,14 @@ from dash_extensions.enrich import Output, DashProxy, Input, MultiplexerTransfor
 
 proxy_container = dcc.Loading()
 app = DashProxy(transforms=[MultiplexerTransform(proxy_location=proxy_container)])
-app.layout = html.Div([html.Button("left", id="left", n_clicks=0),
-                       html.Button("right", id="right", n_clicks=0),
-                       html.Div("Initial value", id="log"), proxy_container])
+app.layout = html.Div(
+    [
+        html.Button("left", id="left", n_clicks=0),
+        html.Button("right", id="right", n_clicks=0),
+        html.Div("Initial value", id="log"),
+        proxy_container,
+    ]
+)
 
 
 @app.callback(Output("log", "children"), Input("left", "n_clicks"))
@@ -22,5 +27,5 @@ def right(n_clicks):
     return f"right ({n_clicks})"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(port=7777)

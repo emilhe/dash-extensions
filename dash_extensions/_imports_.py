@@ -25,5 +25,5 @@ __all__ = [
     "Monitor",
     "Purify",
     "Ticker",
-    "WebSocket"
+    "WebSocket",
 ]

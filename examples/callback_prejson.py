@@ -30,5 +30,5 @@ app.layout = html.Div(list(itertools.chain.from_iterable([make_layout(tag) for t
 for t in tags:
     app.callback(Output(f"graph_{t}", "figure"), Trigger(f"btn_{t}", "n_clicks"), memoize=memoize[t])(make_figure)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(port=8877, debug=True)

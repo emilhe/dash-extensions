@@ -15,5 +15,5 @@ def func(n_clicks):
     return send_file("/home/emher/Documents/Untitled.png")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server()

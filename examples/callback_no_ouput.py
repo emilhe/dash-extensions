@@ -3,9 +3,7 @@ from dash.dependencies import ClientsideFunction
 from dash_extensions.enrich import Dash, Input
 
 app = Dash(__name__, prevent_initial_callbacks=True)
-app.layout = html.Div([
-    html.Button("Click me", id="btn")
-])
+app.layout = html.Div([html.Button("Click me", id="btn")])
 
 
 @app.callback(Input("btn", "n_clicks"))  # no Output is OK
@@ -23,5 +21,5 @@ app.clientside_callback(
     Input("btn", "n_clicks"),  # no Output is OK
 )
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server(port=7777)

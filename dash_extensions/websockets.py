@@ -19,7 +19,6 @@ def add_ws_endpoint(sockets, pool, handler, endpoint):
 
 
 class SocketPool:
-
     def __init__(self, app, handler=lambda ws: ws.receive(), endpoint="/ws"):
         # Set session secret.
         if not app.server.secret_key:
@@ -48,5 +47,6 @@ class SocketPool:
 def run_server(app, port=5000):
     from gevent import pywsgi
     from geventwebsocket.handler import WebSocketHandler
-    server = pywsgi.WSGIServer(('', port), app.server, handler_class=WebSocketHandler)
+
+    server = pywsgi.WSGIServer(("", port), app.server, handler_class=WebSocketHandler)
     server.serve_forever()

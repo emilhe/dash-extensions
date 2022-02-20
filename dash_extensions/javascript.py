@@ -14,6 +14,7 @@ _func_template = """{name}: {function}"""
 
 # endregion
 
+
 class Namespace:
     def __init__(self, *args):
         self.args = list(args)
@@ -34,7 +35,7 @@ class Namespace:
         for ns in reversed(self.args[1:]):
             content = _ns_template.format(namespace=ns, content=content)
         content = _template.format(namespace=self.args[0], content=content)
-        with open(os.path.join(assets_folder, "{}.js".format("_".join(self.args))), 'w') as f:
+        with open(os.path.join(assets_folder, "{}.js".format("_".join(self.args))), "w") as f:
             f.write(jsbeautifier.beautify(content))
 
 
