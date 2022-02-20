@@ -862,7 +862,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "15091ff7b40a5bb8ce123cff598117aa6244444c7b9ebb6f6efa5cdefbbf3b87"
+content-hash = "e087cef3d014e12f540287e3e32f51534a2e179b3cfa8ac8df1c333c15e7b4e5"
 
 [metadata.files]
 arrow = [
