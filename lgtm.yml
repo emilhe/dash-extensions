@@ -1,5 +1,5 @@
 path_classifiers:
   docs:
-    - examples
+    - examples/*
 queries:
   - exclude: py/procedure-return-value-used
