@@ -4,7 +4,7 @@
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/thedirtyfew/dash-extensions.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/thedirtyfew/dash-extensions/context:python)
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/thedirtyfew/dash-extensions.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/thedirtyfew/dash-extensions/context:javascript)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?)](http://makeapullrequest.com)
-[![Testing](https://github.com/thedirtyfew/dash-extensions/actions/workflows/test.yml/badge.svg)](https://github.com/thedirtyfew/dash-extensions/actions/workflows/test.yml)
+[![Testing](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml/badge.svg)](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml)
 
 The purpose of this package is to provide various extensions to the Plotly Dash framework. It can be divided into five main blocks, 
 
