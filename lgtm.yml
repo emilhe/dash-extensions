@@ -1,0 +1,5 @@
+path_classifiers:
+  docs:
+    - examples
+queries:
+  - exclude: py/procedure-return-value-used
