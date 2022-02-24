@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.X.X] - 18-02-22
+
+### Change
+
+- Drop older (TODO: Add version) Dataiku support. 
+
 ## [0.0.71] - 18-02-22
 
 ### Change
