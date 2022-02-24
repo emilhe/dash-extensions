@@ -11,7 +11,6 @@ class Page:
         self.id = id
         self.label = label
         self._prefix_ids = prefix_ids
-        self._prefix_ids = prefix_ids
         self._layout = layout
         # Per default, use prefix transform.
         self._proxy = proxy
