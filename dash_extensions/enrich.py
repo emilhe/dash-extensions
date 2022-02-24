@@ -5,13 +5,11 @@ import logging
 import pickle
 import secrets
 import uuid
-from datetime import datetime
-
 import plotly
-import dash
 
 # Enable enrich as drop-in replacement for dash
 from dash import (
+    Dash as DashBase,
     no_update,
     Input,
     Output,
@@ -20,18 +18,19 @@ from dash import (
     MATCH,
     ALL,
     ALLSMALLER,
-    development,
-    exceptions,
-    resources,
+    development,  # lgtm [py/unused-import]
+    exceptions,  # lgtm [py/unused-import]
+    resources,  # lgtm [py/unused-import]
     dcc,
     html,
-    dash_table,
-    callback_context,
-    callback,
-    clientside_callback,
+    dash_table,  # lgtm [py/unused-import]
+    callback_context,  # lgtm [py/unused-import]
+    callback,  # lgtm [py/unused-import]
+    clientside_callback  # lgtm [py/unused-import]
 )
 from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
+from datetime import datetime
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
@@ -45,7 +44,7 @@ _wildcard_values = list(_wildcard_mappings.values())
 # region Dash proxy
 
 
-class DashProxy(dash.Dash):
+class DashProxy(DashBase):
     def __init__(self, *args, transforms=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.callbacks = []
@@ -146,7 +145,7 @@ class DashProxy(dash.Dash):
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
         return callbacks, clientside_callbacks
 
-    def hijack(self, app: dash.Dash):
+    def hijack(self, app: DashBase):
         # Change properties.
         app.config.update(self.config)
         app.title = self.title
@@ -418,7 +417,7 @@ class DashLogger:
         self.output.append(self.log_writers[level](message, **kwargs))
 
     def get_output(self):
-        return self.output if self.output else dash.no_update
+        return self.output if self.output else no_update
 
 
 class LogTransform(DashTransform):
@@ -944,7 +943,7 @@ class FileSystemStore(FileSystemCache):
         filename = self._get_filename(key)
         try:
             with open(filename, "rb") as f:
-                pickle_time = pickle.load(f)  # ignore time
+                _ = pickle.load(f)  # ignore time
                 return pickle.load(f)
         except (IOError, OSError, pickle.PickleError):
             return None
