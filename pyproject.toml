@@ -16,6 +16,8 @@ Flask-Caching = "^1.10.1"
 dash = {extras = ["dev", "testing"], version = "^2.2.0"}
 pytest-cov = "^3.0.0"
 black = "^22.1.0"
+pandas = "^1.4.1"
+quart = "^0.16.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
