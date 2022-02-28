@@ -40,6 +40,11 @@ jobs:
     - name: Install dependencies
       run: poetry install
 
+    - name: Build components
+      run: |
+        npm install | echo "Ignore npm install error"
+        npm run build_no_r
+
     - name: Test with pytest
       run: |
         poetry run pytest --cov=dash_extensions --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov-report=xml tests
