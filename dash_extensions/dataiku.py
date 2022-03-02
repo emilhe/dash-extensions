@@ -1,68 +1,19 @@
 import os
 import re
-import json
 
 from dash import Dash
 from distutils.dir_util import copy_tree
-from flask import request, jsonify, make_response
 
 """
-This purpose of this module is to ease the integration of Dash with dataiku. 
+This purpose of this module is to ease the integration of Dash with Dataiku. 
 """
-
-
-def parse_config(args):
-    return {"webAppBackendUrl": args.get("webAppBackendUrl"), "appPrefix": args.get("appPrefix")}
-
-
-def get_dataiku_kwargs(server, config_path):
-    try:
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        app_prefix = config["appPrefix"]
-        web_app_backend_url = config["webAppBackendUrl"]
-        return {
-            "server": server,
-            "routes_pathname_prefix": f"/{app_prefix}/",
-            "requests_pathname_prefix": f"{web_app_backend_url}{app_prefix}/",
-        }
-    except FileNotFoundError:
-        return {"server": server}
-
-
-def setup_dataiku(server, config_path):
-    # Add config route.
-    @server.route("/configure")
-    def configure():
-        config = parse_config(request.args)
-        # Check if the configuration has changed.
-        if os.path.isfile(config_path):
-            with open(config_path, "r") as f:
-                current_config = json.load(f)
-            # Configuration has not changed, redirect to app.
-            if config == current_config:
-                return jsonify(success=True)
-        # Configuration changed. Write new config and ask for restart.
-        with open(config_path, "w") as f:
-            json.dump(config, f)
-        return make_response(jsonify({"error": "Configuration changed. Backend restart required."}), 500)
-
-    # Return keyword arguments.
-    try:
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        app_prefix = config["appPrefix"]
-        web_app_backend_url = config["webAppBackendUrl"]
-        return {
-            "server": server,
-            "routes_pathname_prefix": f"/{app_prefix}/",
-            "requests_pathname_prefix": f"{web_app_backend_url}{app_prefix}/",
-        }
-    except FileNotFoundError:
-        return {"server": server}
 
 
 def bind_assets_folder(app: Dash, app_id: str, assets_folder: str):
+    """
+    Dataiku 10 doesn't support separate asset folders for each Dash app. This function targets fixing this issue by
+    (1) creating a new asset sub folder for each app, and (2) limiting asset loading to this folder.
+    """
     # Create assets container folder for the app.
     dst_assets_folder = os.path.join(app.config.assets_folder, app_id)
     os.makedirs(dst_assets_folder, exist_ok=True)

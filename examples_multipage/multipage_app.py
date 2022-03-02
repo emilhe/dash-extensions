@@ -1,5 +1,5 @@
-import examples.pages.module as module
-import examples.pages.app as sub_app
+import examples_multipage.pages.module as module
+import examples_multipage.pages.app as sub_app
 import dash_bootstrap_components as dbc
 
 from dash import dcc, html
