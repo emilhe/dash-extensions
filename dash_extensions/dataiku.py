@@ -5,7 +5,7 @@ from dash import Dash
 from distutils.dir_util import copy_tree
 
 """
-This purpose of this module is to ease the integration of Dash with Dataiku. 
+The purpose of this module is to ease the integration of Dash with Dataiku. 
 """
 
 
