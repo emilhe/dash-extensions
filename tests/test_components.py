@@ -10,5 +10,5 @@ components = ["before_after", "defer_script", "event_listener", "event_source", 
 @pytest.mark.parametrize("component", components)
 def test_render_components(dash_duo, component):
     # Start a dash app contained as the variable `app` in `usage.py`
-    app = import_app(f"component_examples.{component}")
+    app = import_app(f"examples_components.{component}")
     dash_duo.start_server(app)
