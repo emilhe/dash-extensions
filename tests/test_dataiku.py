@@ -15,7 +15,8 @@ def test_bind_assets_folder():
     # Clear the asset dir.
     app = Dash()
     dst_assets_folder = os.path.join(app.config.assets_folder, app_id)
-    rmtree(dst_assets_folder)
+    if os.path.isdir(dst_assets_folder):
+        rmtree(dst_assets_folder)
     # Check that there are no assets.
     app._walk_assets_directory()
     resources = app.scripts._resources._resources
