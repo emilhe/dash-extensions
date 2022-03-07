@@ -160,6 +160,17 @@ class DashProxy(dash.Dash):
         if not app.server.secret_key:
             app.server.secret_key = secrets.token_urlsafe(16)
 
+    def register_page(self, *args, **kwargs):
+        return super().register_page(*args, **kwargs)
+
+    def register_as_page(self, app: dash.Dash, module, prefix=None, **kwargs):
+        if prefix is not None:
+            prefix_transform = PrefixIdTransform(prefix)
+            self.transforms.append(prefix_transform)
+            prefix_transform.init(self)
+        self._register_callbacks(app)
+        dash.register_page(module, layout=self._layout_value, **kwargs)
+
     def clear(self):
         self.callbacks = []
         self.clientside_callbacks = []
@@ -586,7 +597,7 @@ def filter_args(args_filter):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            post_args = list(args[len(args_filter) :])
+            post_args = list(args[len(args_filter):])
             args = list(args[: len(args_filter)])
             filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]] + post_args
             return f(*filtered_args)
@@ -1013,6 +1024,5 @@ class Dash(DashProxy):
             ServersideOutputTransform(**output_defaults),
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
-
 
 # endregion
