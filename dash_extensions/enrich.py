@@ -30,6 +30,7 @@ from dash import (
     callback,
     clientside_callback,
 )
+from dash._utils import patch_collections_abc
 from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
 from flask import session
@@ -42,16 +43,17 @@ _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"
 _wildcard_values = list(_wildcard_mappings.values())
 
 
-# region Dash proxy
+# region Dash blueprint
 
-
-class DashProxy(dash.Dash):
-    def __init__(self, *args, transforms=None, **kwargs):
-        super().__init__(*args, **kwargs)
+class DashBlueprint:
+    def __init__(self, transforms=None, include_global_callbacks=False):
         self.callbacks = []
         self.clientside_callbacks = []
         self.arg_types = [Output, Input, State]
         self.transforms = _resolve_transforms(transforms)
+        self._layout = None
+        self._layout_is_function = False
+        self.include_global_callbacks = include_global_callbacks
         # Do the transform initialization.
         for transform in self.transforms:
             transform.init(self)
@@ -104,9 +106,8 @@ class DashProxy(dash.Dash):
         callback["f"] = clientside_function
         self.clientside_callbacks.append(callback)
 
-    def _register_callbacks(self, app=None):
+    def register_callbacks(self, app):
         callbacks, clientside_callbacks = self._resolve_callbacks()
-        app = super() if app is None else app
         for cb in callbacks:
             outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
             app.callback(outputs, cb[Input], cb[State], **cb["kwargs"])(cb["f"])
@@ -114,37 +115,77 @@ class DashProxy(dash.Dash):
             outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
             app.clientside_callback(cb["f"], outputs, cb[Input], cb[State], **cb["kwargs"])
 
-    def _layout_value(self):
-        layout = self._layout() if self._layout_is_function else self._layout
-        for transform in self.transforms:
-            layout = transform.layout(layout, self._layout_is_function)
-        return layout
-
-    def _setup_server(self):
-        """
-        This method registers the callbacks on the Dash app and injects a session secret.
-        """
-        # Register the callbacks.
-        self._register_callbacks()
-        # Proceed as normally.
-        super()._setup_server()
-        # Set session secret. Used by some subclasses.
-        if not self.server.secret_key:
-            self.server.secret_key = secrets.token_urlsafe(16)
-
     def _resolve_callbacks(self):
         """
         This method resolves the callbacks, i.e. it applies the callback injections.
         """
         callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
         # Add any global callbacks.
-        callbacks += GLOBAL_PROXY.callbacks
-        clientside_callbacks += GLOBAL_PROXY.clientside_callbacks
-        GLOBAL_PROXY.clear()
+        if self.include_global_callbacks:
+            callbacks += GLOBAL_BLUEPRINT.callbacks
+            clientside_callbacks += GLOBAL_BLUEPRINT.clientside_callbacks
         # Proceed as before.
         for transform in self.transforms:
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
         return callbacks, clientside_callbacks
+
+    # def register(self, app: dash.Dash, module, prefix=None, **kwargs):
+    #     if prefix is not None:
+    #         prefix_transform = PrefixIdTransform(prefix)
+    #         self.transforms.append(prefix_transform)
+    #         prefix_transform.init(self)
+    #     self._register_callbacks(app)
+    #     dash.register_page(module, layout=self._layout_value, **kwargs)
+
+    def clear(self):
+        self.callbacks = []
+        self.clientside_callbacks = []
+        self.arg_types = [Output, Input, State]
+        self.transforms = []
+
+    def _layout_value(self):
+        layout = self._layout() if self._layout_is_function else self._layout
+        for transform in self.transforms:
+            layout = transform.layout(layout, self._layout_is_function)
+        return layout
+
+    @property
+    def layout(self):
+        return self._layout
+
+    @layout.setter
+    def layout(self, value):
+        self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
+        self._layout = value
+
+
+# endregion
+
+# region Dash proxy
+
+
+class DashProxy(dash.Dash):
+    def __init__(self, *args, transforms=None, include_global_callbacks=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.blueprint = DashBlueprint(transforms, include_global_callbacks=include_global_callbacks)
+
+    def callback(self, *args, **kwargs):
+        return self.blueprint.callback(*args, **kwargs)
+
+    def clientside_callback(self, clientside_function, *args, **kwargs):
+        return self.blueprint.clientside_callback(*args, **kwargs)
+
+    def _setup_server(self):
+        """
+        This method registers the callbacks on the Dash app and injects a session secret.
+        """
+        # Register the callbacks.
+        self.blueprint.register_callbacks(super())
+        # Proceed as normally.
+        super()._setup_server()
+        # Set session secret. Used by some subclasses.
+        if not self.server.secret_key:
+            self.server.secret_key = secrets.token_urlsafe(16)
 
     def hijack(self, app: dash.Dash):
         # Change properties.
@@ -155,27 +196,24 @@ class DashProxy(dash.Dash):
         app.layout = html.Div()  # fool layout validator
         app._layout_value = self._layout_value
         # Register callbacks.
-        self._register_callbacks(app)
+        self.blueprint.register_callbacks(app)
         # Setup secret.
         if not app.server.secret_key:
             app.server.secret_key = secrets.token_urlsafe(16)
 
-    def register_page(self, *args, **kwargs):
-        return super().register_page(*args, **kwargs)
+    def _layout_value(self):
+        """
+        Delegate layout value (and property setter/getter) to blueprint.
+        """
+        return self.blueprint._layout_value()
 
-    def register_as_page(self, app: dash.Dash, module, prefix=None, **kwargs):
-        if prefix is not None:
-            prefix_transform = PrefixIdTransform(prefix)
-            self.transforms.append(prefix_transform)
-            prefix_transform.init(self)
-        self._register_callbacks(app)
-        dash.register_page(module, layout=self._layout_value, **kwargs)
+    @property
+    def layout(self):
+        return self.blueprint._layout
 
-    def clear(self):
-        self.callbacks = []
-        self.clientside_callbacks = []
-        self.arg_types = [Output, Input, State]
-        self.transforms = []
+    @layout.setter
+    def layout(self, value):
+        self.blueprint.layout = value
 
 
 def _get_session_id(session_key=None):
@@ -184,24 +222,6 @@ def _get_session_id(session_key=None):
     if not session.get(session_key):
         session[session_key] = secrets.token_urlsafe(16)
     return session.get(session_key)
-
-
-def _as_list(item):
-    if item is None:
-        return []
-    if isinstance(item, tuple):
-        return list(item)
-    if isinstance(item, list):
-        return item
-    return [item]
-
-
-def _create_callback_id(item):
-    cid = item.component_id
-    if isinstance(cid, dict):
-        cid = {key: cid[key] if cid[key] not in _wildcard_mappings else _wildcard_mappings[cid[key]] for key in cid}
-        cid = json.dumps(cid)
-    return "{}.{}".format(cid, item.component_property)
 
 
 def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
@@ -217,9 +237,9 @@ def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
         return []
 
 
-def plotly_jsonify(data):
-    return json.loads(json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder))
+# endregion
 
+# region Dash transform
 
 class DashTransform:
     def __init__(self):
@@ -276,7 +296,7 @@ class BlockingCallbackTransform(DashTransform):
     def __init__(self, timeout=60):
         super().__init__()
         self.components = []
-        self.app = DashProxy()
+        self.blueprint = DashBlueprint()
         self.timeout = timeout
 
     def transform_layout(self, layout):
@@ -285,7 +305,7 @@ class BlockingCallbackTransform(DashTransform):
 
     def apply(self, callbacks, clientside_callbacks):
         callbacks = self.apply_serverside(callbacks)
-        return callbacks, clientside_callbacks + self.app.clientside_callbacks
+        return callbacks, clientside_callbacks + self.blueprint.clientside_callbacks
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
@@ -322,14 +342,14 @@ class BlockingCallbackTransform(DashTransform):
                 }}
                 return window.dash_clientside.no_update;
             }}"""
-            self.app.clientside_callback(
+            self.blueprint.clientside_callback(
                 start_callback,
                 Output(start_client_id, "data"),
                 callback[Input],
                 [State(start_client_id, "data"), State(end_client_id, "data")],
             )
             # Bind end signal callback.
-            self.app.clientside_callback(
+            self.blueprint.clientside_callback(
                 "function(){return new Date().getTime();}", Output(end_client_id, "data"), Input(end_server_id, "data")
             )
             # Modify the original callback to send finished signal.
@@ -488,18 +508,17 @@ def bind_logger(logger):
 
 # endregion
 
+# region Global blueprint object (to emulate Dash 2.0 import syntax)
 
-# region Global app object (to emulate Dash 2.0 import syntax)
-
-GLOBAL_PROXY = DashProxy()
+GLOBAL_BLUEPRINT = DashBlueprint()
 
 
 def callback(*args, **kwargs):
-    return GLOBAL_PROXY.callback(*args, **kwargs)
+    return GLOBAL_BLUEPRINT.callback(*args, **kwargs)
 
 
 def clientside_callback(clientside_function, *args, **kwargs):
-    return GLOBAL_PROXY.clientside_callback(clientside_function, *args, **kwargs)
+    return GLOBAL_BLUEPRINT.clientside_callback(clientside_function, *args, **kwargs)
 
 
 # endregion
@@ -682,7 +701,7 @@ class MultiplexerTransform(DashTransform):
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
         self.proxy_wrapper_map = proxy_wrapper_map
-        self.app = DashProxy()
+        self.blueprint = DashBlueprint()
 
     def transform_layout(self, layout):
         # Apply wrappers if needed.
@@ -713,7 +732,7 @@ class MultiplexerTransform(DashTransform):
                 continue
             self._apply_multiplexer(output, output_map[output])
 
-        return callbacks, clientside_callbacks + self.app.clientside_callbacks
+        return callbacks, clientside_callbacks + self.blueprint.clientside_callbacks
 
     def _apply_multiplexer(self, output, callbacks):
         inputs = []
@@ -730,7 +749,7 @@ class MultiplexerTransform(DashTransform):
         # Collect proxy elements to add to layout.
         self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
-        self.app.clientside_callback(
+        self.blueprint.clientside_callback(
             """
             function(){
                 const ts = dash_clientside.callback_context.triggered;
@@ -1010,7 +1029,7 @@ class NoOutputTransform(DashTransform):
 
 # endregion
 
-# region Transformer implementations
+# region Batteries included dash proxy object
 
 
 class Dash(DashProxy):
@@ -1024,5 +1043,31 @@ class Dash(DashProxy):
             ServersideOutputTransform(**output_defaults),
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
+
+
+# endregion
+
+# region Utils
+
+def _as_list(item):
+    if item is None:
+        return []
+    if isinstance(item, tuple):
+        return list(item)
+    if isinstance(item, list):
+        return item
+    return [item]
+
+
+def _create_callback_id(item):
+    cid = item.component_id
+    if isinstance(cid, dict):
+        cid = {key: cid[key] if cid[key] not in _wildcard_mappings else _wildcard_mappings[cid[key]] for key in cid}
+        cid = json.dumps(cid)
+    return "{}.{}".format(cid, item.component_property)
+
+
+def plotly_jsonify(data):
+    return json.loads(json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder))
 
 # endregion
