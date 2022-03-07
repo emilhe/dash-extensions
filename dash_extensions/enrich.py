@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import hashlib
 import json
@@ -37,7 +39,7 @@ from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
-from typing import Dict, Callable, List
+from typing import Dict, Callable, List, Union
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -46,7 +48,7 @@ _wildcard_values = list(_wildcard_mappings.values())
 # region Dash blueprint
 
 class DashBlueprint:
-    def __init__(self, transforms=None, include_global_callbacks=False):
+    def __init__(self, transforms: List[DashTransform] = None, include_global_callbacks: bool = False):
         self.callbacks = []
         self.clientside_callbacks = []
         self.arg_types = [Output, Input, State]
@@ -91,7 +93,7 @@ class DashBlueprint:
 
     def callback(self, *args, **kwargs):
         """
-        This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
+        This method saves the callbacks on the DashBlueprint object.
         """
         callback = self._collect_callback(*args, **kwargs)
         self.callbacks.append(callback)
@@ -102,12 +104,24 @@ class DashBlueprint:
         return wrapper
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
+        """
+        This method saves the clientside callback on the DashBlueprint object.
+        """
         callback = self._collect_callback(*args, **kwargs)
         callback["f"] = clientside_function
         self.clientside_callbacks.append(callback)
 
-    def register_callbacks(self, app):
+    def register_callbacks(self, app: Union[dash.Dash, DashBlueprint]):
+        """
+        This function registers all callbacks collected by the blueprint onto a Dash (or DashBlueprint) object.
+        """
         callbacks, clientside_callbacks = self._resolve_callbacks()
+        # Move callbacks from one blueprint to another.
+        if isinstance(app, DashProxy):
+            app.blueprint.callbacks += callbacks
+            app.blueprint.clientside_callbacks += clientside_callbacks
+            return
+        # Register callbacks on the "real" app object.
         for cb in callbacks:
             outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
             app.callback(outputs, cb[Input], cb[State], **cb["kwargs"])(cb["f"])
@@ -129,13 +143,13 @@ class DashBlueprint:
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
         return callbacks, clientside_callbacks
 
-    # def register(self, app: dash.Dash, module, prefix=None, **kwargs):
-    #     if prefix is not None:
-    #         prefix_transform = PrefixIdTransform(prefix)
-    #         self.transforms.append(prefix_transform)
-    #         prefix_transform.init(self)
-    #     self._register_callbacks(app)
-    #     dash.register_page(module, layout=self._layout_value, **kwargs)
+    def register_page(self, app: Union[dash.Dash, DashProxy], name, prefix=None, **kwargs):
+        if prefix is not None:
+            prefix_transform = PrefixIdTransform(prefix)
+            self.transforms.append(prefix_transform)
+            prefix_transform.init(self)
+        self.register_callbacks(app)
+        dash.register_page(name, layout=self._layout_value, **kwargs)
 
     def clear(self):
         self.callbacks = []
@@ -165,6 +179,12 @@ class DashBlueprint:
 
 
 class DashProxy(dash.Dash):
+    """
+    DashProxy is a wrapper around the DashBlueprint object enabling drop-in replacement of the original Dash object. It
+    enables transforms (via the DashBlueprint object), performs the necessary app configuration for all transforms to
+    work (e.g. setting a secret key on the server), and exposes convenience functions such as 'hijack'.
+    """
+
     def __init__(self, *args, transforms=None, include_global_callbacks=True, **kwargs):
         super().__init__(*args, **kwargs)
         self.blueprint = DashBlueprint(transforms, include_global_callbacks=include_global_callbacks)
@@ -173,12 +193,9 @@ class DashProxy(dash.Dash):
         return self.blueprint.callback(*args, **kwargs)
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
-        return self.blueprint.clientside_callback(*args, **kwargs)
+        return self.blueprint.clientside_callback(clientside_function, *args, **kwargs)
 
     def _setup_server(self):
-        """
-        This method registers the callbacks on the Dash app and injects a session secret.
-        """
         # Register the callbacks.
         self.blueprint.register_callbacks(super())
         # Proceed as normally.
@@ -188,6 +205,9 @@ class DashProxy(dash.Dash):
             self.server.secret_key = secrets.token_urlsafe(16)
 
     def hijack(self, app: dash.Dash):
+        """
+        Hijack another app. Typically, used with Dataiku 10 where the Dash object is instantiated outside user code.
+        """
         # Change properties.
         app.config.update(self.config)
         app.title = self.title
@@ -202,9 +222,6 @@ class DashProxy(dash.Dash):
             app.server.secret_key = secrets.token_urlsafe(16)
 
     def _layout_value(self):
-        """
-        Delegate layout value (and property setter/getter) to blueprint.
-        """
         return self.blueprint._layout_value()
 
     @property
