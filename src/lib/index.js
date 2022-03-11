@@ -10,6 +10,7 @@ import DeferScript from "./components/DeferScript.react";
 import Purify from "./components/Purify.react";
 import EventListener from "./components/EventListener.react";
 import EventSource from "./components/EventSource.react";
+import ListOperator from "./components/ListOperator.react";
 
 export {
     Lottie,
@@ -23,4 +24,5 @@ export {
     Purify,
     EventListener,
     EventSource,
+    ListOperator
 };

@@ -39,19 +39,45 @@ from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
-from typing import Dict, Callable, List, Union
+from typing import Dict, Callable, List, Union, Any, Tuple
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
-
 # region Dash blueprint
+
+CbInput = Union[State, Input]
+
+
+class CallbackBlueprint:
+    def __init__(self, *args, **kwargs):
+        self.outputs: List[Output] = []
+        self.inputs: List[CbInput] = []
+        self._collect_args(args)
+        self.kwargs: Dict[str, Any] = kwargs
+        self.f = None
+
+    def _collect_args(self, args: Union[Tuple[Any], List[Any]]):
+        for arg in args:
+            if isinstance(arg, (list, tuple)):
+                self._collect_args(arg)
+                continue
+            if isinstance(arg, Output):
+                self.outputs.append(arg)
+                continue
+            # TODO: Split in input/state or not?
+            if isinstance(arg, (Input, State)):
+                self.inputs.append(arg)
+                continue
+            # If we get here, the argument was not recognized.
+            msg = f"Callback blueprint received an unsupported argument: {arg}"
+            raise ValueError(msg)
+
 
 class DashBlueprint:
     def __init__(self, transforms: List[DashTransform] = None, include_global_callbacks: bool = False):
-        self.callbacks = []
-        self.clientside_callbacks = []
-        self.arg_types = [Output, Input, State]
+        self.callbacks: List[CallbackBlueprint] = []
+        self.clientside_callbacks: List[CallbackBlueprint] = []
         self.transforms = _resolve_transforms(transforms)
         self._layout = None
         self._layout_is_function = False
@@ -60,46 +86,15 @@ class DashBlueprint:
         for transform in self.transforms:
             transform.init(self)
 
-    def _collect_callback(self, *args, **kwargs):
-        """
-        This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
-        """
-        # Parse Output/Input/State (could be made simpler by enforcing input structure)
-        keys = ["output", "inputs", "state"]
-        args = list(args) + list(flatten([_extract_list_from_kwargs(kwargs, key) for key in keys]))
-        callback = {arg_type: [] for arg_type in self.arg_types}
-        arg_order = []
-        multi_output = False
-        for arg in args:
-            elements = _as_list(arg)
-            for element in elements:
-                for key in callback:
-                    if isinstance(element, key):
-                        # Check if this is a wild card output.
-                        if not multi_output and isinstance(element, Output):
-                            component_id = element.component_id
-                            if isinstance(component_id, dict):
-                                multi_output = any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
-                        callback[key].append(element)
-                        arg_order.append(element)
-        if not multi_output:
-            multi_output = len(callback[Output]) > 1
-        # Save the kwargs for later.
-        callback["kwargs"] = kwargs
-        callback["sorted_args"] = arg_order
-        callback["multi_output"] = multi_output
-
-        return callback
-
     def callback(self, *args, **kwargs):
         """
-        This method saves the callbacks on the DashBlueprint object.
+        This method saves the callback on the DashBlueprint object.
         """
-        callback = self._collect_callback(*args, **kwargs)
-        self.callbacks.append(callback)
+        cbp = CallbackBlueprint(*args, **kwargs)
+        self.callbacks.append(cbp)
 
         def wrapper(f):
-            callback["f"] = f
+            cbp.f = f
 
         return wrapper
 
@@ -107,9 +102,9 @@ class DashBlueprint:
         """
         This method saves the clientside callback on the DashBlueprint object.
         """
-        callback = self._collect_callback(*args, **kwargs)
-        callback["f"] = clientside_function
-        self.clientside_callbacks.append(callback)
+        cbp = CallbackBlueprint(*args, **kwargs)
+        cbp.f = clientside_function
+        self.clientside_callbacks.append(cbp)
 
     def register_callbacks(self, app: Union[dash.Dash, DashBlueprint]):
         """
@@ -122,14 +117,14 @@ class DashBlueprint:
             app.blueprint.clientside_callbacks += clientside_callbacks
             return
         # Register callbacks on the "real" app object.
-        for cb in callbacks:
-            outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
-            app.callback(outputs, cb[Input], cb[State], **cb["kwargs"])(cb["f"])
-        for cb in clientside_callbacks:
-            outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
-            app.clientside_callback(cb["f"], outputs, cb[Input], cb[State], **cb["kwargs"])
+        for cbp in callbacks:
+            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
+            app.callback(o, cbp.inputs, **cbp.kwargs)(cbp.f)
+        for cbp in clientside_callbacks:
+            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
+            app.clientside_callback(cbp.f, o, cbp.inputs, **cbp.kwargs)
 
-    def _resolve_callbacks(self):
+    def _resolve_callbacks(self) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
         """
         This method resolves the callbacks, i.e. it applies the callback injections.
         """
@@ -143,7 +138,8 @@ class DashBlueprint:
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
         return callbacks, clientside_callbacks
 
-    def register_page(self, app: Union[dash.Dash, DashProxy], name, prefix=None, **kwargs):
+    # TODO: Include or not? The plugin still seems a bit immature.
+    def register(self, app: Union[dash.Dash, DashProxy], name, prefix=None, **kwargs):
         if prefix is not None:
             prefix_transform = PrefixIdTransform(prefix)
             self.transforms.append(prefix_transform)
@@ -154,7 +150,6 @@ class DashBlueprint:
     def clear(self):
         self.callbacks = []
         self.clientside_callbacks = []
-        self.arg_types = [Output, Input, State]
         self.transforms = []
 
     def _layout_value(self):
