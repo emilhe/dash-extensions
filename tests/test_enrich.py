@@ -278,11 +278,11 @@ def test_serverside_output_transform(dash_duo):
         return data.to_json()
 
     # Check that stuff works. It doesn't using a normal Dash object.
-    dash_duo.start_server(app, port=9999)
+    dash_duo.start_server(app)
     assert dash_duo.find_element("#store").text == ""
     assert dash_duo.find_element("#log").text == ""
     dash_duo.find_element("#btn").click()
-    time.sleep(0.1)  # wait for callback code to execute.
+    time.sleep(0.2)  # wait for callback code to execute.
     assert dash_duo.find_element("#store").text != ""
     assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
 
