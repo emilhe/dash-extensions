@@ -1,13 +1,19 @@
 from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
-    TriggerTransform, MultiplexerTransform, PrefixIdTransform
+    TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback
 
-def _get_basic_dash_proxy() -> DashProxy:
+
+def _get_basic_dash_proxy(bind_callbacks=True) -> DashProxy:
+    # Setup app.
     app = DashProxy()
     app.layout = html.Div([
         html.Button(id="btn"),
         html.Div(id="log_server"),
         html.Div(id="log_client")
     ])
+    if not bind_callbacks:
+        return app
+
+    # Setup callbacks.
     app.clientside_callback("function(x){return x;}",
                             Output("log_client", "children"), Input("btn", "n_clicks"))
 
@@ -16,6 +22,7 @@ def _get_basic_dash_proxy() -> DashProxy:
         return n_clicks
 
     return app
+
 
 def test_callback_blueprint():
     # Test single element.
@@ -167,3 +174,30 @@ def test_prefix_id_transform(dash_duo):
     dash_duo.find_element("#stuff-btn").click()
     assert log_server.text == "1"
     assert log_client.text == "1"
+
+
+def test_global_blueprint(dash_duo):
+    app = _get_basic_dash_proxy(False)
+    clientside_callback("function(x){return x;}",
+                        Output("log_client", "children"), Input("btn", "n_clicks"))
+
+    @callback(Output("log_server", "children"), Input("btn", "n_clicks"))
+    def update_log(n_clicks):
+        return n_clicks
+
+    return app
+
+
+def test_serverside_output_transform():
+    # TODO: Add test
+    assert True
+
+
+def test_log_transform():
+    # TODO: Add test
+    assert True
+
+
+def test_blocking_callback_transform():
+    # TODO: Add test
+    assert True
