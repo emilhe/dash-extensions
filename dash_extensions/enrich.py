@@ -745,7 +745,7 @@ class MultiplexerTransform(DashTransform):
         # Group by output.
         output_map = defaultdict(list)
         for callback in all_callbacks:
-            for output in callback[Output]:
+            for output in callback.outputs:
                 output_map[output].append(callback)
         # Apply multiplexer where needed.
         for output in output_map:
@@ -765,7 +765,7 @@ class MultiplexerTransform(DashTransform):
             # Create proxy element.
             proxies.append(_mp_element(mp_id_escaped))
             # Assign proxy element as output.
-            callback[Output][callback[Output].index(output)] = Output(mp_id_escaped, _mp_prop())
+            callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped, _mp_prop())
             # Create proxy input.
             inputs.append(Input(mp_id, _mp_prop()))
         # Collect proxy elements to add to layout.

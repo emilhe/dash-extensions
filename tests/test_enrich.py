@@ -1,6 +1,5 @@
 from enrich import DashBlueprint, Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
-    TriggerTransform
-from dash import Dash
+    TriggerTransform, MultiplexerTransform
 
 
 def test_callback_blueprint():
@@ -123,6 +122,33 @@ def test_trigger_transform(dash_duo):
     dash_duo.find_element("#btn3").click()
     assert log.text == "1-1"
 
+
+def test_multiplexer_transform(dash_duo):
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[MultiplexerTransform()])
+    app.layout = html.Div([
+        html.Button(id="left"),
+        html.Button(id="right"),
+        html.Div(id="log"),
+    ])
+
+    @app.callback(Output("log", "children"), Input("left", "n_clicks"))
+    def update_left(_):
+        return "left"
+
+    @app.callback(Output("log", "children"), Input("right", "n_clicks"))
+    def update_right(_):
+        return "right"
+
+    # Check that the app works.
+    dash_duo.start_server(app)
+    log = dash_duo.find_element("#log")
+    assert log.text == ""
+    dash_duo.find_element("#left").click()
+    dash_duo.wait_for_text_to_equal("#log", "left", timeout=0.1)
+    assert log.text == "left"
+    dash_duo.find_element("#right").click()
+    dash_duo.wait_for_text_to_equal("#log", "right", timeout=0.1)
+    assert log.text == "right"
 
 
 def test_parse_callbacks():
