@@ -36,6 +36,7 @@ def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
     for element in elements:
         assert element.text == ""
     dash_duo.find_element(f"#{btn_id}").click()
+    time.sleep(0.1)
     for element in elements:
         assert element.text == "1"
 
@@ -138,12 +139,16 @@ def test_trigger_transform(dash_duo):
     log = dash_duo.find_element("#log")
     assert log.text == ""
     dash_duo.find_element("#btn1").click()
+    time.sleep(0.1)
     assert log.text == "None-None"
     dash_duo.find_element("#btn2").click()
+    time.sleep(0.1)
     assert log.text == "1-None"
     dash_duo.find_element("#btn4").click()
+    time.sleep(0.1)
     assert log.text == "1-None"
     dash_duo.find_element("#btn3").click()
+    time.sleep(0.1)
     assert log.text == "1-1"
 
 
@@ -242,12 +247,12 @@ def test_log_transform(dash_duo):
 
 def test_blocking_callback_transform(dash_duo):
     app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
-    app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=1000)])
+    app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=500)])
     msg = "Hello world!"
 
     @app.callback(Output("log", "children"), Input("trigger", "n_intervals"), blocking=True)
     def update(_):
-        time.sleep(2)
+        time.sleep(1)
         return msg
 
     # Check that stuff works. It doesn't using a normal Dash object.
