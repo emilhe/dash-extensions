@@ -475,19 +475,20 @@ class DashLogger:
 
 
 class LogTransform(DashTransform):
-    def __init__(self, log_config=None):
+    def __init__(self, log_config=None, try_use_mantine=True):
         super().__init__()
         self.components = []
-        if log_config is None:
-            # If no config is provided, try to use dmc notification system.
+        # Per default, try to use dmc notification system.
+        if log_config is None and try_use_mantine:
             try:
-                # raise ImportError
                 log_config = setup_notifications_log_config(self.components)
-            # If dmc is not installed, use a div.
             except ImportError:
                 msg = "Failed to import dash-mantine-components, falling back to simple div for log output."
                 logging.warning(msg)
-                log_config = setup_div_log_config(self.components)
+        # Otherwise, use simple div.
+        if log_config is None:
+            log_config = setup_div_log_config(self.components)
+        # Bind the resulting log config.
         self.log_config = log_config
 
     def transform_layout(self, layout):
@@ -500,14 +501,14 @@ class LogTransform(DashTransform):
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
-            if not callback["kwargs"].get("log", None):
+            if not callback.kwargs.get("log", None):
                 continue
             # Add the log component as output.
-            callback[Output].append(self.log_config.log_output)
+            callback.outputs.append(self.log_config.log_output)
             # Modify the callback function accordingly.
-            f = callback["f"]
+            f = callback.f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback["f"] = bind_logger(logger)(f)
+            callback.f = bind_logger(logger)(f)
 
         return callbacks
 

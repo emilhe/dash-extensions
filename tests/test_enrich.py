@@ -1,27 +1,38 @@
 from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
-    TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback
+    TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
+    setup_notifications_log_config, setup_div_log_config
 
 
-def _get_basic_dash_proxy(bind_callbacks=True) -> DashProxy:
-    # Setup app.
-    app = DashProxy()
+def _get_basic_dash_proxy(**kwargs) -> DashProxy:
+    app = DashProxy(**kwargs)
     app.layout = html.Div([
         html.Button(id="btn"),
         html.Div(id="log_server"),
         html.Div(id="log_client")
     ])
-    if not bind_callbacks:
-        return app
+    return app
 
-    # Setup callbacks.
-    app.clientside_callback("function(x){return x;}",
-                            Output("log_client", "children"), Input("btn", "n_clicks"))
 
+def _bind_basic_callback(app):
     @app.callback(Output("log_server", "children"), Input("btn", "n_clicks"))
     def update_log(n_clicks):
         return n_clicks
 
-    return app
+
+def _bind_basic_clientside_callback(app):
+    app.clientside_callback("function(x){return x;}",
+                            Output("log_client", "children"), Input("btn", "n_clicks"))
+
+
+def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
+    element_ids = ["log_server", "log_client"] if element_ids is None else element_ids
+    dash_duo.start_server(app)
+    elements = [dash_duo.find_element(f"#{element_id}") for element_id in element_ids]
+    for element in elements:
+        assert element.text == ""
+    dash_duo.find_element(f"#{btn_id}").click()
+    for element in elements:
+        assert element.text == "1"
 
 
 def test_callback_blueprint():
@@ -69,15 +80,10 @@ def test_callback_blueprint():
 
 def test_dash_proxy(dash_duo):
     app = _get_basic_dash_proxy()
+    _bind_basic_callback(app)
+    _bind_basic_clientside_callback(app)
     # Check that both server and client side callbacks work.
-    dash_duo.start_server(app)
-    log_server = dash_duo.find_element("#log_server")
-    log_client = dash_duo.find_element("#log_client")
-    assert log_server.text == ""
-    assert log_client.text == ""
-    dash_duo.find_element("#btn").click()
-    assert log_server.text == "1"
-    assert log_client.text == "1"
+    _basic_dash_proxy_test(dash_duo, app)
 
 
 def test_no_output_transform(dash_duo):
@@ -163,21 +169,15 @@ def test_multiplexer_transform(dash_duo):
 
 
 def test_prefix_id_transform(dash_duo):
-    app = _get_basic_dash_proxy()
-    app.blueprint.transforms.append(PrefixIdTransform(prefix="stuff"))
+    app = _get_basic_dash_proxy(transforms=[PrefixIdTransform(prefix="x")])
+    _bind_basic_callback(app)
+    _bind_basic_clientside_callback(app)
     # Check that both server and client side callbacks work.
-    dash_duo.start_server(app)
-    log_server = dash_duo.find_element("#stuff-log_server")
-    log_client = dash_duo.find_element("#stuff-log_client")
-    assert log_server.text == ""
-    assert log_client.text == ""
-    dash_duo.find_element("#stuff-btn").click()
-    assert log_server.text == "1"
-    assert log_client.text == "1"
+    _basic_dash_proxy_test(dash_duo, app, ["x-log_server", "x-log_client"], "x-btn")
 
 
 def test_global_blueprint(dash_duo):
-    app = _get_basic_dash_proxy(False)
+    app = _get_basic_dash_proxy()
     clientside_callback("function(x){return x;}",
                         Output("log_client", "children"), Input("btn", "n_clicks"))
 
@@ -185,7 +185,7 @@ def test_global_blueprint(dash_duo):
     def update_log(n_clicks):
         return n_clicks
 
-    return app
+    _basic_dash_proxy_test(dash_duo, app)
 
 
 def test_serverside_output_transform():
@@ -193,9 +193,18 @@ def test_serverside_output_transform():
     assert True
 
 
-def test_log_transform():
-    # TODO: Add test
-    assert True
+def test_log_transform(dash_duo):
+    app = _get_basic_dash_proxy(transforms=[LogTransform(try_use_mantine=False)])
+
+    @callback(Output("log_server", "children"), Input("btn", "n_clicks"), log=True)
+    def update_log(n_clicks, dash_logger: DashLogger):
+        dash_logger.info("info")
+        dash_logger.warning("warning")
+        dash_logger.error("error")
+        return n_clicks
+
+    _basic_dash_proxy_test(dash_duo, app, ["log_server"])
+    assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
 
 
 def test_blocking_callback_transform():
