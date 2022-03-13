@@ -242,7 +242,7 @@ def test_log_transform(dash_duo):
 
 
 def test_blocking_callback_transform(dash_duo):
-    app = DashProxy(transforms=[BlockingCallbackTransform(timeout=3)])
+    app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
     app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=1000)])
     msg = "Hello world!"
 
@@ -253,7 +253,7 @@ def test_blocking_callback_transform(dash_duo):
 
     # Check that stuff works. It doesn't using a normal Dash object.
     dash_duo.start_server(app)
-    dash_duo.wait_for_text_to_equal("#log", msg, timeout=3)
+    dash_duo.wait_for_text_to_equal("#log", msg, timeout=5)
     assert dash_duo.find_element("#log").text == msg
 
 
