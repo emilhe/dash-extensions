@@ -240,19 +240,18 @@ def test_serverside_output_transform(dash_duo):
     ])
 
     @app.callback(ServersideOutput("store", "children"), Input("btn", "n_clicks"))
-    def update(_):
-        print("STORE")
+    def update_store(_):
         return pd.DataFrame(columns=["A"], data=[1])
 
     @app.callback(Output("log", "children"), Input("store", "children"))
-    def update(data):
-        print("LOG")
+    def update_log(data):
         return data.to_json()
 
     # Check that stuff works. It doesn't using a normal Dash object.
-    dash_duo.start_server(app)
+    dash_duo.start_server(app, port=9999)
     assert dash_duo.find_element("#store").text == ""
     assert dash_duo.find_element("#log").text == ""
     dash_duo.find_element("#btn").click()
+    time.sleep(0.1)  # wait for callback code to execute
     assert dash_duo.find_element("#store").text != ""
     assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
