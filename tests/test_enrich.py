@@ -49,17 +49,24 @@ def test_dash_proxy(dash_duo):
     app = Dash()
     app.layout = html.Div([
         html.Button(id="btn"),
-        html.Div(id="log")
+        html.Div(id="log_server"),
+        html.Div(id="log_client")
     ])
+    app.clientside_callback("function(x){return x;}",
+                            Output("log_client", "children"), Input("btn", "n_clicks"))
 
-    @app.callback(Output("log", "children"), Input("btn", "n_clicks"))
+    @app.callback(Output("log_server", "children"), Input("btn", "n_clicks"))
     def update_log(n_clicks):
         return n_clicks
 
     dash_duo.start_server(app)
-    a = dash_duo.find_element("#log")
-    # assert dash_duo.find_element("div").children == ""
-    # dash_duo.find_element("#btn").click()
+    log_server = dash_duo.find_element("#log_server")
+    log_client = dash_duo.find_element("#log_client")
+    assert log_server.text == ""
+    assert log_client.text == ""
+    dash_duo.find_element("#btn").click()
+    assert log_server.text == "1"
+    assert log_client.text == "1"
 
 
 def test_parse_callbacks():
