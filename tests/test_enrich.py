@@ -1,5 +1,10 @@
+import time
+
 from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
-    TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform
+    TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
+    BlockingCallbackTransform, dcc
+
+from dash import Dash
 
 # region Test utils/stubs
 
@@ -212,6 +217,17 @@ def test_log_transform(dash_duo):
     assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
 
 
-def test_blocking_callback_transform():
-    # TODO: Add test
-    assert True
+def test_blocking_callback_transform(dash_duo):
+    app = DashProxy(transforms=[BlockingCallbackTransform(timeout=3)])
+    app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=1000)])
+    msg = "Hello world!"
+
+    @app.callback(Output("log", "children"), Input("trigger", "n_intervals"), blocking=True)
+    def update(_):
+        time.sleep(2)
+        return msg
+
+    dash_duo.start_server(app)
+    dash_duo.wait_for_text_to_equal("#log", msg, timeout=3)
+    assert dash_duo.find_element("#log").text == msg
+

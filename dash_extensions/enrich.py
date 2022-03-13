@@ -331,11 +331,11 @@ class BlockingCallbackTransform(DashTransform):
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
-            if not callback["kwargs"].get("blocking", None):
+            if not callback.kwargs.get("blocking", None):
                 continue
 
-            timeout = callback["kwargs"].get("blocking_timeout", self.timeout)
-            callback_id = _get_output_id(callback)
+            timeout = callback.kwargs.get("blocking_timeout", self.timeout)
+            callback_id = callback.uid
             # Bind proxy components.
             start_client_id = f"{callback_id}_start_client"
             end_server_id = f"{callback_id}_end_server"
@@ -367,7 +367,7 @@ class BlockingCallbackTransform(DashTransform):
             self.blueprint.clientside_callback(
                 start_callback,
                 Output(start_client_id, "data"),
-                callback[Input],
+                callback.inputs,
                 [State(start_client_id, "data"), State(end_client_id, "data")],
             )
             # Bind end signal callback.
@@ -375,14 +375,13 @@ class BlockingCallbackTransform(DashTransform):
                 "function(){return new Date().getTime();}", Output(end_client_id, "data"), Input(end_server_id, "data")
             )
             # Modify the original callback to send finished signal.
-            callback[Output].append(Output(end_server_id, "data"))
+            callback.outputs.append(Output(end_server_id, "data"))
             # Modify the original callback to not trigger on inputs, but the new special trigger.
-            new_state = [State(item.component_id, item.component_property) for item in callback[Input]]
-            callback[State] = new_state + callback[State]
-            callback[Input] = [Input(start_client_id, "data")]
+            new_state = [State(item.component_id, item.component_property) for item in callback.inputs]
+            callback.inputs = [Input(start_client_id, "data")] + new_state
             # Modify the callback function accordingly.
-            f = callback["f"]
-            callback["f"] = skip_input_signal_add_output_signal()(f)
+            f = callback.f
+            callback.f = skip_input_signal_add_output_signal()(f)
 
         return callbacks
 
@@ -960,15 +959,6 @@ def _get_cache_id(func, output, args, session_check=None, arg_check=True):
     if session_check:
         all_args += [_get_session_id()]
     return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
-
-
-def _get_output_id(callback):
-    if isinstance(callback["f"], (ClientsideFunction, str)):
-        f_repr = repr(callback["f"])  # handles clientside functions
-    else:
-        f_repr = f"{callback['f'].__module__}.{callback['f'].__name__}"  # handles Python functions
-    f_hash = hashlib.md5(f_repr.encode()).digest()
-    return str(uuid.UUID(bytes=f_hash, version=4))
 
 
 # Interface definition for server stores.
