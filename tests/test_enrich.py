@@ -1,4 +1,5 @@
-from enrich import DashBlueprint, Output, Input, State, CallbackBlueprint, html, DashProxy
+from enrich import DashBlueprint, Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
+    TriggerTransform
 from dash import Dash
 
 
@@ -46,7 +47,7 @@ def test_callback_blueprint():
 
 
 def test_dash_proxy(dash_duo):
-    app = Dash()
+    app = DashProxy()
     app.layout = html.Div([
         html.Button(id="btn"),
         html.Div(id="log_server"),
@@ -67,6 +68,61 @@ def test_dash_proxy(dash_duo):
     dash_duo.find_element("#btn").click()
     assert log_server.text == "1"
     assert log_client.text == "1"
+
+
+def test_no_output_transform(dash_duo):
+    app = DashProxy()
+    app.layout = html.Div([
+        html.Button(id="btn"),
+    ])
+
+    @app.callback(Input("btn", "n_clicks"))
+    def update(n_clicks):
+        return n_clicks
+
+    # Check that the callback doesn't have an output.
+    callbacks, _ = app.blueprint._resolve_callbacks()
+    assert len(callbacks[0].outputs) == 0
+    # Check that the transform fixes it.
+    app.blueprint.transforms.append(NoOutputTransform())
+    callbacks, _ = app.blueprint._resolve_callbacks()
+    assert len(callbacks[0].outputs) == 1
+    # Finally, check that the app works.
+    dash_duo.start_server(app)
+    dash_duo.find_element("#btn").click()
+
+
+def test_trigger_transform(dash_duo):
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[TriggerTransform()])
+    app.layout = html.Div([
+        html.Button(id="btn1"),
+        html.Button(id="btn2"),
+        html.Button(id="btn3"),
+        html.Button(id="btn4"),
+        html.Div(id="log"),
+    ])
+
+    @app.callback(Output("log", "children"),
+                  Trigger("btn1", "n_clicks"),
+                  Input("btn2", "n_clicks"),
+                  Trigger("btn3", "n_clicks"),
+                  State("btn4", "n_clicks"))
+    def update(n_clicks2, n_clicks4):
+        return f"{str(n_clicks2)}-{str(n_clicks4)}"
+
+    # Check that the app works.
+    dash_duo.start_server(app)
+    log = dash_duo.find_element("#log")
+    assert log.text == ""
+    dash_duo.find_element("#btn1").click()
+    assert log.text == "None-None"
+    dash_duo.find_element("#btn2").click()
+    assert log.text == "1-None"
+    dash_duo.find_element("#btn4").click()
+    assert log.text == "1-None"
+    dash_duo.find_element("#btn3").click()
+    assert log.text == "1-1"
+
 
 
 def test_parse_callbacks():

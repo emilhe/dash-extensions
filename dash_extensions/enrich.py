@@ -13,6 +13,7 @@ import plotly
 import dash
 
 # Enable enrich as drop-in replacement for dash
+# noinspection PyUnresolvedReferences
 from dash import (
     no_update,
     Input,
@@ -72,6 +73,15 @@ class CallbackBlueprint:
             # If we get here, the argument was not recognized.
             msg = f"Callback blueprint received an unsupported argument: {arg}"
             raise ValueError(msg)
+
+    @property
+    def uid(self) -> str:
+        if isinstance(self.f, (ClientsideFunction, str)):
+            f_repr = repr(self.f)  # handles clientside functions
+        else:
+            f_repr = f"{self.f.__module__}.{self.f.__name__}"  # handles Python functions
+        f_hash = hashlib.md5(f_repr.encode()).digest()
+        return str(uuid.UUID(bytes=f_hash, version=4))
 
 
 class DashBlueprint:
@@ -180,9 +190,9 @@ class DashProxy(dash.Dash):
     work (e.g. setting a secret key on the server), and exposes convenience functions such as 'hijack'.
     """
 
-    def __init__(self, *args, transforms=None, include_global_callbacks=True, **kwargs):
+    def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.blueprint = DashBlueprint(transforms, include_global_callbacks=include_global_callbacks)
+        self.blueprint = DashBlueprint(transforms, include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
 
     def callback(self, *args, **kwargs):
         return self.blueprint.callback(*args, **kwargs)
@@ -614,13 +624,13 @@ class TriggerTransform(DashTransform):
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
-            is_trigger = trigger_filter(callback["sorted_args"])
+            is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
             # Check if any triggers are there.
             if not any(is_trigger):
                 continue
             # If so, filter the callback args.
-            f = callback["f"]
-            callback["f"] = filter_args(is_trigger)(f)
+            f = callback.f
+            callback.f = filter_args(is_trigger)(f)
         return callbacks
 
 
@@ -1022,10 +1032,10 @@ class NoOutputTransform(DashTransform):
 
     def _apply(self, callbacks):
         for callback in callbacks:
-            if len(callback[Output]) == 0:
-                output_id = _get_output_id(callback)
+            if len(callback.outputs) == 0:
+                output_id = callback.uid
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
-                callback[Output] = [Output(output_id, "children")]
+                callback.outputs.append(Output(output_id, "children"))
                 self.components.append(hidden_div)
         return callbacks
 
