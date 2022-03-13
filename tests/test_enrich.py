@@ -4,9 +4,7 @@ import pandas as pd
 
 from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
-    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput
-
-from dash import Dash
+    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL
 
 
 # region Test utils/stubs
@@ -157,10 +155,7 @@ def test_multiplexer_transform(dash_duo):
         html.Button(id="right"),
         html.Div(id="log"),
     ])
-
-    @app.callback(Output("log", "children"), Input("left", "n_clicks"))
-    def update_left(_):
-        return "left"
+    app.clientside_callback("function(x){return 'left'}", Output("log", "children"), Input("left", "n_clicks"))
 
     @app.callback(Output("log", "children"), Input("right", "n_clicks"))
     def update_right(_):
@@ -178,7 +173,36 @@ def test_multiplexer_transform(dash_duo):
     assert log.text == "right"
 
 
-# TODO: Add more multiplexer tests
+def test_multiplexer_transform_wildcard(dash_duo):
+    def make_callback(i):
+        @app.callback(Output({"type": "div", "id": ALL}, "children"),
+                      Input({"type": f"button{i}", "id": ALL}, "n_clicks"))
+        def func(n):
+            return [f"Hello from group {i}"] * len(n)
+
+    def make_block(i):
+        layout = [
+            html.Button(f"Button 0 in group {i}", id={"type": f"button{i}", "id": "x"}),
+            html.Button(f"Button 1 in group {i}", id={"type": f"button{i}", "id": "y"}),
+            html.Div(f"Div {i}", id={"type": f"div", "id": i}),
+        ]
+        make_callback(i)
+        return layout
+
+    app = DashProxy(transforms=[MultiplexerTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div(make_block("0") + make_block("1"))
+
+    def cssid(**kwargs):
+        # escaped CSS for object IDs
+        kvs = r"\,".join([r"\"" + k + r"\"\:\"" + kwargs[k] + r"\"" for k in kwargs])
+        return r"#\{" + kvs + r"\}"
+
+    dash_duo.start_server(app)
+    dash_duo.find_element(cssid(id="x", type="button0")).click()
+    assert dash_duo.find_element(cssid(id="0", type="div")).text == "Hello from group 0"
+    dash_duo.find_element(cssid(id="y", type="button1")).click()
+    assert dash_duo.find_element(cssid(id="1", type="div")).text == "Hello from group 1"
+
 
 def test_prefix_id_transform(dash_duo):
     app = _get_basic_dash_proxy(transforms=[PrefixIdTransform(prefix="x")])
@@ -295,4 +319,3 @@ def test_serverside_output_transform_memoize(dash_duo):
     assert dash_duo.find_element("#log1").text == "2"
     # Args (i.e. n_clicks) not included in memoize key, i.e. only one call is made.
     assert dash_duo.find_element("#log2").text == "1"
-
