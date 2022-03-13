@@ -196,11 +196,6 @@ def test_global_blueprint(dash_duo):
     _basic_dash_proxy_test(dash_duo, app)
 
 
-def test_serverside_output_transform():
-    # TODO: Add test
-    assert True
-
-
 def test_log_transform(dash_duo):
     app = _get_basic_dash_proxy(transforms=[LogTransform(try_use_mantine=False)])
 
@@ -227,7 +222,12 @@ def test_blocking_callback_transform(dash_duo):
         time.sleep(2)
         return msg
 
+    # Check that stuff works. It doesn't using a normal Dash object.
     dash_duo.start_server(app)
     dash_duo.wait_for_text_to_equal("#log", msg, timeout=3)
     assert dash_duo.find_element("#log").text == msg
 
+
+def test_serverside_output_transform():
+    # TODO: Add test
+    assert True
