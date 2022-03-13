@@ -1,7 +1,7 @@
 from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
-    TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
-    setup_notifications_log_config, setup_div_log_config
+    TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform
 
+# region Test utils/stubs
 
 def _get_basic_dash_proxy(**kwargs) -> DashProxy:
     app = DashProxy(**kwargs)
@@ -34,6 +34,8 @@ def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
     for element in elements:
         assert element.text == "1"
 
+
+# endregion
 
 def test_callback_blueprint():
     # Test single element.
@@ -185,6 +187,7 @@ def test_global_blueprint(dash_duo):
     def update_log(n_clicks):
         return n_clicks
 
+    # Check that callbacks work.
     _basic_dash_proxy_test(dash_duo, app)
 
 
@@ -203,7 +206,9 @@ def test_log_transform(dash_duo):
         dash_logger.error("error")
         return n_clicks
 
+    # Check that stuff works.
     _basic_dash_proxy_test(dash_duo, app, ["log_server"])
+    # Check that log is written to div element.
     assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
 
 
