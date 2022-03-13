@@ -8,6 +8,7 @@ from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoO
 
 from dash import Dash
 
+
 # region Test utils/stubs
 
 def _get_basic_dash_proxy(**kwargs) -> DashProxy:
@@ -176,6 +177,7 @@ def test_multiplexer_transform(dash_duo):
     dash_duo.wait_for_text_to_equal("#log", "right", timeout=0.1)
     assert log.text == "right"
 
+
 # TODO: Add more multiplexer tests
 
 def test_prefix_id_transform(dash_duo):
@@ -240,7 +242,7 @@ def test_serverside_output_transform(dash_duo):
     ])
 
     @app.callback(ServersideOutput("store", "children"), Input("btn", "n_clicks"))
-    def update_store(_):
+    def update_default(_):
         return pd.DataFrame(columns=["A"], data=[1])
 
     @app.callback(Output("log", "children"), Input("store", "children"))
@@ -252,6 +254,45 @@ def test_serverside_output_transform(dash_duo):
     assert dash_duo.find_element("#store").text == ""
     assert dash_duo.find_element("#log").text == ""
     dash_duo.find_element("#btn").click()
-    time.sleep(0.1)  # wait for callback code to execute
+    time.sleep(0.1)  # wait for callback code to execute.
     assert dash_duo.find_element("#store").text != ""
     assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
+
+
+def test_serverside_output_transform_memoize(dash_duo):
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
+    app.layout = html.Div([
+        html.Button(id="btn"),
+        html.Div(id="store1"),
+        html.Div(id="store2"),
+        html.Div(id="log1", children="0"),
+        html.Div(id="log2", children="0"),
+    ])
+
+    @app.callback(ServersideOutput("store1", "children"), Input("btn", "n_clicks"), memoize=True)
+    def update_store1(n_clicks):
+        return n_clicks
+
+    @app.callback(Output("log1", "children"), Input("store1", "children"))
+    def update_log1(n_clicks):
+        return n_clicks
+
+    @app.callback(ServersideOutput("store2", "children", arg_check=False), Input("btn", "n_clicks"), memoize=True)
+    def update_store2(n_clicks):
+        return n_clicks
+
+    @app.callback(Output("log2", "children"), Input("store2", "children"))
+    def update_log2(n_clicks):
+        return n_clicks
+
+    # Check that stuff works. It doesn't using a normal Dash object.
+    dash_duo.start_server(app)
+    dash_duo.find_element("#btn").click()
+    time.sleep(0.1)
+    dash_duo.find_element("#btn").click()
+    time.sleep(0.1)
+    # Args (i.e. n_clicks) included in memoize key, i.e. a call is made on every click.
+    assert dash_duo.find_element("#log1").text == "2"
+    # Args (i.e. n_clicks) not included in memoize key, i.e. only one call is made.
+    assert dash_duo.find_element("#log2").text == "1"
+
