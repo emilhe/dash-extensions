@@ -83,6 +83,19 @@ class CallbackBlueprint:
         f_hash = hashlib.md5(f_repr.encode()).digest()
         return str(uuid.UUID(bytes=f_hash, version=4))
 
+    @property
+    def multi_output(self) -> bool:
+        # Check if there are more than  1 output.
+        if len(self.outputs) > 1:
+            return True
+        # Check for wild card output(s).
+        component_id = self.outputs[0].component_id
+        if not isinstance(component_id, dict):
+            return False
+        # The ALL and ALLSMALLER flags indicate multi output.
+        return any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
+
+
 
 class DashBlueprint:
     def __init__(self, transforms: List[DashTransform] = None, include_global_callbacks: bool = False):
@@ -92,9 +105,6 @@ class DashBlueprint:
         self._layout = None
         self._layout_is_function = False
         self.include_global_callbacks = include_global_callbacks
-        # Do the transform initialization.
-        for transform in self.transforms:
-            transform.init(self)
 
     def callback(self, *args, **kwargs):
         """
@@ -153,7 +163,6 @@ class DashBlueprint:
         if prefix is not None:
             prefix_transform = PrefixIdTransform(prefix)
             self.transforms.append(prefix_transform)
-            prefix_transform.init(self)
         self.register_callbacks(app)
         dash.register_page(name, layout=self._layout_value, **kwargs)
 
@@ -266,9 +275,6 @@ def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
 class DashTransform:
     def __init__(self):
         self.layout_initialized = False
-
-    def init(self, dt):
-        pass
 
     def apply(self, callbacks, clientside_callbacks):
         return self.apply_serverside(callbacks), self.apply_clientside(clientside_callbacks)
@@ -819,11 +825,6 @@ class ServersideOutputTransform(DashTransform):
         self.session_check = session_check
         self.arg_check = arg_check
 
-    def init(self, dt):
-        # Set session secret (if not already set).
-        if not dt.server.secret_key:
-            dt.server.secret_key = secrets.token_urlsafe(16)
-
     # NOTE: Doesn't make sense for clientside callbacks.
 
     def apply_serverside(self, callbacks):
@@ -832,10 +833,10 @@ class ServersideOutputTransform(DashTransform):
         serverside_output_map = {}
         for callback in callbacks:
             # If memoize keyword is used, serverside caching is needed.
-            memoize = callback["kwargs"].get("memoize", None)
+            memoize = callback.kwargs.get("memoize", None)
             serverside = False
             # Keep tract of which outputs are server side outputs.
-            for output in callback[Output]:
+            for output in callback.outputs:
                 if isinstance(output, ServersideOutput):
                     serverside_output_map[_create_callback_id(output)] = output
                     serverside = True
@@ -851,21 +852,21 @@ class ServersideOutputTransform(DashTransform):
         # 2) Inject cached data into callbacks.
         for callback in callbacks:
             # Figure out which args need loading.
-            items = callback[Input] + callback[State]
+            items = callback.inputs
             item_ids = [_create_callback_id(item) for item in items]
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
             if any(serverside_outputs):
-                f = callback["f"]
-                callback["f"] = _unpack_outputs(serverside_outputs)(f)
+                f = callback.f
+                callback.f = _unpack_outputs(serverside_outputs)(f)
         # 3) Apply the caching itself.
         for i, callback in enumerate(serverside_callbacks):
-            f = callback["f"]
-            callback["f"] = _pack_outputs(callback)(f)
+            f = callback.f
+            callback.f = _pack_outputs(callback)(f)
         # 4) Strip special args.
         for callback in callbacks:
             for key in ["memoize"]:
-                callback["kwargs"].pop(key, None)
+                callback.kwargs.pop(key, None)
 
         return callbacks
 
@@ -895,20 +896,20 @@ def _unpack_outputs(serverside_outputs):
 
 
 def _pack_outputs(callback):
-    memoize = callback["kwargs"].get("memoize", None)
+    memoize = callback.kwargs.get("memoize", None)
 
     def packed_callback(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            multi_output = callback["multi_output"]
+            multi_output = callback.multi_output
             # If memoize is enabled, we check if the cache already has a valid value.
             if memoize:
                 # Figure out if an update is necessary.
                 unique_ids = []
                 update_needed = False
-                for i, output in enumerate(callback[Output]):
+                for i, output in enumerate(callback.outputs):
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = trigger_filter(callback["sorted_args"])
+                    is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
                     filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     # Generate unique ID.
                     unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
@@ -920,8 +921,8 @@ def _pack_outputs(callback):
                 if not update_needed:
                     results = [
                         uid
-                        if isinstance(callback[Output][i], ServersideOutput)
-                        else callback[Output][i].backend.get(uid)
+                        if isinstance(callback.outputs[i], ServersideOutput)
+                        else callback.outputs[i].backend.get(uid)
                         for i, uid in enumerate(unique_ids)
                     ]
                     return results if multi_output else results[0]
@@ -930,15 +931,15 @@ def _pack_outputs(callback):
             data = list(data) if multi_output else [data]
             if callable(memoize):
                 data = memoize(data)
-            for i, output in enumerate(callback[Output]):
+            for i, output in enumerate(callback.outputs):
                 # Skip no_update updates.
                 if isinstance(data[i], type(no_update)):
                     continue
                 # Replace only for server side outputs.
-                serverside_output = isinstance(callback[Output][i], ServersideOutput)
+                serverside_output = isinstance(callback.outputs[i], ServersideOutput)
                 if serverside_output or memoize:
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = trigger_filter(callback["sorted_args"])
+                    is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
                     filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
                     output.backend.set(unique_id, data[i])

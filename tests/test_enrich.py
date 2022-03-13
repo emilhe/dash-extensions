@@ -1,8 +1,10 @@
 import time
 
+import pandas as pd
+
 from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
-    BlockingCallbackTransform, dcc
+    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput
 
 from dash import Dash
 
@@ -174,6 +176,7 @@ def test_multiplexer_transform(dash_duo):
     dash_duo.wait_for_text_to_equal("#log", "right", timeout=0.1)
     assert log.text == "right"
 
+# TODO: Add more multiplexer tests
 
 def test_prefix_id_transform(dash_duo):
     app = _get_basic_dash_proxy(transforms=[PrefixIdTransform(prefix="x")])
@@ -228,6 +231,28 @@ def test_blocking_callback_transform(dash_duo):
     assert dash_duo.find_element("#log").text == msg
 
 
-def test_serverside_output_transform():
-    # TODO: Add test
-    assert True
+def test_serverside_output_transform(dash_duo):
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
+    app.layout = html.Div([
+        html.Button(id="btn"),
+        html.Div(id="store"),
+        html.Div(id="log"),
+    ])
+
+    @app.callback(ServersideOutput("store", "children"), Input("btn", "n_clicks"))
+    def update(_):
+        print("STORE")
+        return pd.DataFrame(columns=["A"], data=[1])
+
+    @app.callback(Output("log", "children"), Input("store", "children"))
+    def update(data):
+        print("LOG")
+        return data.to_json()
+
+    # Check that stuff works. It doesn't using a normal Dash object.
+    dash_duo.start_server(app)
+    assert dash_duo.find_element("#store").text == ""
+    assert dash_duo.find_element("#log").text == ""
+    dash_duo.find_element("#btn").click()
+    assert dash_duo.find_element("#store").text != ""
+    assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
