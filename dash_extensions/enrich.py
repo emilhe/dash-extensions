@@ -556,8 +556,10 @@ class PrefixIdTransform(DashTransform):
 
     def _apply(self, callbacks):
         for callback in callbacks:
-            for arg in callback["sorted_args"]:
-                arg.component_id = apply_prefix(self.prefix, arg.component_id)
+            for i in callback.inputs:
+                i.component_id = apply_prefix(self.prefix, i.component_id)
+            for o in callback.outputs:
+                o.component_id = apply_prefix(self.prefix, o.component_id)
         return callbacks
 
     def apply_serverside(self, callbacks):

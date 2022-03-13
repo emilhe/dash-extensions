@@ -1,6 +1,21 @@
-from enrich import DashBlueprint, Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
-    TriggerTransform, MultiplexerTransform
+from enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
+    TriggerTransform, MultiplexerTransform, PrefixIdTransform
 
+def _get_basic_dash_proxy() -> DashProxy:
+    app = DashProxy()
+    app.layout = html.Div([
+        html.Button(id="btn"),
+        html.Div(id="log_server"),
+        html.Div(id="log_client")
+    ])
+    app.clientside_callback("function(x){return x;}",
+                            Output("log_client", "children"), Input("btn", "n_clicks"))
+
+    @app.callback(Output("log_server", "children"), Input("btn", "n_clicks"))
+    def update_log(n_clicks):
+        return n_clicks
+
+    return app
 
 def test_callback_blueprint():
     # Test single element.
@@ -46,19 +61,8 @@ def test_callback_blueprint():
 
 
 def test_dash_proxy(dash_duo):
-    app = DashProxy()
-    app.layout = html.Div([
-        html.Button(id="btn"),
-        html.Div(id="log_server"),
-        html.Div(id="log_client")
-    ])
-    app.clientside_callback("function(x){return x;}",
-                            Output("log_client", "children"), Input("btn", "n_clicks"))
-
-    @app.callback(Output("log_server", "children"), Input("btn", "n_clicks"))
-    def update_log(n_clicks):
-        return n_clicks
-
+    app = _get_basic_dash_proxy()
+    # Check that both server and client side callbacks work.
     dash_duo.start_server(app)
     log_server = dash_duo.find_element("#log_server")
     log_client = dash_duo.find_element("#log_client")
@@ -151,45 +155,15 @@ def test_multiplexer_transform(dash_duo):
     assert log.text == "right"
 
 
-def test_parse_callbacks():
-    output_test, input_test, state_test = Output("x", "prop"), Input("y", "prop"), State("z", "prop")
-    kwargs = dict(hello="world")
-    callback_result = "result"
-    expected = {Output: [output_test], Input: [input_test], State: [state_test], 'kwargs': kwargs,
-                'multi_output': False, 'sorted_args': [output_test, input_test, state_test], "f": callback_result}
-
-    # Single element syntax.
-
-    dbp = DashBlueprint()
-
-    @dbp.callback(output_test, input_test, state_test, **kwargs)
-    def callback():
-        return callback_result
-
-    cb = dbp.callbacks[0]
-    cb["f"] = cb["f"]()
-    assert expected == dbp.callbacks[0]
-
-    # List syntax
-
-    dbp = DashBlueprint()
-
-    @dbp.callback([output_test], [input_test], [state_test], **kwargs)
-    def callback():
-        return callback_result
-
-    cb = dbp.callbacks[0]
-    cb["f"] = cb["f"]()
-    assert expected == dbp.callbacks[0]
-
-    # Mixed syntax
-
-    dbp = DashBlueprint()
-
-    @dbp.callback([output_test], input_test, [state_test], **kwargs)
-    def callback():
-        return callback_result
-
-    cb = dbp.callbacks[0]
-    cb["f"] = cb["f"]()
-    assert expected == dbp.callbacks[0]
+def test_prefix_id_transform(dash_duo):
+    app = _get_basic_dash_proxy()
+    app.blueprint.transforms.append(PrefixIdTransform(prefix="stuff"))
+    # Check that both server and client side callbacks work.
+    dash_duo.start_server(app)
+    log_server = dash_duo.find_element("#stuff-log_server")
+    log_client = dash_duo.find_element("#stuff-log_client")
+    assert log_server.text == ""
+    assert log_client.text == ""
+    dash_duo.find_element("#stuff-btn").click()
+    assert log_server.text == "1"
+    assert log_client.text == "1"
