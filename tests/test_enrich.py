@@ -3,7 +3,7 @@ import pandas as pd
 
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
-    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL
+    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, FileSystemStore
 
 
 # region Test utils/stubs
@@ -262,7 +262,9 @@ def test_blocking_callback_transform(dash_duo):
 
 
 def test_serverside_output_transform(dash_duo):
-    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
+    fss = FileSystemStore("/tmp/file_system_store")
+    transforms = [ServersideOutputTransform(backend=fss)]
+    app = DashProxy(prevent_initial_callbacks=True, transforms=transforms)
     app.layout = html.Div([
         html.Button(id="btn"),
         html.Div(id="store"),
