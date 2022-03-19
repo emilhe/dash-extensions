@@ -7,17 +7,19 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-dash = "^2.2.0"
+dash = "^2.3.0"
 more-itertools = "^8.12.0"
 jsbeautifier = "^1.14.0"
 Flask-Caching = "^1.10.1"
 
 [tool.poetry.dev-dependencies]
-dash = {extras = ["dev", "testing"], version = "^2.2.0"}
+dash = {extras = ["dev", "testing"], version = "^2.3.0"}
 pytest-cov = "^3.0.0"
 black = "^22.1.0"
 pandas = "^1.4.1"
 quart = "^0.16.3"
+starlette = "^0.19.0"
+uvicorn = "^0.17.6"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

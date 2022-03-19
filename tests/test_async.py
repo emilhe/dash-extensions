@@ -13,6 +13,7 @@ server_port = 5001
 sse_server_url = f"http://127.0.0.1:{server_port}"
 ws_server_url = f"ws://127.0.0.1:{server_port}/ws"
 
+
 def run_server():
     uvicorn.run(async_server, port=server_port)
 
