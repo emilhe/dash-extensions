@@ -6,7 +6,7 @@ category = "dev"
 optional = false
 python-versions = ">=3.6,<4.0"
 
- [[package]]
+[[package]]
 name = "anyio"
 version = "3.5.0"
 description = "High level compatibility layer for multiple asynchronous event loop implementations"
@@ -806,6 +806,17 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
+name = "sse-starlette"
+version = "0.10.3"
+description = "\"SSE plugin for Starlette\""
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+starlette = "*"
+
+[[package]]
 name = "starlette"
 version = "0.19.0"
 description = "The little ASGI library that shines."
@@ -966,7 +977,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "0e29c0948d8d4dbc7a5b8b1df6aedfb42c8cb5bbcf49bd9d570984c9e6b69061"
+content-hash = "63750f8806e27e03e50b9fe5455aae93691f6f23f94a46ee244cc93126a87a5c"
 
 [metadata.files]
 aiofiles = [
@@ -1593,6 +1604,10 @@ sortedcontainers = [
 soupsieve = [
     {file = "soupsieve-2.3.1-py3-none-any.whl", hash = "sha256:1a3cca2617c6b38c0343ed661b1fa5de5637f257d4fe22bd9f1338010a1efefb"},
     {file = "soupsieve-2.3.1.tar.gz", hash = "sha256:b8d49b1cd4f037c7082a9683dfa1801aa2597fb11c3a1155b7a5b94829b4f1f9"},
+]
+sse-starlette = [
+    {file = "sse-starlette-0.10.3.tar.gz", hash = "sha256:840607fed361360cc76f8408a25f0eca887e7cab3c3ee44f9762f179428e2bd4"},
+    {file = "sse_starlette-0.10.3-py3-none-any.whl", hash = "sha256:ca2de945af80b83f1efda6144df9e13db83880b3b87c660044b64f199395e8b7"},
 ]
 starlette = [
     {file = "starlette-0.19.0-py3-none-any.whl", hash = "sha256:de752c8f6c2ac6ef78bfe44058fc61dc04895eba24d4e47d2ae254ba5c125c5e"},
