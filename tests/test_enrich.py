@@ -1,6 +1,5 @@
 import time
 import pandas as pd
-import pytest
 
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
@@ -272,7 +271,6 @@ def test_serverside_output_transform(dash_duo):
     assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
 
 
-@pytest.mark.xfail(reason="Must be run separately to work.")
 def test_serverside_output_transform_memoize(dash_duo):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
     app.layout = html.Div([
@@ -291,7 +289,8 @@ def test_serverside_output_transform_memoize(dash_duo):
     def update_log1(n_clicks):
         return n_clicks
 
-    @app.callback(ServersideOutput("store2", "children", arg_check=False), Input("btn", "n_clicks"), memoize=True)
+    @app.callback(ServersideOutput("store2", "children", arg_check=False, session_check=False),
+                  Input("btn", "n_clicks"), memoize=True)
     def update_store2(n_clicks):
         return n_clicks
 
@@ -302,11 +301,10 @@ def test_serverside_output_transform_memoize(dash_duo):
     # Check that stuff works. It doesn't using a normal Dash object.
     dash_duo.start_server(app)
     dash_duo.find_element("#btn").click()
-    time.sleep(0.01)
+    time.sleep(1)
     dash_duo.find_element("#btn").click()
-    time.sleep(0.01)
     # Args (i.e. n_clicks) included in memoize key, i.e. a call is made on every click.
-    assert dash_duo.find_element("#log1").text == "2"
+    dash_duo.wait_for_text_to_equal("#log1", "2", timeout=1)
     # Args (i.e. n_clicks) not included in memoize key, i.e. only one call is made.
     assert dash_duo.find_element("#log2").text == "1"
 
@@ -314,7 +312,7 @@ def test_serverside_output_transform_memoize(dash_duo):
 def test_log_transform(dash_duo):
     app = _get_basic_dash_proxy(transforms=[LogTransform(try_use_mantine=False)])
 
-    @callback(Output("log_server", "children"), Input("btn", "n_clicks"), log=True)
+    @app.callback(Output("log_server", "children"), Input("btn", "n_clicks"), log=True)
     def update_log(n_clicks, dash_logger: DashLogger):
         dash_logger.info("info")
         dash_logger.warning("warning")
