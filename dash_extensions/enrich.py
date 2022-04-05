@@ -147,7 +147,8 @@ class DashProxy(DashBase):
 
     def hijack(self, app: DashBase):
         # Change properties.
-        app.config.update(self.config)
+        readonly_props = app.config.__dict__.get("_read_only", {})
+        app.config.update({k: v for k, v in self.config.items() if k not in readonly_props})
         app.title = self.title
         app.index_string = self.index_string
         # Inject layout.
