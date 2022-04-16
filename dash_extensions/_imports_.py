@@ -4,6 +4,7 @@ from .DeferScript import DeferScript
 from .Download import Download
 from .EventListener import EventListener
 from .EventSource import EventSource
+from .ForwardStore import ForwardStore
 from .Keyboard import Keyboard
 from .Lottie import Lottie
 from .Mermaid import Mermaid
@@ -19,6 +20,7 @@ __all__ = [
     "Download",
     "EventListener",
     "EventSource",
+    "ForwardStore",
     "Keyboard",
     "Lottie",
     "Mermaid",

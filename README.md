@@ -189,6 +189,8 @@ Makes it possible to avoid invoking a callback _if it is already running_. A typ
 
 Under the hood, hidden dummy elements (client side) and client side callbacks keep track of whether a callback is already running or not. If it is already running, the Python callback invocation is skipped.
 
+If one or more callback invocation is skipped, the callback will be invoked again automatically, just after the current invocation ends, using the latest values of input parameters.
+
 ## Multipage
 
 The `multipage` module makes it easy to create multipage apps. Pages can be constructed explicitly with the following syntax,
@@ -705,4 +707,36 @@ def sync_inputs(data):
 
 if __name__ == '__main__':
     app.run_server(debug=False)
+```
+
+### ForwardStore
+
+The `ForwardStore` component is a simple data store that automatically copies the current value of the sourceData property into the destinationData property. It can be used to break circular dependencies.
+
+```python
+import time
+from dash import Dash, Input, Output, html
+from dash_extensions.enrich import ForwardStore
+
+app = Dash(__name__)
+server = app.server
+app.layout = html.Div([
+    html.Div(id="output"),
+    ForwardStore(id="store", destinationData=10)
+])
+
+
+@app.callback(Output("output", "children"), Input("store", "destinationData"))
+def update_output(value):
+    return f"Current value: {value}"
+
+
+@app.callback(Output("store", "sourceData"), Input("store", "destinationData"))
+def calculate(value):
+    time.sleep(1)
+    return value + 1
+
+
+if __name__ == "__main__":
+    app.run_server(debug=True)
 ```
