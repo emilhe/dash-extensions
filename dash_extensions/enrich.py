@@ -184,6 +184,12 @@ def _as_list(item):
     return [item]
 
 
+def _as_output_list(output, expected_values):
+    if expected_values == 1:
+        return [output]
+    return _as_list(output)
+
+
 def _create_callback_id(item):
     cid = item.component_id
     if isinstance(cid, dict):
@@ -321,6 +327,7 @@ class BlockingCallbackTransform(DashTransform):
                 "function(){return new Date().getTime();}", Output(end_client_id, "data"), Input(end_server_id, "data")
             )
             # Modify the original callback to send finished signal.
+            f_outputs = len(callback[Output])
             callback[Output].append(Output(end_server_id, "data"))
             # Modify the original callback to not trigger on inputs, but the new special trigger.
             new_state = [State(item.component_id, item.component_property) for item in callback[Input]]
@@ -328,17 +335,17 @@ class BlockingCallbackTransform(DashTransform):
             callback[Input] = [Input(start_client_id, "data")]
             # Modify the callback function accordingly.
             f = callback["f"]
-            callback["f"] = skip_input_signal_add_output_signal()(f)
+            callback["f"] = skip_input_signal_add_output_signal()(f, f_outputs)
 
         return callbacks
 
 
 def skip_input_signal_add_output_signal():
-    def wrapper(f):
+    def wrapper(f, f_outputs):
         @functools.wraps(f)
         def decorated_function(*args):
             value = f(*args[1:])
-            return _as_list(value) + [datetime.utcnow().timestamp()]
+            return _as_output_list(value, f_outputs) + [datetime.utcnow().timestamp()]
 
         return decorated_function
 
@@ -449,11 +456,12 @@ class LogTransform(DashTransform):
             if not callback["kwargs"].get("log", None):
                 continue
             # Add the log component as output.
+            f_outputs = len(callback[Output])
             callback[Output].append(self.log_config.log_output)
             # Modify the callback function accordingly.
             f = callback["f"]
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback["f"] = bind_logger(logger)(f)
+            callback["f"] = bind_logger(logger)(f, f_outputs)
 
         return callbacks
 
@@ -462,12 +470,12 @@ class LogTransform(DashTransform):
 
 
 def bind_logger(logger):
-    def wrapper(f):
+    def wrapper(f, f_outputs):
         @functools.wraps(f)
         def decorated_function(*args):
             logger.clear()
             value = f(*args, logger)
-            return _as_list(value) + [logger.get_output()]
+            return _as_output_list(value, f_outputs) + [logger.get_output()]
 
         return decorated_function
 
