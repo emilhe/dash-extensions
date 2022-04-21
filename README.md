@@ -19,3 +19,5 @@ The `enrich` module enables a number of _transforms_ that add functionality and/
 * Improving app performance via the `ServersideOutputTransform`
 
 to name a few. To enable interactivity, the documentation has been moved a [separate page](http://dash-extensions.onrender.com).
+
+NB: The 0.1.0 version introduces a number of breaking changes, see the changelog for details.
