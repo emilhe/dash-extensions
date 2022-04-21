@@ -7,8 +7,6 @@ import logging
 import pickle
 import secrets
 import uuid
-from datetime import datetime
-
 import plotly
 import dash
 
@@ -34,13 +32,14 @@ from dash import (
     clientside_callback,
 )
 from dash._utils import patch_collections_abc
-from dash.dependencies import _Wildcard
+from dash.dependencies import _Wildcard, DashDependency
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple
+from datetime import datetime
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -94,7 +93,6 @@ class CallbackBlueprint:
             return False
         # The ALL and ALLSMALLER flags indicate multi output.
         return any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
-
 
 
 class DashBlueprint:
@@ -159,12 +157,12 @@ class DashBlueprint:
         return callbacks, clientside_callbacks
 
     # TODO: Include or not? The plugin still seems a bit immature.
-    def register(self, app: Union[dash.Dash, DashProxy], name, prefix=None, **kwargs):
+    def register(self, app: Union[dash.Dash, DashProxy], module, prefix=None, **kwargs):
         if prefix is not None:
             prefix_transform = PrefixIdTransform(prefix)
             self.transforms.append(prefix_transform)
         self.register_callbacks(app)
-        dash.register_page(name, layout=self._layout_value, **kwargs)
+        dash.register_page(module, layout=self._layout_value, **kwargs)
 
     def clear(self):
         self.callbacks = []
@@ -201,7 +199,8 @@ class DashProxy(dash.Dash):
 
     def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.blueprint = DashBlueprint(transforms, include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
+        self.blueprint = DashBlueprint(transforms,
+                                       include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
 
     def callback(self, *args, **kwargs):
         return self.blueprint.callback(*args, **kwargs)
@@ -549,23 +548,33 @@ def clientside_callback(clientside_function, *args, **kwargs):
     return GLOBAL_BLUEPRINT.clientside_callback(clientside_function, *args, **kwargs)
 
 
+# TODO: Include or not? The plugin still seems a bit immature.
+def register(blueprint: DashBlueprint, name: str, prefix=None, **kwargs):
+    if prefix is not None:
+        prefix_transform = PrefixIdTransform(prefix)
+        blueprint.transforms.append(prefix_transform)
+    blueprint.register_callbacks(GLOBAL_BLUEPRINT)
+    dash.register_page(name, layout=blueprint._layout_value, **kwargs)
+
+
 # endregion
 
 # region Prefix ID transform
 
 
 class PrefixIdTransform(DashTransform):
-    def __init__(self, prefix, prefix_func=None):
+    def __init__(self, prefix, prefix_func=None, escape=None):
         super().__init__()
         self.prefix = prefix
         self.prefix_func = prefix_func if prefix_func is not None else prefix_component
+        self.escape = default_prefix_escape if escape is None else escape
 
     def _apply(self, callbacks):
         for callback in callbacks:
             for i in callback.inputs:
-                i.component_id = apply_prefix(self.prefix, i.component_id)
+                i.component_id = apply_prefix(self.prefix, i.component_id, self.escape)
             for o in callback.outputs:
-                o.component_id = apply_prefix(self.prefix, o.component_id)
+                o.component_id = apply_prefix(self.prefix, o.component_id, self.escape)
         return callbacks
 
     def apply_serverside(self, callbacks):
@@ -575,10 +584,21 @@ class PrefixIdTransform(DashTransform):
         return self._apply(callbacks)
 
     def transform_layout(self, layout):
-        prefix_recursively(layout, self.prefix, self.prefix_func)
+        prefix_recursively(layout, self.prefix, self.prefix_func, self.escape)
 
 
-def apply_prefix(prefix, component_id):
+def default_prefix_escape(component_id: str):
+    if isinstance(component_id, str):
+        if component_id.startswith("a-"):  # intended usage is for anchors
+            return True
+        if component_id.startswith("anchor-"):  # intended usage is for anchors
+            return True
+    return False
+
+
+def apply_prefix(prefix, component_id, escape):
+    if escape(component_id):
+        return component_id
     if isinstance(component_id, dict):
         for key in component_id:
             # This branch handles the IDs. TODO: Can we always assume use of ints?
@@ -593,24 +613,34 @@ def apply_prefix(prefix, component_id):
     return "{}-{}".format(prefix, component_id)
 
 
-def prefix_recursively(item, key, prefix_func):
-    prefix_func(key, item)
+def prefix_recursively(item, key, prefix_func, escape):
+    prefix_func(key, item, escape)
     if hasattr(item, "children"):
         children = _as_list(item.children)
         for child in children:
-            prefix_recursively(child, key, prefix_func)
+            prefix_recursively(child, key, prefix_func, escape)
 
 
-def prefix_component(key, component):
+def prefix_component(key: str, component: Component, escape: Callable):
     if hasattr(component, "id"):
-        component.id = apply_prefix(key, component.id)
+        component.id = apply_prefix(key, component.id, escape)
     if not hasattr(component, "_namespace"):
         return
     # Special handling of dash bootstrap components. TODO: Maybe add others?
     if component._namespace == "dash_bootstrap_components":
         if component._type == "Tooltip":
-            component.target = apply_prefix(key, component.target)
+            component.target = apply_prefix(key, component.target, escape)
 
+
+# TODO: Test this one.
+def dynamic_prefix(app: Union[DashBlueprint, DashProxy], component: Component):
+    bp: DashBlueprint = app if isinstance(app, DashBlueprint) else app.blueprint
+    prefix_transforms = list(filter(lambda t: isinstance(t, PrefixIdTransform), bp.transforms))
+    # No transform, just return.
+    if len(prefix_transforms) == 0:
+        return
+    prefix_transform: PrefixIdTransform = prefix_transforms[0]
+    prefix_component(prefix_transform.prefix, component, prefix_transform.escape)
 
 # endregion
 

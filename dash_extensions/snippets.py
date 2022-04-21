@@ -71,15 +71,18 @@ def generate_html_table(
 # endregion
 
 
-def fix_page_load_anchor_issue(app, delay=None):
+def fix_page_load_anchor_issue(app, delay, input_id=None, output_id=None):
     """
     Fixes the issue that the pages is not scrolled to the anchor position on initial load.
     :param app: the Dash app object
     :param delay: in some cases, an additional delay might be needed for the page to load, specify in ms
+    :param input_id: id of input dummy element
+    :param output_id: id of output dummy element
     :return: dummy elements, which must be added to the layout for the fix to work
     """
     # Create dummy components.
-    input_id, output_id = str(uuid.uuid4()), str(uuid.uuid4())
+    input_id = input_id if input_id is not None else "fix_page_load_anchor_issue_input"
+    output_id = output_id if output_id is not None else "fix_page_load_anchor_issue_output"
     dummy_input = html.Div(id=input_id, style={"display": "hidden"})
     dummy_output = html.Div(id=output_id, style={"display": "hidden"})
     # Setup the callback that does the magic.

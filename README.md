@@ -368,17 +368,19 @@ if __name__ == "__main__":
 
 ### WebSocket
 
-The `WebSocket` component enables communication via _websockets_ in Dash. Simply add the `WebSocket` component to the layout and set the `url` property to the websocket endpoint. Messages can be send by writing to the `send` property, and received messages are written to the `message` property. Here is a small example,
+The `WebSocket` component enables communication via _websockets_ in Dash. As compared to HTTP, the websocket protocol provides lower latency, and bidirectional capabilities, and it is thus better suited for use cases such as real time updates and push notification. 
+
+Add the `WebSocket` component to the layout, and set the `url` property to the websocket endpoint. Messages can be send by writing to the `send` property, and received messages are written to the `message` property. As a simple example, consider the following app,
 
 ```python
-from dash import Dash, html, dcc, Input, Output
+from dash_extensions.enrich import DashProxy, html, dcc, Input, Output
 from dash_extensions import WebSocket
 
 # Create example app.
-app = Dash(prevent_initial_callbacks=True)
+app = DashProxy(prevent_initial_callbacks=True)
 app.layout = html.Div([
     dcc.Input(id="input", autoComplete="off"), html.Div(id="message"),
-    WebSocket(url="wss://echo.websocket.org", id="ws")
+    WebSocket(url="wss://localhost:5000/ws", id="ws")
 ])
 
 @app.callback(Output("ws", "send"), [Input("input", "value")])
@@ -392,6 +394,8 @@ def message(e):
 if __name__ == '__main__':
     app.run_server()
 ```
+
+where the content of a text field is written to the websocket, and the server response written to a log field.
 
 Websockets make it possible to solve a number of cases, which can otherwise be challenging in Dash, e.g.
 
