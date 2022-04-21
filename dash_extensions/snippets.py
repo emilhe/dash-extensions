@@ -1,5 +1,4 @@
 import json
-import uuid
 
 from dash import html, Output, Input, callback_context
 from dash.development.base_component import Component

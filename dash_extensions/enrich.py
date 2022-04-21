@@ -32,7 +32,7 @@ from dash import (
     clientside_callback,
 )
 from dash._utils import patch_collections_abc
-from dash.dependencies import _Wildcard, DashDependency
+from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -1021,7 +1021,7 @@ class FileSystemStore(FileSystemCache):
         filename = self._get_filename(key)
         try:
             with open(filename, "rb") as f:
-                pickle_time = pickle.load(f)  # ignore time
+                _ = pickle.load(f)  # ignore time
                 return pickle.load(f)
         except (IOError, OSError, pickle.PickleError):
             return None
