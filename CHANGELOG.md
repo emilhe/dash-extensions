@@ -2,11 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.X.X] - 18-02-22
+## [0.1.0] - 21-04-22
 
-### Change
+### Added
 
-- Drop older (TODO: Add version) Dataiku support. 
+- Added tests for the main parts of the code
+- Added LGTM analysis for the main parts of the code
+- Added a new, interactive documentation page
+
+### Changed
+
+- Most of the `dataiku` module has been dropped. The dropped parts were only relevant for old Dataiku versions
+- The `enrich` module has been refactored, with the `DashBluePrint` and `CallbackBlueprint` being introduced as part of the refactor
+- Added `escape` functionality to `PrefixIdTransform`, default to escape ids starting with "a-" (used for anchors)
+- A few changes/update to the `fix_page_load_anchor_issue` function
+
+### Removed
+
+- The `multipage` module. Please use the `pages` plugin instead (available in [dash-labs](https://github.com/plotly/dash-labs))
+- The `websockets` module. Please refer to the new, interactive documentation for updated examples
+- The `examples` package. Please refer to the new, interactive documentation for updated examples
+- The `Burger` component. Please look at `dash-mantine-components` for an alternative
+- The `Download` component. It was migrated to `dash-core-components` a some time ago, but has been kept around for backwards compatibility
+- The `Keyboard` component. The `EventListener` component can do the same, but is more general
+- The `Monitor` component. Now that Dash has introduced (limited) support for circular callbacks, it has become irrelevant
+- Most of the readme. Please refer to the new, interactive documentation for updated examples
 
 ## [0.0.71] - 18-02-22
 

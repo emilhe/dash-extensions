@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dash-extensions"
-version = "0.1.0rc10"
+version = "0.1.0"
 description = "Extensions for Plotly Dash."
 authors = ["emher <emil.h.eriksen@gmail.com>"]
 license = "MIT"
@@ -16,7 +16,7 @@ Flask-Caching = "^1.10.1"
 dash = {extras = ["dev", "testing"], version = "^2.3.1"}
 pytest-cov = "^3.0.0"
 black = "^22.1.0"
-pandas = "^1.4.1"
+pandas = ">=1.1.5"
 quart = "^0.17.0"
 starlette = "^0.19.0"
 uvicorn = "^0.17.6"
