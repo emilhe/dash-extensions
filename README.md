@@ -5,7 +5,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?)](http://makeapullrequest.com)
 [![Testing](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml/badge.svg)](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml)
 
-Dash Extensions is a collection of utilities functions, syntax extensions, and Dash components that aim to improve the Dash development experience. It can be divided in four main pillars,
+The `dash-extensions` package is a collection of utility functions, syntax extensions, and Dash components that aim to improve the Dash development experience. It can be divided in four main pillars,
 
 * The `enrich` module, which contains various enriched versions of Dash components
 * A number of custom components, e.g. the `Websocket` component, which enables real-time communication
@@ -14,8 +14,8 @@ Dash Extensions is a collection of utilities functions, syntax extensions, and D
 
 The `enrich` module enables a number of _transforms_ that add functionality and/or syntactic sugar to Dash. Examples include
 
-* Making it possible to target an `Output` by multiple callbacks via the MultiplexerTransform
-* Enabling logging from within Dash callbacks via the LogTransform
-* Improving app performance via the ServersideOutputTransform
+* Making it possible to target an `Output` by multiple callbacks via the `MultiplexerTransform`
+* Enabling logging from within Dash callbacks via the `LogTransform`
+* Improving app performance via the `ServersideOutputTransform`
 
 to name a few. To enable interactivity, the documentation has been moved a [separate page](http://dash-extensions.onrender.com).
