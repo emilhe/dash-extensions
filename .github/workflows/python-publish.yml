@@ -34,7 +34,7 @@ jobs:
       run: poetry install
     - name: Build and publish
       run: |
-        npm install | echo "Ignore npm install error"
-        npm run build_no_r
+        poetry run npm install | echo "Ignore npm install error"
+        poetry run npm run build_no_r
         poetry build
         poetry publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 import hashlib
 import json
@@ -6,10 +8,11 @@ import pickle
 import secrets
 import uuid
 import plotly
+import dash
 
 # Enable enrich as drop-in replacement for dash
+# noinspection PyUnresolvedReferences
 from dash import (
-    Dash as DashBase,
     no_update,
     Input,
     Output,
@@ -18,100 +21,153 @@ from dash import (
     MATCH,
     ALL,
     ALLSMALLER,
-    development,  # lgtm [py/unused-import]
-    exceptions,  # lgtm [py/unused-import]
-    resources,  # lgtm [py/unused-import]
+    development,
+    exceptions,
+    resources,
     dcc,
     html,
-    dash_table,  # lgtm [py/unused-import]
-    callback_context,  # lgtm [py/unused-import]
-    callback,  # lgtm [py/unused-import]
-    clientside_callback  # lgtm [py/unused-import]
+    dash_table,
+    callback_context,
+    callback,
+    clientside_callback,
 )
+from dash._utils import patch_collections_abc
 from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
-from datetime import datetime
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
-from typing import Dict, Callable, List
+from typing import Dict, Callable, List, Union, Any, Tuple
+from datetime import datetime
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
+# region Dash blueprint
 
-# region Dash proxy
+CbInput = Union[State, Input]
 
 
-class DashProxy(DashBase):
-    def __init__(self, *args, transforms=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.callbacks = []
-        self.clientside_callbacks = []
-        self.arg_types = [Output, Input, State]
-        self.transforms = _resolve_transforms(transforms)
-        # Do the transform initialization.
-        for transform in self.transforms:
-            transform.init(self)
+class CallbackBlueprint:
+    def __init__(self, *args, **kwargs):
+        self.outputs: List[Output] = []
+        self.inputs: List[CbInput] = []
+        self._collect_args(args)
+        self.kwargs: Dict[str, Any] = kwargs
+        self.f = None
 
-    def _collect_callback(self, *args, **kwargs):
-        """
-        This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
-        """
-        # Parse Output/Input/State (could be made simpler by enforcing input structure)
-        keys = ["output", "inputs", "state"]
-        args = list(args) + list(flatten([_extract_list_from_kwargs(kwargs, key) for key in keys]))
-        callback = {arg_type: [] for arg_type in self.arg_types}
-        arg_order = []
-        multi_output = False
+    def _collect_args(self, args: Union[Tuple[Any], List[Any]]):
         for arg in args:
-            elements = _as_list(arg)
-            for element in elements:
-                for key in callback:
-                    if isinstance(element, key):
-                        # Check if this is a wild card output.
-                        if not multi_output and isinstance(element, Output):
-                            component_id = element.component_id
-                            if isinstance(component_id, dict):
-                                multi_output = any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
-                        callback[key].append(element)
-                        arg_order.append(element)
-        if not multi_output:
-            multi_output = len(callback[Output]) > 1
-        # Save the kwargs for later.
-        callback["kwargs"] = kwargs
-        callback["sorted_args"] = arg_order
-        callback["multi_output"] = multi_output
+            if isinstance(arg, (list, tuple)):
+                self._collect_args(arg)
+                continue
+            if isinstance(arg, Output):
+                self.outputs.append(arg)
+                continue
+            # TODO: Split in input/state or not?
+            if isinstance(arg, (Input, State)):
+                self.inputs.append(arg)
+                continue
+            # If we get here, the argument was not recognized.
+            msg = f"Callback blueprint received an unsupported argument: {arg}"
+            raise ValueError(msg)
 
-        return callback
+    @property
+    def uid(self) -> str:
+        if isinstance(self.f, (ClientsideFunction, str)):
+            f_repr = repr(self.f)  # handles clientside functions
+        else:
+            f_repr = f"{self.f.__module__}.{self.f.__name__}"  # handles Python functions
+        f_hash = hashlib.md5(f_repr.encode()).digest()
+        return str(uuid.UUID(bytes=f_hash, version=4))
+
+    @property
+    def multi_output(self) -> bool:
+        # Check if there are more than  1 output.
+        if len(self.outputs) > 1:
+            return True
+        # Check for wild card output(s).
+        component_id = self.outputs[0].component_id
+        if not isinstance(component_id, dict):
+            return False
+        # The ALL and ALLSMALLER flags indicate multi output.
+        return any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
+
+
+class DashBlueprint:
+    def __init__(self, transforms: List[DashTransform] = None, include_global_callbacks: bool = False):
+        self.callbacks: List[CallbackBlueprint] = []
+        self.clientside_callbacks: List[CallbackBlueprint] = []
+        self.transforms = _resolve_transforms(transforms)
+        self._layout = None
+        self._layout_is_function = False
+        self.include_global_callbacks = include_global_callbacks
 
     def callback(self, *args, **kwargs):
         """
-        This method saves the callbacks on the DashTransformer object. It acts as a proxy for the Dash app callback.
+        This method saves the callback on the DashBlueprint object.
         """
-        callback = self._collect_callback(*args, **kwargs)
-        self.callbacks.append(callback)
+        cbp = CallbackBlueprint(*args, **kwargs)
+        self.callbacks.append(cbp)
 
         def wrapper(f):
-            callback["f"] = f
+            cbp.f = f
 
         return wrapper
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
-        callback = self._collect_callback(*args, **kwargs)
-        callback["f"] = clientside_function
-        self.clientside_callbacks.append(callback)
+        """
+        This method saves the clientside callback on the DashBlueprint object.
+        """
+        cbp = CallbackBlueprint(*args, **kwargs)
+        cbp.f = clientside_function
+        self.clientside_callbacks.append(cbp)
 
-    def _register_callbacks(self, app=None):
+    def register_callbacks(self, app: Union[dash.Dash, DashBlueprint]):
+        """
+        This function registers all callbacks collected by the blueprint onto a Dash (or DashBlueprint) object.
+        """
         callbacks, clientside_callbacks = self._resolve_callbacks()
-        app = super() if app is None else app
-        for cb in callbacks:
-            outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
-            app.callback(outputs, cb[Input], cb[State], **cb["kwargs"])(cb["f"])
-        for cb in clientside_callbacks:
-            outputs = cb[Output][0] if len(cb[Output]) == 1 else cb[Output]
-            app.clientside_callback(cb["f"], outputs, cb[Input], cb[State], **cb["kwargs"])
+        # Move callbacks from one blueprint to another.
+        if isinstance(app, DashProxy):
+            app.blueprint.callbacks += callbacks
+            app.blueprint.clientside_callbacks += clientside_callbacks
+            return
+        # Register callbacks on the "real" app object.
+        for cbp in callbacks:
+            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
+            app.callback(o, cbp.inputs, **cbp.kwargs)(cbp.f)
+        for cbp in clientside_callbacks:
+            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
+            app.clientside_callback(cbp.f, o, cbp.inputs, **cbp.kwargs)
+
+    def _resolve_callbacks(self) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
+        """
+        This method resolves the callbacks, i.e. it applies the callback injections.
+        """
+        callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
+        # Add any global callbacks.
+        if self.include_global_callbacks:
+            callbacks += GLOBAL_BLUEPRINT.callbacks
+            clientside_callbacks += GLOBAL_BLUEPRINT.clientside_callbacks
+        # Proceed as before.
+        for transform in self.transforms:
+            callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
+        return callbacks, clientside_callbacks
+
+    # TODO: Include or not? The plugin still seems a bit immature.
+    def register(self, app: Union[dash.Dash, DashProxy], module, prefix=None, **kwargs):
+        if prefix is not None:
+            prefix_transform = PrefixIdTransform(prefix)
+            self.transforms.append(prefix_transform)
+        self.register_callbacks(app)
+        dash.register_page(module, layout=self._layout_value, **kwargs)
+
+    def clear(self):
+        self.callbacks = []
+        self.clientside_callbacks = []
+        self.transforms = []
 
     def _layout_value(self):
         layout = self._layout() if self._layout_is_function else self._layout
@@ -119,33 +175,52 @@ class DashProxy(DashBase):
             layout = transform.layout(layout, self._layout_is_function)
         return layout
 
+    @property
+    def layout(self):
+        return self._layout
+
+    @layout.setter
+    def layout(self, value):
+        self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
+        self._layout = value
+
+
+# endregion
+
+# region Dash proxy
+
+
+class DashProxy(dash.Dash):
+    """
+    DashProxy is a wrapper around the DashBlueprint object enabling drop-in replacement of the original Dash object. It
+    enables transforms (via the DashBlueprint object), performs the necessary app configuration for all transforms to
+    work (e.g. setting a secret key on the server), and exposes convenience functions such as 'hijack'.
+    """
+
+    def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.blueprint = DashBlueprint(transforms,
+                                       include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
+
+    def callback(self, *args, **kwargs):
+        return self.blueprint.callback(*args, **kwargs)
+
+    def clientside_callback(self, clientside_function, *args, **kwargs):
+        return self.blueprint.clientside_callback(clientside_function, *args, **kwargs)
+
     def _setup_server(self):
-        """
-        This method registers the callbacks on the Dash app and injects a session secret.
-        """
         # Register the callbacks.
-        self._register_callbacks()
+        self.blueprint.register_callbacks(super())
         # Proceed as normally.
         super()._setup_server()
         # Set session secret. Used by some subclasses.
         if not self.server.secret_key:
             self.server.secret_key = secrets.token_urlsafe(16)
 
-    def _resolve_callbacks(self):
+    def hijack(self, app: dash.Dash):
         """
-        This method resolves the callbacks, i.e. it applies the callback injections.
+        Hijack another app. Typically, used with Dataiku 10 where the Dash object is instantiated outside user code.
         """
-        callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
-        # Add any global callbacks.
-        callbacks += GLOBAL_PROXY.callbacks
-        clientside_callbacks += GLOBAL_PROXY.clientside_callbacks
-        GLOBAL_PROXY.clear()
-        # Proceed as before.
-        for transform in self.transforms:
-            callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
-        return callbacks, clientside_callbacks
-
-    def hijack(self, app: DashBase):
         # Change properties.
         app.config.update(self.config)
         app.title = self.title
@@ -154,16 +229,21 @@ class DashProxy(DashBase):
         app.layout = html.Div()  # fool layout validator
         app._layout_value = self._layout_value
         # Register callbacks.
-        self._register_callbacks(app)
+        self.blueprint.register_callbacks(app)
         # Setup secret.
         if not app.server.secret_key:
             app.server.secret_key = secrets.token_urlsafe(16)
 
-    def clear(self):
-        self.callbacks = []
-        self.clientside_callbacks = []
-        self.arg_types = [Output, Input, State]
-        self.transforms = []
+    def _layout_value(self):
+        return self.blueprint._layout_value()
+
+    @property
+    def layout(self):
+        return self.blueprint._layout
+
+    @layout.setter
+    def layout(self, value):
+        self.blueprint.layout = value
 
 
 def _get_session_id(session_key=None):
@@ -172,24 +252,6 @@ def _get_session_id(session_key=None):
     if not session.get(session_key):
         session[session_key] = secrets.token_urlsafe(16)
     return session.get(session_key)
-
-
-def _as_list(item):
-    if item is None:
-        return []
-    if isinstance(item, tuple):
-        return list(item)
-    if isinstance(item, list):
-        return item
-    return [item]
-
-
-def _create_callback_id(item):
-    cid = item.component_id
-    if isinstance(cid, dict):
-        cid = {key: cid[key] if cid[key] not in _wildcard_mappings else _wildcard_mappings[cid[key]] for key in cid}
-        cid = json.dumps(cid)
-    return "{}.{}".format(cid, item.component_property)
 
 
 def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
@@ -205,16 +267,13 @@ def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
         return []
 
 
-def plotly_jsonify(data):
-    return json.loads(json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder))
+# endregion
 
+# region Dash transform
 
 class DashTransform:
     def __init__(self):
         self.layout_initialized = False
-
-    def init(self, dt):
-        pass
 
     def apply(self, callbacks, clientside_callbacks):
         return self.apply_serverside(callbacks), self.apply_clientside(clientside_callbacks)
@@ -264,7 +323,7 @@ class BlockingCallbackTransform(DashTransform):
     def __init__(self, timeout=60):
         super().__init__()
         self.components = []
-        self.app = DashProxy()
+        self.blueprint = DashBlueprint()
         self.timeout = timeout
 
     def transform_layout(self, layout):
@@ -273,15 +332,15 @@ class BlockingCallbackTransform(DashTransform):
 
     def apply(self, callbacks, clientside_callbacks):
         callbacks = self.apply_serverside(callbacks)
-        return callbacks, clientside_callbacks + self.app.clientside_callbacks
+        return callbacks, clientside_callbacks + self.blueprint.clientside_callbacks
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
-            if not callback["kwargs"].get("blocking", None):
+            if not callback.kwargs.get("blocking", None):
                 continue
 
-            timeout = callback["kwargs"].get("blocking_timeout", self.timeout)
-            callback_id = _get_output_id(callback)
+            timeout = callback.kwargs.get("blocking_timeout", self.timeout)
+            callback_id = callback.uid
             # Bind proxy components.
             start_client_id = f"{callback_id}_start_client"
             end_server_id = f"{callback_id}_end_server"
@@ -310,25 +369,24 @@ class BlockingCallbackTransform(DashTransform):
                 }}
                 return window.dash_clientside.no_update;
             }}"""
-            self.app.clientside_callback(
+            self.blueprint.clientside_callback(
                 start_callback,
                 Output(start_client_id, "data"),
-                callback[Input],
+                callback.inputs,
                 [State(start_client_id, "data"), State(end_client_id, "data")],
             )
             # Bind end signal callback.
-            self.app.clientside_callback(
+            self.blueprint.clientside_callback(
                 "function(){return new Date().getTime();}", Output(end_client_id, "data"), Input(end_server_id, "data")
             )
             # Modify the original callback to send finished signal.
-            callback[Output].append(Output(end_server_id, "data"))
+            callback.outputs.append(Output(end_server_id, "data"))
             # Modify the original callback to not trigger on inputs, but the new special trigger.
-            new_state = [State(item.component_id, item.component_property) for item in callback[Input]]
-            callback[State] = new_state + callback[State]
-            callback[Input] = [Input(start_client_id, "data")]
+            new_state = [State(item.component_id, item.component_property) for item in callback.inputs]
+            callback.inputs = [Input(start_client_id, "data")] + new_state
             # Modify the callback function accordingly.
-            f = callback["f"]
-            callback["f"] = skip_input_signal_add_output_signal()(f)
+            f = callback.f
+            callback.f = skip_input_signal_add_output_signal()(f)
 
         return callbacks
 
@@ -417,23 +475,24 @@ class DashLogger:
         self.output.append(self.log_writers[level](message, **kwargs))
 
     def get_output(self):
-        return self.output if self.output else no_update
+        return self.output if self.output else dash.no_update
 
 
 class LogTransform(DashTransform):
-    def __init__(self, log_config=None):
+    def __init__(self, log_config=None, try_use_mantine=True):
         super().__init__()
         self.components = []
-        if log_config is None:
-            # If no config is provided, try to use dmc notification system.
+        # Per default, try to use dmc notification system.
+        if log_config is None and try_use_mantine:
             try:
-                # raise ImportError
                 log_config = setup_notifications_log_config(self.components)
-            # If dmc is not installed, use a div.
             except ImportError:
                 msg = "Failed to import dash-mantine-components, falling back to simple div for log output."
                 logging.warning(msg)
-                log_config = setup_div_log_config(self.components)
+        # Otherwise, use simple div.
+        if log_config is None:
+            log_config = setup_div_log_config(self.components)
+        # Bind the resulting log config.
         self.log_config = log_config
 
     def transform_layout(self, layout):
@@ -446,14 +505,14 @@ class LogTransform(DashTransform):
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
-            if not callback["kwargs"].get("log", None):
+            if not callback.kwargs.get("log", None):
                 continue
             # Add the log component as output.
-            callback[Output].append(self.log_config.log_output)
+            callback.outputs.append(self.log_config.log_output)
             # Modify the callback function accordingly.
-            f = callback["f"]
+            f = callback.f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback["f"] = bind_logger(logger)(f)
+            callback.f = bind_logger(logger)(f)
 
         return callbacks
 
@@ -476,18 +535,26 @@ def bind_logger(logger):
 
 # endregion
 
+# region Global blueprint object (to emulate Dash 2.0 import syntax)
 
-# region Global app object (to emulate Dash 2.0 import syntax)
-
-GLOBAL_PROXY = DashProxy()
+GLOBAL_BLUEPRINT = DashBlueprint()
 
 
 def callback(*args, **kwargs):
-    return GLOBAL_PROXY.callback(*args, **kwargs)
+    return GLOBAL_BLUEPRINT.callback(*args, **kwargs)
 
 
 def clientside_callback(clientside_function, *args, **kwargs):
-    return GLOBAL_PROXY.clientside_callback(clientside_function, *args, **kwargs)
+    return GLOBAL_BLUEPRINT.clientside_callback(clientside_function, *args, **kwargs)
+
+
+# TODO: Include or not? The plugin still seems a bit immature.
+def register(blueprint: DashBlueprint, name: str, prefix=None, **kwargs):
+    if prefix is not None:
+        prefix_transform = PrefixIdTransform(prefix)
+        blueprint.transforms.append(prefix_transform)
+    blueprint.register_callbacks(GLOBAL_BLUEPRINT)
+    dash.register_page(name, layout=blueprint._layout_value, **kwargs)
 
 
 # endregion
@@ -496,15 +563,18 @@ def clientside_callback(clientside_function, *args, **kwargs):
 
 
 class PrefixIdTransform(DashTransform):
-    def __init__(self, prefix, prefix_func=None):
+    def __init__(self, prefix, prefix_func=None, escape=None):
         super().__init__()
         self.prefix = prefix
         self.prefix_func = prefix_func if prefix_func is not None else prefix_component
+        self.escape = default_prefix_escape if escape is None else escape
 
     def _apply(self, callbacks):
         for callback in callbacks:
-            for arg in callback["sorted_args"]:
-                arg.component_id = apply_prefix(self.prefix, arg.component_id)
+            for i in callback.inputs:
+                i.component_id = apply_prefix(self.prefix, i.component_id, self.escape)
+            for o in callback.outputs:
+                o.component_id = apply_prefix(self.prefix, o.component_id, self.escape)
         return callbacks
 
     def apply_serverside(self, callbacks):
@@ -514,10 +584,21 @@ class PrefixIdTransform(DashTransform):
         return self._apply(callbacks)
 
     def transform_layout(self, layout):
-        prefix_recursively(layout, self.prefix, self.prefix_func)
+        prefix_recursively(layout, self.prefix, self.prefix_func, self.escape)
 
 
-def apply_prefix(prefix, component_id):
+def default_prefix_escape(component_id: str):
+    if isinstance(component_id, str):
+        if component_id.startswith("a-"):  # intended usage is for anchors
+            return True
+        if component_id.startswith("anchor-"):  # intended usage is for anchors
+            return True
+    return False
+
+
+def apply_prefix(prefix, component_id, escape):
+    if escape(component_id):
+        return component_id
     if isinstance(component_id, dict):
         for key in component_id:
             # This branch handles the IDs. TODO: Can we always assume use of ints?
@@ -532,24 +613,34 @@ def apply_prefix(prefix, component_id):
     return "{}-{}".format(prefix, component_id)
 
 
-def prefix_recursively(item, key, prefix_func):
-    prefix_func(key, item)
+def prefix_recursively(item, key, prefix_func, escape):
+    prefix_func(key, item, escape)
     if hasattr(item, "children"):
         children = _as_list(item.children)
         for child in children:
-            prefix_recursively(child, key, prefix_func)
+            prefix_recursively(child, key, prefix_func, escape)
 
 
-def prefix_component(key, component):
+def prefix_component(key: str, component: Component, escape: Callable):
     if hasattr(component, "id"):
-        component.id = apply_prefix(key, component.id)
+        component.id = apply_prefix(key, component.id, escape)
     if not hasattr(component, "_namespace"):
         return
     # Special handling of dash bootstrap components. TODO: Maybe add others?
     if component._namespace == "dash_bootstrap_components":
         if component._type == "Tooltip":
-            component.target = apply_prefix(key, component.target)
+            component.target = apply_prefix(key, component.target, escape)
 
+
+# TODO: Test this one.
+def dynamic_prefix(app: Union[DashBlueprint, DashProxy], component: Component):
+    bp: DashBlueprint = app if isinstance(app, DashBlueprint) else app.blueprint
+    prefix_transforms = list(filter(lambda t: isinstance(t, PrefixIdTransform), bp.transforms))
+    # No transform, just return.
+    if len(prefix_transforms) == 0:
+        return
+    prefix_transform: PrefixIdTransform = prefix_transforms[0]
+    prefix_component(prefix_transform.prefix, component, prefix_transform.escape)
 
 # endregion
 
@@ -571,13 +662,13 @@ class TriggerTransform(DashTransform):
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
-            is_trigger = trigger_filter(callback["sorted_args"])
+            is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
             # Check if any triggers are there.
             if not any(is_trigger):
                 continue
             # If so, filter the callback args.
-            f = callback["f"]
-            callback["f"] = filter_args(is_trigger)(f)
+            f = callback.f
+            callback.f = filter_args(is_trigger)(f)
         return callbacks
 
 
@@ -585,7 +676,7 @@ def filter_args(args_filter):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            post_args = list(args[len(args_filter) :])
+            post_args = list(args[len(args_filter):])
             args = list(args[: len(args_filter)])
             filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]] + post_args
             return f(*filtered_args)
@@ -670,7 +761,7 @@ class MultiplexerTransform(DashTransform):
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
         self.proxy_wrapper_map = proxy_wrapper_map
-        self.app = DashProxy()
+        self.blueprint = DashBlueprint()
 
     def transform_layout(self, layout):
         # Apply wrappers if needed.
@@ -692,7 +783,7 @@ class MultiplexerTransform(DashTransform):
         # Group by output.
         output_map = defaultdict(list)
         for callback in all_callbacks:
-            for output in callback[Output]:
+            for output in callback.outputs:
                 output_map[output].append(callback)
         # Apply multiplexer where needed.
         for output in output_map:
@@ -701,7 +792,7 @@ class MultiplexerTransform(DashTransform):
                 continue
             self._apply_multiplexer(output, output_map[output])
 
-        return callbacks, clientside_callbacks + self.app.clientside_callbacks
+        return callbacks, clientside_callbacks + self.blueprint.clientside_callbacks
 
     def _apply_multiplexer(self, output, callbacks):
         inputs = []
@@ -712,13 +803,13 @@ class MultiplexerTransform(DashTransform):
             # Create proxy element.
             proxies.append(_mp_element(mp_id_escaped))
             # Assign proxy element as output.
-            callback[Output][callback[Output].index(output)] = Output(mp_id_escaped, _mp_prop())
+            callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped, _mp_prop())
             # Create proxy input.
             inputs.append(Input(mp_id, _mp_prop()))
         # Collect proxy elements to add to layout.
         self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
-        self.app.clientside_callback(
+        self.blueprint.clientside_callback(
             """
             function(){
                 const ts = dash_clientside.callback_context.triggered;
@@ -764,11 +855,6 @@ class ServersideOutputTransform(DashTransform):
         self.session_check = session_check
         self.arg_check = arg_check
 
-    def init(self, dt):
-        # Set session secret (if not already set).
-        if not dt.server.secret_key:
-            dt.server.secret_key = secrets.token_urlsafe(16)
-
     # NOTE: Doesn't make sense for clientside callbacks.
 
     def apply_serverside(self, callbacks):
@@ -777,10 +863,10 @@ class ServersideOutputTransform(DashTransform):
         serverside_output_map = {}
         for callback in callbacks:
             # If memoize keyword is used, serverside caching is needed.
-            memoize = callback["kwargs"].get("memoize", None)
+            memoize = callback.kwargs.get("memoize", None)
             serverside = False
             # Keep tract of which outputs are server side outputs.
-            for output in callback[Output]:
+            for output in callback.outputs:
                 if isinstance(output, ServersideOutput):
                     serverside_output_map[_create_callback_id(output)] = output
                     serverside = True
@@ -796,21 +882,21 @@ class ServersideOutputTransform(DashTransform):
         # 2) Inject cached data into callbacks.
         for callback in callbacks:
             # Figure out which args need loading.
-            items = callback[Input] + callback[State]
+            items = callback.inputs
             item_ids = [_create_callback_id(item) for item in items]
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
             if any(serverside_outputs):
-                f = callback["f"]
-                callback["f"] = _unpack_outputs(serverside_outputs)(f)
+                f = callback.f
+                callback.f = _unpack_outputs(serverside_outputs)(f)
         # 3) Apply the caching itself.
         for i, callback in enumerate(serverside_callbacks):
-            f = callback["f"]
-            callback["f"] = _pack_outputs(callback)(f)
+            f = callback.f
+            callback.f = _pack_outputs(callback)(f)
         # 4) Strip special args.
         for callback in callbacks:
             for key in ["memoize"]:
-                callback["kwargs"].pop(key, None)
+                callback.kwargs.pop(key, None)
 
         return callbacks
 
@@ -840,20 +926,20 @@ def _unpack_outputs(serverside_outputs):
 
 
 def _pack_outputs(callback):
-    memoize = callback["kwargs"].get("memoize", None)
+    memoize = callback.kwargs.get("memoize", None)
 
     def packed_callback(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            multi_output = callback["multi_output"]
+            multi_output = callback.multi_output
             # If memoize is enabled, we check if the cache already has a valid value.
             if memoize:
                 # Figure out if an update is necessary.
                 unique_ids = []
                 update_needed = False
-                for i, output in enumerate(callback[Output]):
+                for i, output in enumerate(callback.outputs):
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = trigger_filter(callback["sorted_args"])
+                    is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
                     filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     # Generate unique ID.
                     unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
@@ -865,8 +951,8 @@ def _pack_outputs(callback):
                 if not update_needed:
                     results = [
                         uid
-                        if isinstance(callback[Output][i], ServersideOutput)
-                        else callback[Output][i].backend.get(uid)
+                        if isinstance(callback.outputs[i], ServersideOutput)
+                        else callback.outputs[i].backend.get(uid)
                         for i, uid in enumerate(unique_ids)
                     ]
                     return results if multi_output else results[0]
@@ -875,15 +961,15 @@ def _pack_outputs(callback):
             data = list(data) if multi_output else [data]
             if callable(memoize):
                 data = memoize(data)
-            for i, output in enumerate(callback[Output]):
+            for i, output in enumerate(callback.outputs):
                 # Skip no_update updates.
                 if isinstance(data[i], type(no_update)):
                     continue
                 # Replace only for server side outputs.
-                serverside_output = isinstance(callback[Output][i], ServersideOutput)
+                serverside_output = isinstance(callback.outputs[i], ServersideOutput)
                 if serverside_output or memoize:
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = trigger_filter(callback["sorted_args"])
+                    is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
                     filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
                     unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
                     output.backend.set(unique_id, data[i])
@@ -903,16 +989,8 @@ def _get_cache_id(func, output, args, session_check=None, arg_check=True):
         all_args += list(args)
     if session_check:
         all_args += [_get_session_id()]
+    print(all_args)
     return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
-
-
-def _get_output_id(callback):
-    if isinstance(callback["f"], (ClientsideFunction, str)):
-        f_repr = repr(callback["f"])  # handles clientside functions
-    else:
-        f_repr = f"{callback['f'].__module__}.{callback['f'].__name__}"  # handles Python functions
-    f_hash = hashlib.md5(f_repr.encode()).digest()
-    return str(uuid.UUID(bytes=f_hash, version=4))
 
 
 # Interface definition for server stores.
@@ -979,10 +1057,10 @@ class NoOutputTransform(DashTransform):
 
     def _apply(self, callbacks):
         for callback in callbacks:
-            if len(callback[Output]) == 0:
-                output_id = _get_output_id(callback)
+            if len(callback.outputs) == 0:
+                output_id = callback.uid
                 hidden_div = html.Div(id=output_id, style={"display": "none"})
-                callback[Output] = [Output(output_id, "children")]
+                callback.outputs.append(Output(output_id, "children"))
                 self.components.append(hidden_div)
         return callbacks
 
@@ -998,7 +1076,7 @@ class NoOutputTransform(DashTransform):
 
 # endregion
 
-# region Transformer implementations
+# region Batteries included dash proxy object
 
 
 class Dash(DashProxy):
@@ -1013,5 +1091,30 @@ class Dash(DashProxy):
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
 
+
+# endregion
+
+# region Utils
+
+def _as_list(item):
+    if item is None:
+        return []
+    if isinstance(item, tuple):
+        return list(item)
+    if isinstance(item, list):
+        return item
+    return [item]
+
+
+def _create_callback_id(item):
+    cid = item.component_id
+    if isinstance(cid, dict):
+        cid = {key: cid[key] if cid[key] not in _wildcard_mappings else _wildcard_mappings[cid[key]] for key in cid}
+        cid = json.dumps(cid)
+    return "{}.{}".format(cid, item.component_property)
+
+
+def plotly_jsonify(data):
+    return json.loads(json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder))
 
 # endregion

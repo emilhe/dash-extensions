@@ -1,6 +1,5 @@
-from dash import html, dcc, Dash, no_update
+from dash import Dash, html, dcc, Input, Output, no_update
 from dash_extensions import Lottie
-from dash.dependencies import Input, Output
 
 # Setup options.
 url = "https://assets9.lottiefiles.com/packages/lf20_YXD37q.json"
@@ -10,7 +9,7 @@ app = Dash(__name__)
 app.layout = html.Div(
     [
         Lottie(options=options, width="25%", height="25%", url=url, id="lottie", speed=2),
-        dcc.Slider(id="slider", value=20, min=0, max=100, step=1),
+        dcc.Slider(id="slider", value=20, min=0, max=100, step=5),
     ]
 )
 

@@ -4,13 +4,8 @@ from dash.exceptions import PreventUpdate
 from dash_extensions import EventListener
 
 # Create a small data table.
-df = pd.read_csv("https://git.io/Juf1t")
-df["id"] = df.index
-table = dt.DataTable(
-    id="tbl",
-    data=df.to_dict("records"),
-    columns=[{"name": i, "id": i} for i in df.columns],
-)
+df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/solar.csv')
+table = dt.DataTable(df.to_dict('records'), [{"name": i, "id": i} for i in df.columns], id="tbl")
 # The event(s) to listen to (i.e. click) and the prop(s) to record, i.e. the column name.
 row_index = "srcElement.attributes.data-dash-row.value"
 events = [{"event": "click", "props": [row_index]}]
