@@ -3,7 +3,6 @@
 [![codecov](https://img.shields.io/codecov/c/github/thedirtyfew/dash-extensions?logo=codecov)](https://codecov.io/gh/thedirtyfew/dash-extensions)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/thedirtyfew/dash-extensions.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/thedirtyfew/dash-extensions/context:python)
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/thedirtyfew/dash-extensions.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/thedirtyfew/dash-extensions/context:javascript)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?)](http://makeapullrequest.com)
 [![Testing](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml/badge.svg)](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml)
 
 The `dash-extensions` package is a collection of utility functions, syntax extensions, and Dash components that aim to improve the Dash development experience. It can be divided in four main pillars,
