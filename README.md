@@ -1,5 +1,4 @@
 [![PyPI Latest Release](https://img.shields.io/pypi/v/dash-extensions.svg)](https://pypi.org/project/dash-extensions/)
-![support-version](https://img.shields.io/pypi/pyversions/dash-extensions)
 [![codecov](https://img.shields.io/codecov/c/github/thedirtyfew/dash-extensions?logo=codecov)](https://codecov.io/gh/thedirtyfew/dash-extensions)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/thedirtyfew/dash-extensions.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/thedirtyfew/dash-extensions/context:python)
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/thedirtyfew/dash-extensions.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/thedirtyfew/dash-extensions/context:javascript)
