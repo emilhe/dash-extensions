@@ -1,1 +1,1 @@
-* ?
+* Go through component doc strings
