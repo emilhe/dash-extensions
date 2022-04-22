@@ -12,7 +12,7 @@ import dash
 
 # Enable enrich as drop-in replacement for dash
 # noinspection PyUnresolvedReferences
-from dash import (
+from dash import (  # lgtm [py/unused-import]
     no_update,
     Input,
     Output,
@@ -21,15 +21,15 @@ from dash import (
     MATCH,
     ALL,
     ALLSMALLER,
-    development,  # lgtm [py/unused-import]
-    exceptions,  # lgtm [py/unused-import]
-    resources,  # lgtm [py/unused-import]
+    development,
+    exceptions,
+    resources,
     dcc,
     html,
-    dash_table,  # lgtm [py/unused-import]
-    callback_context,  # lgtm [py/unused-import]
-    callback,  # lgtm [py/unused-import]
-    clientside_callback,  # lgtm [py/unused-import]
+    dash_table,
+    callback_context,
+    callback,
+    clientside_callback,
 )
 from dash._utils import patch_collections_abc
 from dash.dependencies import _Wildcard
