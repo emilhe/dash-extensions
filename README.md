@@ -19,4 +19,4 @@ The `enrich` module enables a number of _transforms_ that add functionality and/
 * Enabling logging from within Dash callbacks via the LogTransform
 * Improving app performance via the ServersideOutputTransform
 
-to name a few. To enable interactivity, the documentation has been moved a [separate page](http://dash-extensions.onrender.com).
+to name a few. To enable interactivity, the documentation has been moved a [separate page](https://www.dash-extensions.com).
