@@ -21,16 +21,16 @@ from dash import (
     MATCH,
     ALL,
     ALLSMALLER,
-    development,
-    exceptions,
-    resources,
+    development,  # lgtm [py/unused-import]
+    exceptions,  # lgtm [py/unused-import]
+    resources,  # lgtm [py/unused-import]
     dcc,
     html,
-    dash_table,
-    callback_context,
-    callback,
-    clientside_callback,
-)  # lgtm [py/unused-import]
+    dash_table,  # lgtm [py/unused-import]
+    callback_context,  # lgtm [py/unused-import]
+    callback,  # lgtm [py/unused-import]
+    clientside_callback,  # lgtm [py/unused-import]
+)
 from dash._utils import patch_collections_abc
 from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
