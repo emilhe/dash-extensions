@@ -30,7 +30,7 @@ from dash import (
     callback_context,
     callback,
     clientside_callback,
-)
+)  # lgtm [py/unused-import]
 from dash._utils import patch_collections_abc
 from dash.dependencies import _Wildcard
 from dash.development.base_component import Component
@@ -641,6 +641,7 @@ def dynamic_prefix(app: Union[DashBlueprint, DashProxy], component: Component):
         return
     prefix_transform: PrefixIdTransform = prefix_transforms[0]
     prefix_component(prefix_transform.prefix, component, prefix_transform.escape)
+
 
 # endregion
 
