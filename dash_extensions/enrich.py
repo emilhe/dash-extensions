@@ -12,7 +12,7 @@ import dash
 
 # Enable enrich as drop-in replacement for dash
 # noinspection PyUnresolvedReferences
-from dash import (
+from dash import (  # lgtm [py/unused-import]
     no_update,
     Input,
     Output,
@@ -641,6 +641,7 @@ def dynamic_prefix(app: Union[DashBlueprint, DashProxy], component: Component):
         return
     prefix_transform: PrefixIdTransform = prefix_transforms[0]
     prefix_component(prefix_transform.prefix, component, prefix_transform.escape)
+
 
 # endregion
 
