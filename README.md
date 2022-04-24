@@ -7,7 +7,7 @@
 The `dash-extensions` package is a collection of utility functions, syntax extensions, and Dash components that aim to improve the Dash development experience. It can be divided in four main pillars,
 
 * The `enrich` module, which contains various enriched versions of Dash components
-* A number of custom components, e.g. the `Websocket` component, which enables real-time communication
+* A number of custom components, e.g. the `Websocket` component, which enables real-time communication and push notifications
 * The `javascript` module, which contains functionality to ease the interplay between Dash and JavaScript
 * The `snippets` module, which contains a collection of utility functions (documentation limited to source code comments)
 
