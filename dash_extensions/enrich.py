@@ -1088,6 +1088,7 @@ class Dash(DashProxy):
             LogTransform(),
             MultiplexerTransform(),
             NoOutputTransform(),
+            BlockingCallbackTransform(),
             ServersideOutputTransform(**output_defaults),
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
