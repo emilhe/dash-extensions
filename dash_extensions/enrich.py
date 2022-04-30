@@ -383,23 +383,27 @@ class BlockingCallbackTransform(DashTransform):
                 "function(){return new Date().getTime();}", Output(end_client_id, "data"), Input(end_server_id, "data")
             )
             # Modify the original callback to send finished signal.
+            single_output = len(callback.outputs) <= 1
             callback.outputs.append(Output(end_server_id, "data"))
             # Modify the original callback to not trigger on inputs, but the new special trigger.
             new_state = [State(item.component_id, item.component_property) for item in callback.inputs]
             callback.inputs = [Input(start_client_id, "data")] + new_state
             # Modify the callback function accordingly.
             f = callback.f
-            callback.f = skip_input_signal_add_output_signal()(f)
+            callback.f = skip_input_signal_add_output_signal(single_output)(f)
 
         return callbacks
 
 
-def skip_input_signal_add_output_signal():
+def skip_input_signal_add_output_signal(single_output: bool):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
             value = f(*args[1:])
-            return _as_list(value) + [datetime.utcnow().timestamp()]
+            value = _as_list(value)
+            if single_output:
+                value = [value]
+            return value + [datetime.utcnow().timestamp()]
 
         return decorated_function
 
