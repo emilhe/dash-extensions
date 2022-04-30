@@ -400,10 +400,7 @@ def skip_input_signal_add_output_signal(single_output: bool):
         @functools.wraps(f)
         def decorated_function(*args):
             value = f(*args[1:])
-            value = _as_list(value)
-            if single_output:
-                value = [value]
-            return value + [datetime.utcnow().timestamp()]
+            return _as_output_list(value, single_output) + [datetime.utcnow().timestamp()]
 
         return decorated_function
 
@@ -515,11 +512,12 @@ class LogTransform(DashTransform):
             if not callback.kwargs.get("log", None):
                 continue
             # Add the log component as output.
+            single_output = len(callback.outputs) <= 1
             callback.outputs.append(self.log_config.log_output)
             # Modify the callback function accordingly.
             f = callback.f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback.f = bind_logger(logger)(f)
+            callback.f = bind_logger(logger, single_output)(f)
 
         return callbacks
 
@@ -527,13 +525,13 @@ class LogTransform(DashTransform):
         return [MultiplexerTransform()]
 
 
-def bind_logger(logger):
+def bind_logger(logger, single_output):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
             logger.clear()
             value = f(*args, logger)
-            return _as_list(value) + [logger.get_output()]
+            return _as_output_list(value, single_output) + [logger.get_output()]
 
         return decorated_function
 
@@ -1112,6 +1110,12 @@ def _as_list(item):
     if isinstance(item, list):
         return item
     return [item]
+
+
+def _as_output_list(item, single_output: bool):
+    if single_output:
+        return [item]
+    return _as_list(item)
 
 
 def _create_callback_id(item):
