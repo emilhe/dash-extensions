@@ -1,4 +1,5 @@
 from .BeforeAfter import BeforeAfter
+from .CycleBreaker import CycleBreaker
 from .DeferScript import DeferScript
 from .EventListener import EventListener
 from .EventSource import EventSource
@@ -10,6 +11,7 @@ from .WebSocket import WebSocket
 
 __all__ = [
     "BeforeAfter",
+    "CycleBreaker",
     "DeferScript",
     "EventListener",
     "EventSource",

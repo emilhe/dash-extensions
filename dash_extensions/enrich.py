@@ -32,7 +32,7 @@ from dash import (  # lgtm [py/unused-import]
     clientside_callback,
 )
 from dash._utils import patch_collections_abc
-from dash.dependencies import _Wildcard
+from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -40,6 +40,8 @@ from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple
 from datetime import datetime
+
+from dash_extensions import CycleBreaker
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -536,6 +538,45 @@ def bind_logger(logger, single_output):
         return decorated_function
 
     return wrapper
+
+
+# endregion
+
+# region Cycle breaker transform
+
+class CycleBreakerTransform(DashTransform):
+
+    def __init__(self, cycle_breaks: List[Union[DashDependency, Tuple[str, str]]]):
+        super().__init__()
+        self.cycle_breaks = [c if isinstance(c, DashDependency) else DashDependency(*c) for c in cycle_breaks]
+
+    def transform_layout(self, layout):
+        cycle_components = [CycleBreaker(id=self._cycle_break_id(b)) for b in self.cycle_breaks]
+        children = _as_list(layout.children) + cycle_components
+        layout.children = children
+
+    def apply(self, callbacks, clientside_callbacks):
+        self._apply(callbacks)
+        self._apply(clientside_callbacks)
+        cycle_callbacks = []
+        f = "function(x){return x;}"
+        for b in self.cycle_breaks:
+            cb = CallbackBlueprint(Output(self._cycle_break_id(b), "src"), Input(b.component_id, b.component_property))
+            cb.f = f
+            cycle_callbacks.append(cb)
+        return callbacks, clientside_callbacks + cycle_callbacks
+
+    def _apply(self, callbacks):
+        for callback in callbacks:
+            for i in callback.inputs:
+                if i not in self.cycle_breaks:
+                    continue
+                i.component_id = self._cycle_break_id(i)
+                i.component_property = "dst"
+
+    @staticmethod
+    def _cycle_break_id(d: DashDependency):
+        return f"{str(d).replace('.', '_')}_breaker"
 
 
 # endregion
