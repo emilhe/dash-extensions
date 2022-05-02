@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [0.1.1] - NOT RELEASED
 
+### Added
+
+- Added `CycleBreaker` component, contributed by  @TomaszRewak
+- Added `CycleBreakerTransform` transform
+
 ### Changed
 
 - Bug when a single output of list type was used with `LogTransform` and `BlockingCallbackTransform` fixed by @TomaszRewak

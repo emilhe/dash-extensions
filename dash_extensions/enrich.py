@@ -14,7 +14,6 @@ import dash
 # noinspection PyUnresolvedReferences
 from dash import (  # lgtm [py/unused-import]
     no_update,
-    Input,
     Output,
     State,
     ClientsideFunction,
@@ -32,7 +31,7 @@ from dash import (  # lgtm [py/unused-import]
     clientside_callback,
 )
 from dash._utils import patch_collections_abc
-from dash.dependencies import _Wildcard
+from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -41,8 +40,19 @@ from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple
 from datetime import datetime
 
+from dash_extensions import CycleBreaker
+
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
+
+# region Enriched dependencies
+
+class Input(dash.Input):
+    def __init__(self, component_id, component_property, break_cycle=False):
+        super().__init__(component_id, component_property)
+        self.break_cycle = break_cycle
+
+# endregion
 
 # region Dash blueprint
 
@@ -536,6 +546,46 @@ def bind_logger(logger, single_output):
         return decorated_function
 
     return wrapper
+
+
+# endregion
+
+# region Cycle breaker transform
+
+class CycleBreakerTransform(DashTransform):
+
+    def __init__(self):
+        super().__init__()
+        self.components = []
+
+    def transform_layout(self, layout):
+        children = _as_list(layout.children) + self.components
+        layout.children = children
+
+    def apply(self, callbacks, clientside_callbacks):
+        cycle_inputs = {}
+        # Update inputs.
+        for c in callbacks + clientside_callbacks:
+            for i in c.inputs:
+                if isinstance(i, Input) and i.break_cycle:
+                    cid = self._cycle_break_id(i)
+                    cycle_inputs[cid] = (i.component_id, i.component_property)
+                    i.component_id = cid
+                    i.component_property = "dst"
+        # Construct components.
+        self.components = [CycleBreaker(id=cid) for cid in cycle_inputs]
+        # Construct callbacks.
+        f = "function(x){return x;}"
+        cycle_callbacks = []
+        for cid in cycle_inputs:
+            cb = CallbackBlueprint(Output(cid, "src"), Input(*cycle_inputs[cid]))
+            cb.f = f
+            cycle_callbacks.append(cb)
+        return callbacks, clientside_callbacks + cycle_callbacks
+
+    @staticmethod
+    def _cycle_break_id(d: DashDependency):
+        return f"{str(d).replace('.', '_')}_breaker"
 
 
 # endregion
@@ -1093,6 +1143,7 @@ class Dash(DashProxy):
             LogTransform(),
             MultiplexerTransform(),
             NoOutputTransform(),
+            CycleBreakerTransform(),
             ServersideOutputTransform(**output_defaults),
         ]
         super().__init__(*args, transforms=transforms, **kwargs)

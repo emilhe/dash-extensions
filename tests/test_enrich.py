@@ -1,9 +1,13 @@
 import time
 import pandas as pd
+import dash
+
+from dash.exceptions import PreventUpdate
+from selenium.webdriver.chrome.webdriver import WebDriver
 
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
-    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL
+    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform
 
 
 # region Test utils/stubs
@@ -323,3 +327,33 @@ def test_log_transform(dash_duo):
     _basic_dash_proxy_test(dash_duo, app, ["log_server"])
     # Check that log is written to div element.
     assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
+
+
+def test_cycle_breaker_transform(dash_duo):
+    app = DashProxy(transforms=[CycleBreakerTransform()])
+    app.layout = html.Div([
+        dcc.Input(id="celsius"),
+        dcc.Input(id="fahrenheit"),
+    ])
+
+    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value", break_cycle=True))
+    def update_celsius(value):
+        if value is None:
+            raise PreventUpdate()
+        return (float(value) - 32) / 9 * 5
+
+    @app.callback(Output("fahrenheit", "value"), Input("celsius", "value"))
+    def update_fahrenheit(value):
+        if value is None:
+            raise PreventUpdate()
+        return float(value) / 5 * 9 + 32
+
+    dash_duo.start_server(app)
+    time.sleep(0.1)
+    assert not dash_duo.get_logs()  # check that there are no console errors
+    f = dash_duo.find_element("#fahrenheit")
+    f.send_keys("32")
+    dash_duo.wait_for_text_to_equal("#celsius", "0", timeout=1)
+    c = dash_duo.find_element("#celsius")
+    c.send_keys("100")
+    dash_duo.wait_for_text_to_equal("#fahrenheit", "212", timeout=1)
