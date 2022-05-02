@@ -8,6 +8,7 @@ import DeferScript from "./components/DeferScript.react";
 import Purify from "./components/Purify.react";
 import EventListener from "./components/EventListener.react";
 import EventSource from "./components/EventSource.react";
+import CycleBreaker from "./components/CycleBreaker.react";
 
 export {
     Lottie,
@@ -18,5 +19,6 @@ export {
     DeferScript,
     Purify,
     EventListener,
-    EventSource
+    EventSource,
+    CycleBreaker
 };

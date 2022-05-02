@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - NOT RELEASED
+
+### Added
+
+- Added `CycleBreaker` component, strategy contributed by @TomaszRewak
+- Added `CycleBreakerTransform` transform
+
+### Changed
+
+- Bug when a single output of list type was used with `LogTransform` and `BlockingCallbackTransform` fixed by @TomaszRewak
+- Bug where an attempt was made to write to read-only properties in `hijack` utility function fixed by @RafaelWO
+- Remap of callback bindings in `DashProxy` post init to enable callback registration via the `before_first_request` hook (need for compatibility with the latest `pages` implementation)
+
 ## [0.1.0] - 21-04-22
 
 ### Added
