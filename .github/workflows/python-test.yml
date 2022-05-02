@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      ALLOWED_ERRORS: 0
+      TEST_CYCLE_BREAKER_ALLOWED_ERRORS: 2
     steps:
     - uses: actions/checkout@v2
     - uses: nanasess/setup-chromedriver@v1.0.1
