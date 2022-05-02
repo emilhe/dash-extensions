@@ -1,3 +1,4 @@
+import decimal
 import time
 import pandas as pd
 import dash
@@ -332,21 +333,25 @@ def test_log_transform(dash_duo):
 def test_cycle_breaker_transform(dash_duo):
     app = DashProxy(transforms=[CycleBreakerTransform()])
     app.layout = html.Div([
-        dcc.Input(id="celsius"),
-        dcc.Input(id="fahrenheit"),
+        dcc.Input(id="celsius", type="number"),
+        dcc.Input(id="fahrenheit", type="number"),
     ])
 
-    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value", break_cycle=True))
-    def update_celsius(value):
+    def validate_input(value) -> decimal:
         if value is None:
             raise PreventUpdate()
-        return (float(value) - 32) / 9 * 5
+        try:
+            return decimal.Decimal(value)
+        except ValueError:
+            raise PreventUpdate()
 
-    @app.callback(Output("fahrenheit", "value"), Input("celsius", "value"))
+    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value"))
+    def update_celsius(value):
+        return str((validate_input(value) - 32) / 9 * 5)
+
+    @app.callback(Output("fahrenheit", "value"), Input("celsius", "value", break_cycle=True))
     def update_fahrenheit(value):
-        if value is None:
-            raise PreventUpdate()
-        return float(value) / 5 * 9 + 32
+        return str(validate_input(value) / 5 * 9 + 32)
 
     dash_duo.start_server(app)
     time.sleep(0.1)
