@@ -349,12 +349,13 @@ def test_cycle_breaker_transform(dash_duo):
     def update_celsius(value):
         return str((validate_input(value) - 32) / 9 * 5)
 
-    @app.callback(Output("fahrenheit", "value"), Input("celsius", "value", break_cycle=True))
+    @app.callback(Output("fahrenheit", "value"), Input("celsius", "value"))
     def update_fahrenheit(value):
         return str(validate_input(value) / 5 * 9 + 32)
 
     dash_duo.start_server(app)
     time.sleep(0.1)
+    print(f"NUMBER OF ERRORS IS {len(dash_duo.get_logs())}")
     assert not dash_duo.get_logs()  # check that there are no console errors
     f = dash_duo.find_element("#fahrenheit")
     f.send_keys("32")
