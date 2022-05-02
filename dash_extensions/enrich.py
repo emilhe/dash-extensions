@@ -567,7 +567,7 @@ class CycleBreakerTransform(DashTransform):
         # Update inputs.
         for c in callbacks + clientside_callbacks:
             for i in c.inputs:
-                if isinstance(c, Input) and c.break_cycle:
+                if isinstance(i, Input) and i.break_cycle:
                     cid = self._cycle_break_id(i)
                     cycle_inputs[cid] = (i.component_id, i.component_property)
                     i.component_id = cid

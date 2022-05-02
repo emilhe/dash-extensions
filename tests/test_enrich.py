@@ -1,6 +1,9 @@
 import time
 import pandas as pd
+import dash
+
 from dash.exceptions import PreventUpdate
+from selenium.webdriver.chrome.webdriver import WebDriver
 
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
@@ -327,14 +330,13 @@ def test_log_transform(dash_duo):
 
 
 def test_cycle_breaker_transform(dash_duo):
-    cycle_breaks = [("fahrenheit", "value")]
-    app = DashProxy(transforms=[CycleBreakerTransform(cycle_breaks=cycle_breaks)])
+    app = DashProxy(transforms=[CycleBreakerTransform()])
     app.layout = html.Div([
-        dcc.Input(id="celsius", label="Celsius"),
-        dcc.Input(id="fahrenheit", label="Fahrenheit"),
+        dcc.Input(id="celsius"),
+        dcc.Input(id="fahrenheit"),
     ])
 
-    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value"))
+    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value", break_cycle=True))
     def update_celsius(value):
         if value is None:
             raise PreventUpdate()
@@ -347,9 +349,11 @@ def test_cycle_breaker_transform(dash_duo):
         return float(value) / 5 * 9 + 32
 
     dash_duo.start_server(app)
+    time.sleep(0.1)
+    assert not dash_duo.get_logs()  # check that there are no console errors
     f = dash_duo.find_element("#fahrenheit")
     f.send_keys("32")
-    dash_duo.wait_for_text_to_equal("#celsius", "0")
-    c = dash_duo.find_element("#celcius")
+    dash_duo.wait_for_text_to_equal("#celsius", "0", timeout=1)
+    c = dash_duo.find_element("#celsius")
     c.send_keys("100")
-    dash_duo.wait_for_text_to_equal("#fahrenheit", "212")
+    dash_duo.wait_for_text_to_equal("#fahrenheit", "212", timeout=1)
