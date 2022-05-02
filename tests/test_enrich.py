@@ -346,7 +346,7 @@ def test_cycle_breaker_transform(dash_duo):
         except ValueError:
             raise PreventUpdate()
 
-    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value"))
+    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value", break_cycle=True))
     def update_celsius(value):
         return str((validate_input(value) - 32) / 9 * 5)
 
