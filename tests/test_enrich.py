@@ -357,8 +357,6 @@ def test_cycle_breaker_transform(dash_duo):
     dash_duo.start_server(app)
     time.sleep(0.1)
     logs = dash_duo.get_logs()
-    print(logs)
-    print(f"NUMBER OF ERRORS IS {len(logs)}")
     assert len(logs) <= int(os.environ.get("TEST_CYCLE_BREAKER_ALLOWED_ERRORS", "0"))
     f = dash_duo.find_element("#fahrenheit")
     f.send_keys("32")
