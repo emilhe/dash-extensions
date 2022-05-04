@@ -71,8 +71,7 @@ class CallbackBlueprint:
         self.input_indices = None
         self.output_grouping = None
         # Collect args "normally".
-        dst_map = {(Input, State): [], Output: []}
-        _collect_args(args, dst_map)
+        self._collect_args(args)
         # Flexible signature handling via keyword arguments. If provided, it takes precedence.
         if "output" in kwargs:
             output_arg = dict(output=kwargs.pop("output"))
@@ -87,6 +86,22 @@ class CallbackBlueprint:
         # Collect the rest.
         self.kwargs: Dict[str, Any] = kwargs
         self._f = None
+
+    def _collect_args(self, args: Union[Tuple[Any], List[Any]]):
+        for arg in args:
+            if isinstance(arg, (list, tuple)):
+                self._collect_args(arg)
+                continue
+            if isinstance(arg, Output):
+                self.outputs.append(arg)
+                continue
+            # TODO: Split in input/state or not?
+            if isinstance(arg, (Input, State)):
+                self.inputs.append(arg)
+                continue
+            # If we get here, the argument was not recognized.
+            msg = f"Callback blueprint received an unsupported argument: {arg}"
+            raise ValueError(msg)
 
     @property
     def f(self):
@@ -133,20 +148,6 @@ class CallbackBlueprint:
             return False
         # The ALL and ALLSMALLER flags indicate multi output.
         return any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
-
-
-def _collect_args(args: Union[Tuple[Any], List[Any]], dst_map):
-    for arg in args:
-        if isinstance(arg, (list, tuple)):
-            _collect_args(arg, dst_map)
-            continue
-        for t in dst_map:
-            if isinstance(arg, t):
-                dst_map[t].append(arg)
-                continue
-        # If we get here, the argument was not recognized.
-        msg = f"Callback blueprint received an unsupported argument: {arg}"
-        raise ValueError(msg)
 
 
 class DashBlueprint:
