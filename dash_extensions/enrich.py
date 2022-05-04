@@ -30,8 +30,12 @@ from dash import (  # lgtm [py/unused-import]
     callback,
     clientside_callback,
 )
+from dash._grouping import flatten_grouping
 from dash._utils import patch_collections_abc
-from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
+from dash._validate import validate_and_group_input_args
+from dash.dependencies import _Wildcard, DashDependency, \
+    extract_grouped_input_state_callback_args, extract_grouped_output_callback_args, \
+    compute_input_state_grouping_indices  # lgtm [py/unused-import]
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -44,12 +48,14 @@ from dash_extensions import CycleBreaker
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
+
 # region Enriched dependencies
 
 class Input(dash.Input):
     def __init__(self, component_id, component_property, break_cycle=False):
         super().__init__(component_id, component_property)
         self.break_cycle = break_cycle
+
 
 # endregion
 
@@ -62,29 +68,50 @@ class CallbackBlueprint:
     def __init__(self, *args, **kwargs):
         self.outputs: List[Output] = []
         self.inputs: List[CbInput] = []
-        args = list(args)
-        for k in ["output", "inputs", "state"]:
-            if k in kwargs:
-                args.append(kwargs.pop(k))
-        self._collect_args(args)
+        self.input_indices = None
+        self.output_grouping = None
+        # Collect args "normally".
+        dst_map = {(Input, State): [], Output: []}
+        _collect_args(args, dst_map)
+        # Flexible signature handling via keyword arguments. If provided, it takes precedence.
+        if "output" in kwargs:
+            output_arg = dict(output=kwargs.pop("output"))
+            self.output_grouping = extract_grouped_output_callback_args(None, output_arg)
+            self.outputs = flatten_grouping(self.output_grouping)
+        if "inputs" in kwargs:
+            input_state_args = dict(inputs=kwargs.pop("inputs"), state=kwargs.pop("state", None))
+            inputs_state = extract_grouped_input_state_callback_args(None, input_state_args)
+            flat_inputs, flat_state, input_state_indices = compute_input_state_grouping_indices(inputs_state)
+            self.inputs = flat_inputs + flat_state  # TODO: Is this correct?
+            self.input_indices = input_state_indices
+        # Collect the rest.
         self.kwargs: Dict[str, Any] = kwargs
-        self.f = None
+        self._f = None
 
-    def _collect_args(self, args: Union[Tuple[Any], List[Any]]):
-        for arg in args:
-            if isinstance(arg, (list, tuple)):
-                self._collect_args(arg)
-                continue
-            if isinstance(arg, Output):
-                self.outputs.append(arg)
-                continue
-            # TODO: Split in input/state or not?
-            if isinstance(arg, (Input, State)):
-                self.inputs.append(arg)
-                continue
-            # If we get here, the argument was not recognized.
-            msg = f"Callback blueprint received an unsupported argument: {arg}"
-            raise ValueError(msg)
+    @property
+    def f(self):
+        # For clientside callbacks, don't do flexible callback stuff.
+        if isinstance(self._f, (str, ClientsideFunction)):
+            return self._f
+        # Normal callback, don't do anything.
+        if self.input_indices is None and self.output_grouping is None:
+            return self._f
+        # Flexible callback, apply packing stuff.
+
+        def apply_grouping(f):
+            @functools.wraps(f)
+            def decorated_function(*args):
+                f_args, f_kwargs = validate_and_group_input_args(args, self.input_indices)
+                outputs = f(*f_args, **f_kwargs)
+                flat_outputs = flatten_grouping(outputs, self.output_grouping)
+                return flat_outputs
+            return decorated_function
+
+        return apply_grouping(self._f)  # TODO: FIX
+
+    @f.setter
+    def f(self, f):
+        self._f = f
 
     @property
     def uid(self) -> str:
@@ -106,6 +133,20 @@ class CallbackBlueprint:
             return False
         # The ALL and ALLSMALLER flags indicate multi output.
         return any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
+
+
+def _collect_args(args: Union[Tuple[Any], List[Any]], dst_map):
+    for arg in args:
+        if isinstance(arg, (list, tuple)):
+            _collect_args(arg, dst_map)
+            continue
+        for t in dst_map:
+            if isinstance(arg, t):
+                dst_map[t].append(arg)
+                continue
+        # If we get here, the argument was not recognized.
+        msg = f"Callback blueprint received an unsupported argument: {arg}"
+        raise ValueError(msg)
 
 
 class DashBlueprint:

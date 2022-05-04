@@ -3,10 +3,7 @@ import os
 import time
 import pandas as pd
 import dash
-
 from dash.exceptions import PreventUpdate
-from selenium.webdriver.chrome.webdriver import WebDriver
-
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform
@@ -90,6 +87,9 @@ def test_callback_blueprint():
         hello="world"
     )
     assert cbp.kwargs == dict(hello="world")
+
+
+def test_flexible_callback_signature():
     # Test input/output/state as kwargs.
     cbp = CallbackBlueprint(
         output=[Output("o", "prop")],
@@ -100,6 +100,34 @@ def test_callback_blueprint():
     assert cbp.inputs == [Input("i", "prop"), State("s", "prop")]
     assert cbp.outputs == [Output("o", "prop")]
     assert cbp.kwargs == dict(hello="world")
+    # Test dict grouping.
+    cbp = CallbackBlueprint(
+        output=dict(o=Output("o", "prop"), u=Output("u", "prop")),
+        inputs=dict(i=Input("i", "prop"), s=State("s", "prop")),
+        hello="world"
+    )
+    assert cbp.inputs == [Input("i", "prop"), State("s", "prop")]
+    assert cbp.outputs == [Output("o", "prop"), Output("u", "prop")]
+    assert cbp.kwargs == dict(hello="world")
+
+
+def test_flexible_callback_signature_in_app(dash_duo):
+    app = DashProxy()
+    app.layout = html.Div([
+        html.Div(id="a", children="a"),
+        html.Div(id="b", children="b"),
+        html.Div(id="log", children=None),
+    ])
+
+    @app.callback(output=dict(x=Output("log", "children")),
+                  inputs=dict(a=Input("a", "children"), b=Input("b", "children")))
+    def update_x(b, a):
+        return dict(x=f"{a}_{b}")
+
+    dash_duo.start_server(app)
+    time.sleep(0.1)
+    x = dash_duo.find_element("#log")
+    assert x.text == "a_b"
 
 
 def test_dash_proxy(dash_duo):
