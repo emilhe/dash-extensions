@@ -39,7 +39,6 @@ from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple
 from datetime import datetime
-
 from dash_extensions import CycleBreaker
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
@@ -63,6 +62,10 @@ class CallbackBlueprint:
     def __init__(self, *args, **kwargs):
         self.outputs: List[Output] = []
         self.inputs: List[CbInput] = []
+        args = list(args)
+        for k in ["output", "inputs", "state"]:
+            if k in kwargs:
+                args.append(kwargs.pop(k))
         self._collect_args(args)
         self.kwargs: Dict[str, Any] = kwargs
         self.f = None

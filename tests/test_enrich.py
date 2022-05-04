@@ -90,6 +90,16 @@ def test_callback_blueprint():
         hello="world"
     )
     assert cbp.kwargs == dict(hello="world")
+    # Test input/output/state as kwargs.
+    cbp = CallbackBlueprint(
+        output=[Output("o", "prop")],
+        inputs=[Input("i", "prop")],
+        state=[State("s", "prop")],
+        hello="world"
+    )
+    assert cbp.inputs == [Input("i", "prop"), State("s", "prop")]
+    assert cbp.outputs == [Output("o", "prop")]
+    assert cbp.kwargs == dict(hello="world")
 
 
 def test_dash_proxy(dash_duo):
