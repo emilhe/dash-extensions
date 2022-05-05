@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Add [location path name in `WebSocket` component default url]_(https://github.com/thedirtyfew/dash-extensions/pull/91) by @0x0ACB
+- Add [location path name in `WebSocket` component default url](https://github.com/thedirtyfew/dash-extensions/pull/91) by @0x0ACB
 - Improve `BlockingCallbackTransform` adding a [final callback invocation blocking ends](https://github.com/thedirtyfew/dash-extensions/pull/169) by @TomaszRewak
 - Bug when a single output of list type was used with `LogTransform` and `BlockingCallbackTransform` fixed by @TomaszRewak
 - Bug where an attempt was made to write to read-only properties in `hijack` utility function fixed by @RafaelWO
