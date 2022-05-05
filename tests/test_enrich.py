@@ -2,11 +2,8 @@ import decimal
 import os
 import time
 import pandas as pd
-import dash
 
 from dash.exceptions import PreventUpdate
-from selenium.webdriver.chrome.webdriver import WebDriver
-
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform
