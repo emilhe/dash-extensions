@@ -404,9 +404,15 @@ class BlockingCallbackTransform(DashTransform):
             start_client_id = f"{callback_id}_start_client"
             end_server_id = f"{callback_id}_end_server"
             end_client_id = f"{callback_id}_end_client"
-            self.components.extend(
-                [dcc.Store(id=start_client_id), dcc.Store(id=end_server_id), dcc.Store(id=end_client_id)]
-            )
+            start_blocked_id = f"{callback_id}_start_blocked"
+            end_blocked_id = f"{callback_id}_end_blocked"
+            self.components.extend([
+                dcc.Store(id=start_client_id),
+                dcc.Store(id=end_server_id),
+                dcc.Store(id=end_client_id),
+                dcc.Store(id=start_blocked_id),
+                CycleBreaker(id=end_blocked_id)
+            ])
             # Bind start signal callback.
             start_callback = f"""function()
             {{
@@ -414,29 +420,41 @@ class BlockingCallbackTransform(DashTransform):
                 const end = arguments[arguments.length-1];
                 const now = new Date().getTime();
                 if(!end & !start){{
-                    return now;
+                    return [now, null];
                 }}
-                if((now - start)/1000 > {timeout}){{              
-                    console.log("HITTING TIMEOUT");  
-                    return now;
+                if((now - start)/1000 > {timeout}){{
+                    // timed out
+                    return [now, null];
                 }}
                 if(!end){{
-                    return window.dash_clientside.no_update;
+                    // blocked
+                    return [window.dash_clientside.no_update, now];
                 }}
                 if(end > start){{
-                    return now;
+                    return [now, null];
                 }}
-                return window.dash_clientside.no_update;
+                return [window.dash_clientside.no_update, now];
             }}"""
             self.blueprint.clientside_callback(
                 start_callback,
-                Output(start_client_id, "data"),
-                callback.inputs,
+                [Output(start_client_id, "data"), Output(start_blocked_id, "data")],
+                callback.inputs + [Input(end_blocked_id, "dst")],
                 [State(start_client_id, "data"), State(end_client_id, "data")],
             )
             # Bind end signal callback.
+            end_callback = """function(endServerId, startBlockedId)
+            {
+                const now = new Date().getTime();
+                if(startBlockedId){
+                    return [now, now];
+                }
+                return [now, window.dash_clientside.no_update];
+            }"""
             self.blueprint.clientside_callback(
-                "function(){return new Date().getTime();}", Output(end_client_id, "data"), Input(end_server_id, "data")
+                end_callback,
+                [Output(end_client_id, "data"), Output(end_blocked_id, "src")],
+                Input(end_server_id, "data"),
+                State(start_blocked_id, "data")
             )
             # Modify the original callback to send finished signal.
             single_output = len(callback.outputs) <= 1
