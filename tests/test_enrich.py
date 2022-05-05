@@ -109,6 +109,15 @@ def test_flexible_callback_signature():
     assert cbp.inputs == [Input("i", "prop"), State("s", "prop")]
     assert cbp.outputs == [Output("o", "prop"), Output("u", "prop")]
     assert cbp.kwargs == dict(hello="world")
+    # Test complex dict grouping.
+    cbp = CallbackBlueprint(
+        output=[Output("o", "prop"), Output("u", "prop")],
+        inputs=dict(w=dict(i=Input("i", "prop"), s=State("s", "prop")), z=dict(i=Input("i2", "prop"))),
+        hello="world"
+    )
+    assert cbp.inputs == [Input("i", "prop"), Input("i2", "prop"), State("s", "prop")]
+    assert cbp.outputs == [Output("o", "prop"), Output("u", "prop")]
+    assert cbp.kwargs == dict(hello="world")
 
 
 def test_flexible_callback_signature_in_app(dash_duo):
@@ -120,9 +129,9 @@ def test_flexible_callback_signature_in_app(dash_duo):
     ])
 
     @app.callback(output=dict(x=Output("log", "children")),
-                  inputs=dict(a=Input("a", "children"), b=Input("b", "children")))
-    def update_x(b, a):
-        return dict(x=f"{a}_{b}")
+                  inputs=dict(dict(g=dict(a=Input("a", "children"), b=Input("b", "children")))))
+    def update_x(g):
+        return dict(x=f"{g['a']}_{g['b']}")
 
     dash_duo.start_server(app)
     time.sleep(0.1)
