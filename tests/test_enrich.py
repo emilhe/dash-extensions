@@ -251,6 +251,23 @@ def test_blocking_callback_transform(dash_duo):
     assert dash_duo.find_element("#log").text == msg
 
 
+def test_blocking_callback_transform_final_invocation(dash_duo):
+    app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
+    app.layout = html.Div([html.Div(id="log"), dcc.Input(id="input")])
+
+    @app.callback(Output("log", "children"), Input("input", "value"), blocking=True)
+    def update(value):
+        time.sleep(0.2)
+        return value
+
+    dash_duo.start_server(app)
+    f = dash_duo.find_element("#input")
+    f.send_keys("a")
+    f.send_keys("b")
+    f.send_keys("c")
+    dash_duo.wait_for_text_to_equal("#log", "abc", timeout=5)  # final invocation
+
+
 def test_serverside_output_transform(dash_duo):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
     app.layout = html.Div([
