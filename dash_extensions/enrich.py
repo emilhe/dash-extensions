@@ -617,9 +617,9 @@ class LogTransform(DashTransform):
             single_output = len(callback.outputs) <= 1
             flex_key = callback.add_output(self.log_config.log_output)
             # Modify the callback function accordingly.
-            f = callback.f
+            f = callback._f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback.f = bind_logger(logger, single_output, flex_key)(f)
+            callback._f = bind_logger(logger, single_output, flex_key)(f)
 
         return callbacks
 

@@ -337,6 +337,7 @@ def test_blocking_callback_transform_final_invocation(dash_duo):
     dash_duo.wait_for_text_to_equal("#log", "abc", timeout=5)  # final invocation
 
 
+# TODO: ADD FLEX TEST
 def test_serverside_output_transform(dash_duo):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
     app.layout = html.Div([
@@ -401,10 +402,15 @@ def test_serverside_output_transform_memoize(dash_duo):
     assert dash_duo.find_element("#log2").text == "1"
 
 
-def test_log_transform(dash_duo):
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([Output("log_server", "children"), Input("btn", "n_clicks")], dict()),
+     ([], dict(output=[Output("log_server", "children")],
+               inputs=dict(n_clicks=Input("btn", "n_clicks"))))])
+def test_log_transform(dash_duo, args, kwargs):
     app = _get_basic_dash_proxy(transforms=[LogTransform(try_use_mantine=False)])
 
-    @app.callback(Output("log_server", "children"), Input("btn", "n_clicks"), log=True)
+    @app.callback(*args, **kwargs, log=True)
     def update_log(n_clicks, dash_logger: DashLogger):
         dash_logger.info("info")
         dash_logger.warning("warning")
