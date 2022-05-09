@@ -337,8 +337,12 @@ def test_blocking_callback_transform_final_invocation(dash_duo):
     dash_duo.wait_for_text_to_equal("#log", "abc", timeout=5)  # final invocation
 
 
-# TODO: ADD FLEX TEST
-def test_serverside_output_transform(dash_duo):
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([ServersideOutput("store", "children"), Input("btn", "n_clicks")], dict()),
+     ([], dict(output=[ServersideOutput("store", "children")],
+               inputs=dict(n_clicks=Input("btn", "n_clicks"))))])
+def test_serverside_output_transform(dash_duo, args, kwargs):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
     app.layout = html.Div([
         html.Button(id="btn"),
@@ -346,8 +350,8 @@ def test_serverside_output_transform(dash_duo):
         html.Div(id="log"),
     ])
 
-    @app.callback(ServersideOutput("store", "children"), Input("btn", "n_clicks"))
-    def update_default(_):
+    @app.callback(*args, **kwargs)
+    def update_default(n_clicks):
         return pd.DataFrame(columns=["A"], data=[1])
 
     @app.callback(Output("log", "children"), Input("store", "children"))
@@ -359,7 +363,7 @@ def test_serverside_output_transform(dash_duo):
     assert dash_duo.find_element("#store").text == ""
     assert dash_duo.find_element("#log").text == ""
     dash_duo.find_element("#btn").click()
-    time.sleep(0.01)  # wait for callback code to execute.
+    time.sleep(0.2)  # wait for callback code to execute.
     assert dash_duo.find_element("#store").text != ""
     assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
 

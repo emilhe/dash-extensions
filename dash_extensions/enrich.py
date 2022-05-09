@@ -142,13 +142,11 @@ class CallbackBlueprint:
             @functools.wraps(f)
             def decorated_function(*args):
                 f_args, f_kwargs = validate_and_group_input_args(args, self.input_indices)
-                outputs = f(*f_args, **f_kwargs)
-                flat_outputs = flatten_grouping(outputs, self.output_grouping)
-                return flat_outputs
+                return f(*f_args, **f_kwargs)
 
             return decorated_function
 
-        return apply_grouping(self._f)  # TODO: FIX
+        return apply_grouping(self._f)
 
     @f.setter
     def f(self, f):
@@ -218,7 +216,10 @@ class DashBlueprint:
         # Register callbacks on the "real" app object.
         for cbp in callbacks:
             o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
-            app.callback(o, cbp.inputs, **cbp.kwargs)(cbp.f)
+            if cbp.output_grouping:
+                app.callback(cbp.inputs, output=cbp.output_grouping, **cbp.kwargs)(cbp.f)
+            else:
+                app.callback(o, cbp.inputs, **cbp.kwargs)(cbp.f)
         for cbp in clientside_callbacks:
             o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
             app.clientside_callback(cbp.f, o, cbp.inputs, **cbp.kwargs)
@@ -953,7 +954,7 @@ class MultiplexerTransform(DashTransform):
             # Assign proxy element as output.
             callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped, _mp_prop())
             # Create proxy input.
-            callback.add_input(Input(mp_id, _mp_prop()))
+            inputs.append(Input(mp_id, _mp_prop()))
         # Collect proxy elements to add to layout.
         self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
@@ -1035,12 +1036,12 @@ class ServersideOutputTransform(DashTransform):
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
             if any(serverside_outputs):
-                f = callback.f
-                callback.f = _unpack_outputs(serverside_outputs)(f)
+                f = callback._f
+                callback._f = _unpack_outputs(serverside_outputs)(f)
         # 3) Apply the caching itself.
         for i, callback in enumerate(serverside_callbacks):
-            f = callback.f
-            callback.f = _pack_outputs(callback)(f)
+            f = callback._f
+            callback._f = _pack_outputs(callback)(f)
         # 4) Strip special args.
         for callback in callbacks:
             for key in ["memoize"]:
@@ -1052,9 +1053,9 @@ class ServersideOutputTransform(DashTransform):
 def _unpack_outputs(serverside_outputs):
     def unpack(f):
         @functools.wraps(f)
-        def decorated_function(*args):
+        def decorated_function(*args, **kwargs):
             if not any(serverside_outputs):
-                return f(*args)
+                return f(*args, **kwargs)
             args = list(args)
             for i, serverside_output in enumerate(serverside_outputs):
                 # Just skip elements that are not stored server side.
@@ -1066,7 +1067,7 @@ def _unpack_outputs(serverside_outputs):
                 except TypeError as ex:
                     # TODO: Should we do anything about this?
                     args[i] = None
-            return f(*args)
+            return f(*args, **kwargs)
 
         return decorated_function
 
@@ -1078,7 +1079,7 @@ def _pack_outputs(callback):
 
     def packed_callback(f):
         @functools.wraps(f)
-        def decorated_function(*args):
+        def decorated_function(*args, **kwargs):
             multi_output = callback.multi_output
             # If memoize is enabled, we check if the cache already has a valid value.
             if memoize:
@@ -1105,7 +1106,7 @@ def _pack_outputs(callback):
                     ]
                     return results if multi_output else results[0]
             # Do the update.
-            data = f(*args)
+            data = f(*args, **kwargs)
             data = list(data) if multi_output else [data]
             if callable(memoize):
                 data = memoize(data)
