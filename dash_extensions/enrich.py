@@ -44,6 +44,7 @@ from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple
 from datetime import datetime
 from dash_extensions import CycleBreaker
+from dash.dependencies import DashDependency
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -103,18 +104,28 @@ class CallbackBlueprint:
             msg = f"Callback blueprint received an unsupported argument: {arg}"
             raise ValueError(msg)
 
-    def add_output(self, output: Output, flex_key=None) -> str:
-        self.outputs.append(output)
+    @staticmethod
+    def _add_flex(dep: DashDependency, dst, value, grouping, flex_key=None) -> Union[str, int, None]:
+        next_index = len(dst)
+        dst.append(dep)
         # Check if flex signature.
-        if self.output_grouping is None:
-            return
+        if grouping is None:
+            return next_index
         # Handle flex signature.
-        if isinstance(self.output_grouping, list):
-            self.output_grouping.append(output)
-        if isinstance(self.output_grouping, dict):
-            flex_key = f"{output.component_id}_{output.component_property}" if flex_key is None else flex_key
-            self.output_grouping[flex_key] = output
+        if isinstance(grouping, list):
+            grouping.append(value)
+            return next_index
+        if isinstance(grouping, dict):
+            flex_key = f"{dep.component_id}_{dep.component_property}" if flex_key is None else flex_key
+            grouping[flex_key] = value
             return flex_key
+        raise ValueError("Flex add failed.")
+
+    def add_input(self, i: CbInput, flex_key=None) -> Union[str, int, None]:
+        return self._add_flex(i, self.inputs, len(self.inputs), self.input_indices, flex_key)
+
+    def add_output(self, o: Output, flex_key=None) -> Union[str, int, None]:
+        return self._add_flex(o, self.outputs, o, self.output_grouping, flex_key)
 
     @property
     def f(self):
@@ -473,23 +484,25 @@ class BlockingCallbackTransform(DashTransform):
             )
             # Modify the original callback to send finished signal.
             single_output = len(callback.outputs) <= 1
-            flex_key = callback.add_output(Output(end_server_id, "data"))
-            # Modify the original callback to not trigger on inputs, but the new special trigger.
-            new_state = [State(item.component_id, item.component_property) for item in callback.inputs]
-            callback.inputs = [Input(start_client_id, "data")] + new_state
+            out_flex_key = callback.add_output(Output(end_server_id, "data"))
+            # Change original inputs to state.
+            callback.inputs = [State(item.component_id, item.component_property) for item in callback.inputs]
+            # Add new input trigger.
+            in_flex_key = callback.add_input(Input(start_client_id, "data"))
             # Modify the callback function accordingly.
-            f = callback.f
-            callback.f = skip_input_signal_add_output_signal(single_output, flex_key)(f)
+            f = callback._f
+            callback._f = skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key)(f)
 
         return callbacks
 
 
-def skip_input_signal_add_output_signal(single_output: bool, flex_key: str):
+def skip_input_signal_add_output_signal(single_output: bool, out_flex_key, in_flex_key):
     def wrapper(f):
         @functools.wraps(f)
-        def decorated_function(*args):
-            outputs = f(*args[1:])
-            return _append_output(outputs, datetime.utcnow().timestamp(), single_output, flex_key)
+        def decorated_function(*args, **kwargs):
+            args, kwargs = _skip_input(args, kwargs, in_flex_key)
+            outputs = f(*args, **kwargs)
+            return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
 
         return decorated_function
 
@@ -604,9 +617,9 @@ class LogTransform(DashTransform):
             single_output = len(callback.outputs) <= 1
             flex_key = callback.add_output(self.log_config.log_output)
             # Modify the callback function accordingly.
-            f = callback._f
+            f = callback.f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback._f = bind_logger(logger, single_output, flex_key)(f)
+            callback.f = bind_logger(logger, single_output, flex_key)(f)
 
         return callbacks
 
@@ -625,6 +638,7 @@ def bind_logger(logger, single_output, flex_key):
         return decorated_function
 
     return wrapper
+
 
 # endregion
 
@@ -939,7 +953,7 @@ class MultiplexerTransform(DashTransform):
             # Assign proxy element as output.
             callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped, _mp_prop())
             # Create proxy input.
-            inputs.append(Input(mp_id, _mp_prop()))
+            callback.add_input(Input(mp_id, _mp_prop()))
         # Collect proxy elements to add to layout.
         self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
@@ -1242,13 +1256,21 @@ def _as_list(item):
     return [item]
 
 
+def _skip_input(args, kwargs, flex_key):
+    if isinstance(flex_key, str):
+        kwargs.pop(flex_key)
+    else:
+        args = list(args)
+        args.pop(flex_key)
+    return args, kwargs
+
 
 def _append_output(outputs, value, single_output, flex_key):
     # Handle single output.
-    if single_output and not flex_key:
+    if single_output and not isinstance(flex_key, str):
         return [outputs, value]
     # Handle flex signature.
-    if isinstance(value, dict):
+    if isinstance(outputs, dict):
         outputs[flex_key] = value
         return outputs
     # Finally, the "normal" case.

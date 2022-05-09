@@ -2,6 +2,7 @@ import decimal
 import os
 import time
 import pandas as pd
+import pytest
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
@@ -20,10 +21,19 @@ def _get_basic_dash_proxy(**kwargs) -> DashProxy:
     return app
 
 
-def _bind_basic_callback(app):
+def _bind_basic_callback(app, flex=False):
+    if flex:
+        return _bind_basic_callback_flex(app)
+
     @app.callback(Output("log_server", "children"), Input("btn", "n_clicks"))
     def update_log(n_clicks):
         return n_clicks
+
+
+def _bind_basic_callback_flex(app):
+    @app.callback(output=dict(n=Output("log_server", "children")), inputs=dict(n_clicks=Input("btn", "n_clicks")))
+    def update_log(n_clicks):
+        return dict(n=n_clicks)
 
 
 def _bind_basic_clientside_callback(app):
@@ -146,13 +156,17 @@ def test_dash_proxy(dash_duo):
     _basic_dash_proxy_test(dash_duo, app)
 
 
-def test_no_output_transform(dash_duo):
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([Input("btn", "n_clicks")], dict()),
+     ([], dict(inputs=dict(n_clicks=Input("btn", "n_clicks"))))])
+def test_no_output_transform(dash_duo, args, kwargs):
     app = DashProxy()
     app.layout = html.Div([
         html.Button(id="btn"),
     ])
 
-    @app.callback(Input("btn", "n_clicks"))
+    @app.callback(*args, **kwargs)
     def update(n_clicks):
         return n_clicks
 
@@ -168,6 +182,7 @@ def test_no_output_transform(dash_duo):
     dash_duo.find_element("#btn").click()
 
 
+# TODO: Flex support would require code changes.
 def test_trigger_transform(dash_duo):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[TriggerTransform()])
     app.layout = html.Div([
@@ -204,6 +219,7 @@ def test_trigger_transform(dash_duo):
     assert log.text == "1-1"
 
 
+# TODO: ADD FLEX TEST
 def test_multiplexer_transform(dash_duo):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[MultiplexerTransform()])
     app.layout = html.Div([
@@ -229,6 +245,7 @@ def test_multiplexer_transform(dash_duo):
     assert log.text == "right"
 
 
+# TODO: ADD FLEX TEST
 def test_multiplexer_transform_wildcard(dash_duo):
     def make_callback(i):
         @app.callback(Output({"type": "div", "id": ALL}, "children"),
@@ -260,9 +277,10 @@ def test_multiplexer_transform_wildcard(dash_duo):
     assert dash_duo.find_element(cssid(id="1", type="div")).text == "Hello from group 1"
 
 
-def test_prefix_id_transform(dash_duo):
+@pytest.mark.parametrize('flex', [False, True])
+def test_prefix_id_transform(dash_duo, flex):
     app = _get_basic_dash_proxy(transforms=[PrefixIdTransform(prefix="x")])
-    _bind_basic_callback(app)
+    _bind_basic_callback(app, flex)
     _bind_basic_clientside_callback(app)
     # Check that both server and client side callbacks work.
     _basic_dash_proxy_test(dash_duo, app, ["x-log_server", "x-log_client"], "x-btn")
@@ -281,13 +299,18 @@ def test_global_blueprint(dash_duo):
     _basic_dash_proxy_test(dash_duo, app)
 
 
-def test_blocking_callback_transform(dash_duo):
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([Output("log", "children"), Input("trigger", "n_intervals")], dict()),
+     ([], dict(output=[Output("log", "children")],
+               inputs=dict(tick=Input("trigger", "n_intervals"))))])
+def test_blocking_callback_transform(dash_duo, args, kwargs):
     app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
     app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=500)])
     msg = "Hello world!"
 
-    @app.callback(Output("log", "children"), Input("trigger", "n_intervals"), blocking=True)
-    def update(_):
+    @app.callback(*args, **kwargs, blocking=True)
+    def update(tick):
         time.sleep(1)
         return msg
 
