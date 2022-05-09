@@ -340,7 +340,7 @@ def test_blocking_callback_transform_final_invocation(dash_duo):
 @pytest.mark.parametrize(
     'args, kwargs',
     [([ServersideOutput("store", "children"), Input("btn", "n_clicks")], dict()),
-     ([], dict(output=[ServersideOutput("store", "children")],
+     ([], dict(output=ServersideOutput("store", "children"),
                inputs=dict(n_clicks=Input("btn", "n_clicks"))))])
 def test_serverside_output_transform(dash_duo, args, kwargs):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
@@ -363,7 +363,7 @@ def test_serverside_output_transform(dash_duo, args, kwargs):
     assert dash_duo.find_element("#store").text == ""
     assert dash_duo.find_element("#log").text == ""
     dash_duo.find_element("#btn").click()
-    time.sleep(0.2)  # wait for callback code to execute.
+    time.sleep(0.1)  # wait for callback code to execute.
     assert dash_duo.find_element("#store").text != ""
     assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
 
