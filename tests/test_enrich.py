@@ -182,7 +182,6 @@ def test_no_output_transform(dash_duo, args, kwargs):
     dash_duo.find_element("#btn").click()
 
 
-# TODO: Flex support would require code changes.
 def test_trigger_transform(dash_duo):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[TriggerTransform()])
     app.layout = html.Div([
@@ -219,8 +218,11 @@ def test_trigger_transform(dash_duo):
     assert log.text == "1-1"
 
 
-# TODO: ADD FLEX TEST
-def test_multiplexer_transform(dash_duo):
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([Output("log", "children"), Input("right", "n_clicks")], dict()),
+     ([], dict(output=Output("log", "children"), inputs=dict(n_clicks=Input("right", "n_clicks"))))])
+def test_multiplexer_transform(dash_duo, args, kwargs):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[MultiplexerTransform()])
     app.layout = html.Div([
         html.Button(id="left"),
@@ -230,7 +232,7 @@ def test_multiplexer_transform(dash_duo):
     app.clientside_callback("function(x){return 'left'}", Output("log", "children"), Input("left", "n_clicks"))
 
     @app.callback(Output("log", "children"), Input("right", "n_clicks"))
-    def update_right(_):
+    def update_right(n_clicks):
         return "right"
 
     # Check that the app works.
@@ -245,7 +247,6 @@ def test_multiplexer_transform(dash_duo):
     assert log.text == "right"
 
 
-# TODO: ADD FLEX TEST
 def test_multiplexer_transform_wildcard(dash_duo):
     def make_callback(i):
         @app.callback(Output({"type": "div", "id": ALL}, "children"),
@@ -427,7 +428,14 @@ def test_log_transform(dash_duo, args, kwargs):
     assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
 
 
-def test_cycle_breaker_transform(dash_duo):
+@pytest.mark.parametrize(
+    'c_args, c_kwargs, f_args, f_kwargs',
+    [([Output("celsius", "value"), Input("fahrenheit", "value", break_cycle=True)], dict(),
+      [Output("fahrenheit", "value"), Input("celsius", "value")], dict()),
+     ([], dict(output=Output("celsius", "value"), inputs=dict(value=Input("fahrenheit", "value", break_cycle=True))),
+      [], dict(output=Output("fahrenheit", "value"), inputs=dict(value=Input("celsius", "value"))))
+     ])
+def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
     app = DashProxy(transforms=[CycleBreakerTransform()])
     app.layout = html.Div([
         dcc.Input(id="celsius", type="number"),
@@ -442,11 +450,11 @@ def test_cycle_breaker_transform(dash_duo):
         except ValueError:
             raise PreventUpdate()
 
-    @app.callback(Output("celsius", "value"), Input("fahrenheit", "value", break_cycle=True))
+    @app.callback(*c_args, **c_kwargs)
     def update_celsius(value):
         return str((validate_input(value) - 32) / 9 * 5)
 
-    @app.callback(Output("fahrenheit", "value"), Input("celsius", "value"))
+    @app.callback(*f_args, **f_kwargs)
     def update_fahrenheit(value):
         return str(validate_input(value) / 5 * 9 + 32)
 
