@@ -1,6 +1,8 @@
 import decimal
 import os
 import time
+
+import dash
 import pandas as pd
 import pytest
 from dash.exceptions import PreventUpdate
@@ -155,6 +157,18 @@ def test_dash_proxy(dash_duo):
     _bind_basic_clientside_callback(app)
     # Check that both server and client side callbacks work.
     _basic_dash_proxy_test(dash_duo, app)
+
+
+def test_dash_output_input_state_compatibility(dash_duo):
+    app = _get_basic_dash_proxy()
+
+    @app.callback(dash.Output("log_server", "children"),
+                  dash.Input("btn", "n_clicks"),
+                  dash.State("btn", "n_clicks"))
+    def update_log(n_clicks, state):
+        return n_clicks
+
+    _basic_dash_proxy_test(dash_duo, app, element_ids=["log_server"])
 
 
 @pytest.mark.parametrize(
