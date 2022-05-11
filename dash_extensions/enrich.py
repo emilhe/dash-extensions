@@ -16,6 +16,7 @@ from dash import (  # lgtm [py/unused-import]
     no_update,
     Output,
     State,
+    Input,
     ClientsideFunction,
     MATCH,
     ALL,
@@ -48,17 +49,6 @@ from dash.dependencies import DashDependency
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
-
-
-# region Enriched dependencies
-
-class Input(dash.Input):
-    def __init__(self, component_id, component_property, break_cycle=False):
-        super().__init__(component_id, component_property)
-        self.break_cycle = break_cycle
-
-
-# endregion
 
 # region Dash blueprint
 
@@ -660,7 +650,7 @@ class CycleBreakerTransform(DashTransform):
         # Update inputs.
         for c in callbacks + clientside_callbacks:
             for i in c.inputs:
-                if isinstance(i, Input) and i.break_cycle:
+                if isinstance(i, CycleBreakerInput):
                     cid = self._cycle_break_id(i)
                     cycle_inputs[cid] = (i.component_id, i.component_property)
                     i.component_id = cid
@@ -679,6 +669,11 @@ class CycleBreakerTransform(DashTransform):
     @staticmethod
     def _cycle_break_id(d: DashDependency):
         return f"{str(d).replace('.', '_')}_breaker"
+
+
+class CycleBreakerInput(Input):
+    def __init__(self, component_id, component_property):
+        super().__init__(component_id, component_property)
 
 
 # endregion

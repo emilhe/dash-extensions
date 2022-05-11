@@ -6,7 +6,8 @@ import pytest
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
-    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform
+    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
+    CycleBreakerInput
 
 
 # region Test utils/stubs
@@ -430,9 +431,9 @@ def test_log_transform(dash_duo, args, kwargs):
 
 @pytest.mark.parametrize(
     'c_args, c_kwargs, f_args, f_kwargs',
-    [([Output("celsius", "value"), Input("fahrenheit", "value", break_cycle=True)], dict(),
+    [([Output("celsius", "value"), CycleBreakerInput("fahrenheit", "value")], dict(),
       [Output("fahrenheit", "value"), Input("celsius", "value")], dict()),
-     ([], dict(output=Output("celsius", "value"), inputs=dict(value=Input("fahrenheit", "value", break_cycle=True))),
+     ([], dict(output=Output("celsius", "value"), inputs=dict(value=CycleBreakerInput("fahrenheit", "value"))),
       [], dict(output=Output("fahrenheit", "value"), inputs=dict(value=Input("celsius", "value"))))
      ])
 def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
