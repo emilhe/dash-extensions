@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - NOT RELEASED
+
+### Added
+
+- Added support for flexible callback signatures
+
+### Changed
+
+- Added `CycleBreakerInput` component, which is to be used instead of the `break_cycle` keyword in 0.1.1
+
 ## [0.1.1] - 10-05-22
 
 ### Added
