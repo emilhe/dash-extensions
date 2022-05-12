@@ -31,12 +31,8 @@ from dash import (  # lgtm [py/unused-import]
     callback,
     clientside_callback,
 )
-from dash._grouping import flatten_grouping
 from dash._utils import patch_collections_abc
-from dash._validate import validate_and_group_input_args
-from dash.dependencies import _Wildcard, DashDependency, \
-    extract_grouped_input_state_callback_args, extract_grouped_output_callback_args, \
-    compute_input_state_grouping_indices  # lgtm [py/unused-import]
+from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -45,7 +41,6 @@ from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple
 from datetime import datetime
 from dash_extensions import CycleBreaker
-from dash.dependencies import DashDependency
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
