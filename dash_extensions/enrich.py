@@ -50,6 +50,7 @@ from dash.dependencies import DashDependency
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
+DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
 
 # region DependencyCollection
 
@@ -70,7 +71,10 @@ def build_index(structure, entry, index):
 
 def validate_structure(structure, level=0):
     if isinstance(structure, DashDependency):
-        return [structure] if level == 0 else structure
+        # TODO: Maybe relax this constraint, would need some callback function modification though
+        if level == 0:
+            raise ValueError("Keyword dependencies must be list or dict")
+        return structure
     if isinstance(structure, tuple):
         result = list(structure)
         for i, entry in enumerate(result):
@@ -88,32 +92,38 @@ def validate_structure(structure, level=0):
 
 
 class DependencyCollection:
-    def __init__(self, structure):
+    def __init__(self, structure, append_prefix=None):
         self.structure = validate_structure(structure)
-        self.index = None
+        self._index = None
         self._re_index()
 
     def __getitem__(self, key: int):
         e = self.structure
-        for j in self.index[key]:
+        for j in self._index[key]:
             e = e[j]
         return e
 
     def __setitem__(self, key: int, value):
         e = self.structure
-        for i, j in enumerate(self.index[key]):
-            if i == len(self.index[key]) - 1:
+        for i, j in enumerate(self._index[key]):
+            if i == len(self._index[key]) - 1:
                 e[j] = value
 
     def __len__(self):
-        return len(self.index)
+        return len(self._index)
 
     def __iter__(self):
         for i in range(len(self)):
-            yield self._resolve(i)
+            yield self[i]
+
+    def index(self, value):
+        for i in range(len(self)):
+            if self[i] == value:
+                return i
+        return -1
 
     def append(self, value, key=None):
-        i = len(self.index)
+        i = len(self._index)
         if isinstance(self.structure, list):
             self.structure.append(value)
             self._re_index()
@@ -121,16 +131,10 @@ class DependencyCollection:
             key = i if key is None else key
             self.structure[key] = value
             self._re_index()
-        return i
-
-    def _resolve(self, i):
-        e = self.structure
-        for j in self.index[i]:
-            e = e[j]
-        return e
+        return f"{DEPENDENCY_APPEND_PREFIX}{i}"
 
     def _re_index(self):
-        self.index = build_index(self.structure, [], [])
+        self._index = build_index(self.structure, [], [])
 
 
 # endregion
@@ -494,7 +498,7 @@ class BlockingCallbackTransform(DashTransform):
             self.blueprint.clientside_callback(
                 start_callback,
                 [Output(start_client_id, "data"), Output(start_blocked_id, "data")],
-                callback.inputs + [Input(end_blocked_id, "dst")],
+                list(callback.inputs) + [Input(end_blocked_id, "dst")],
                 [State(start_client_id, "data"), State(end_client_id, "data")],
             )
             # Bind end signal callback.
@@ -514,19 +518,20 @@ class BlockingCallbackTransform(DashTransform):
             )
             # Modify the original callback to send finished signal.
             single_output = len(callback.outputs) <= 1
-            out_flex_key = callback.add_output(Output(end_server_id, "data"))
+            out_flex_key = callback.outputs.append(Output(end_server_id, "data"))
             # Change original inputs to state.
-            callback.inputs = [State(item.component_id, item.component_property) for item in callback.inputs]
+            for i, item in enumerate(callback.inputs):
+                callback.inputs[i] = State(item.component_id, item.component_property)
             # Add new input trigger.
-            in_flex_key = callback.add_input(Input(start_client_id, "data"))
+            in_flex_key = callback.inputs.append(Input(start_client_id, "data"))
             # Modify the callback function accordingly.
-            f = callback._f
-            callback._f = skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key)(f)
+            f = callback.f
+            callback.f = skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key)(f)
 
         return callbacks
 
 
-def skip_input_signal_add_output_signal(single_output: bool, out_flex_key, in_flex_key):
+def skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
@@ -1291,23 +1296,26 @@ def _as_list(item):
     return [item]
 
 
-def _skip_input(args, kwargs, flex_key):
-    if isinstance(flex_key, str):
-        kwargs.pop(flex_key)
+def _skip_input(args, kwargs, key=None):
+    if isinstance(key, str):
+        kwargs.pop(key)
     else:
         args = list(args)
-        args.pop(flex_key)
+        if key is not None:
+            args.pop(key)
+        else:
+            args.pop()
     return args, kwargs
 
 
-def _append_output(outputs, value, single_output, flex_key):
-    # Handle single output.
-    if single_output and not isinstance(flex_key, str):
-        return [outputs, value]
+def _append_output(outputs, value, single_output, out_key):
     # Handle flex signature.
     if isinstance(outputs, dict):
-        outputs[flex_key] = value
+        outputs[out_key] = value
         return outputs
+    # Handle single output.
+    if single_output:
+        return [outputs, value]
     # Finally, the "normal" case.
     return _as_list(outputs) + [value]
 

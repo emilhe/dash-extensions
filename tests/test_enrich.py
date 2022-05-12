@@ -65,9 +65,7 @@ def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
      ([Input("a", "prop"), Input("b", "prop"), Input("c", "prop")],
       [Input("a", "prop"), Input("b", "prop"), Input("c", "prop")]),
      ((Input("a", "prop"), Input("b", "prop"), Input("c", "prop")),
-      [Input("a", "prop"), Input("b", "prop"), Input("c", "prop")]),
-     (Input("a", "prop"),
-      [Input("a", "prop")])
+      [Input("a", "prop"), Input("b", "prop"), Input("c", "prop")])
      ])
 def test_dependency_collection(tst, flt):
     dc = DependencyCollection(tst)
@@ -81,8 +79,8 @@ def test_dependency_collection(tst, flt):
     dc[0] = Input("b", "prop")
     assert dc[0] == Input("b", "prop")
     # Test addition.
-    i_new = dc.append(Input("new", "prop"))
-    assert dc[i_new] == Input("new", "prop")
+    _ = dc.append(Input("new", "prop"))
+    assert dc[-1] == Input("new", "prop")
 
 
 def test_callback_blueprint():
@@ -262,7 +260,7 @@ def test_trigger_transform(dash_duo):
 @pytest.mark.parametrize(
     'args, kwargs',
     [([Output("log", "children"), Input("right", "n_clicks")], dict()),
-     ([], dict(output=Output("log", "children"), inputs=dict(n_clicks=Input("right", "n_clicks"))))])
+     ([], dict(output=[Output("log", "children")], inputs=dict(n_clicks=Input("right", "n_clicks"))))])
 def test_multiplexer_transform(dash_duo, args, kwargs):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[MultiplexerTransform()])
     app.layout = html.Div([
@@ -274,7 +272,7 @@ def test_multiplexer_transform(dash_duo, args, kwargs):
 
     @app.callback(*args, **kwargs)
     def update_right(n_clicks):
-        return "right"
+        return ["right"]
 
     # Check that the app works.
     dash_duo.start_server(app)
@@ -354,10 +352,10 @@ def test_blocking_callback_transform(dash_duo, args, kwargs):
     @app.callback(*args, **kwargs, blocking=True)
     def update(tick):
         time.sleep(1)
-        return msg
+        return [msg]
 
     # Check that stuff works. It doesn't using a normal Dash object.
-    dash_duo.start_server(app)
+    dash_duo.start_server(app, port=4757)
     dash_duo.wait_for_text_to_equal("#log", msg, timeout=5)
     assert dash_duo.find_element("#log").text == msg
 
