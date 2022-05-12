@@ -71,9 +71,8 @@ def build_index(structure, entry, index):
 
 def validate_structure(structure, level=0):
     if isinstance(structure, DashDependency):
-        # TODO: Maybe relax this constraint, would need some callback function modification though
         if level == 0:
-            raise ValueError("Keyword dependencies must be list or dict")
+            return [structure]
         return structure
     if isinstance(structure, tuple):
         result = list(structure)
@@ -92,8 +91,9 @@ def validate_structure(structure, level=0):
 
 
 class DependencyCollection:
-    def __init__(self, structure, append_prefix=None):
+    def __init__(self, structure, keyword=None):
         self.structure = validate_structure(structure)
+        self.keyword = keyword
         self._index = None
         self._re_index()
 
@@ -154,7 +154,7 @@ def collect_args(args: Union[Tuple[Any], List[Any]], inputs, outputs):
             continue
         # If we get here, the argument was not recognized.
         raise ValueError(f"Unsupported argument: {arg}")
-    return inputs, outputs
+    return DependencyCollection(inputs), DependencyCollection(outputs)
 
 
 class CallbackBlueprint:
@@ -163,9 +163,9 @@ class CallbackBlueprint:
         self.inputs, self.outputs = collect_args(args, [], [])
         # Flexible signature handling via keyword arguments. If provided, it takes precedence.
         if "output" in kwargs:
-            self.outputs = DependencyCollection(kwargs.pop("output"))
+            self.outputs = DependencyCollection(kwargs.pop("output"), keyword="output")
         if "inputs" in kwargs:
-            self.inputs = DependencyCollection(kwargs.pop("inputs"))
+            self.inputs = DependencyCollection(kwargs.pop("inputs"), keyword="inputs")
         if "state" in kwargs:
             raise ValueError("Please use the 'inputs' keyword instead of the 'state' keyword.")
         # Collect the rest.
@@ -173,24 +173,21 @@ class CallbackBlueprint:
         self.f = None
 
     def register(self, app: dash.Dash):
-        args = []
-        dependency_kwargs = {}
-        # Collect outputs.
-        if isinstance(self.outputs, DependencyCollection):
-            dependency_kwargs["output"] = self.outputs.structure
-        else:
-            o = self.outputs if len(self.outputs) > 1 else self.outputs[0]  # TODO: Is this still needed?
-            args.append(o)
-        # Collect inputs.
-        if isinstance(self.inputs, DependencyCollection):
-            dependency_kwargs["inputs"] = self.inputs.structure
-        else:
-            args.append(self.inputs)
+        # Collect dependencies.
+        dep_args, dep_kwargs = [], {}
+        for dep_col in [self.outputs, self.inputs]:
+            s = dep_col.structure
+            if isinstance(s, list) and len(s) == 1:
+                s = s[0]
+            if dep_col.keyword is None:
+                dep_args.append(s)
+            else:
+                dep_kwargs[dep_col.keyword] = s
         # Do binding.
         if isinstance(self.f, (str, ClientsideFunction)):
-            app.clientside_callback(self.f, *args, **dependency_kwargs, **self.kwargs)
+            app.clientside_callback(self.f, *dep_args, **dep_kwargs, **self.kwargs)
         else:
-            app.callback(*args, **dependency_kwargs, **self.kwargs)(self.f)
+            app.callback(*dep_args, **dep_kwargs, **self.kwargs)(self.f)
 
     @property
     def uid(self) -> str:

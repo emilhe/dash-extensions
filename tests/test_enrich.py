@@ -86,16 +86,16 @@ def test_dependency_collection(tst, flt):
 def test_callback_blueprint():
     # Test single element.
     cbp = CallbackBlueprint(State("s", "prop"), Output("o", "prop"), Input("i", "prop"))
-    assert cbp.outputs == [Output("o", "prop")]
-    assert cbp.inputs == [State("s", "prop"), Input("i", "prop")]
+    assert list(cbp.outputs) == [Output("o", "prop")]
+    assert list(cbp.inputs) == [State("s", "prop"), Input("i", "prop")]
     # Test list element.
     cbp = CallbackBlueprint(
         [State("s", "prop"), State("s2", "prop")],
         [Output("o", "prop")],
         [Input("i", "prop")]
     )
-    assert cbp.outputs == [Output("o", "prop")]
-    assert cbp.inputs == [State("s", "prop"), State("s2", "prop"), Input("i", "prop")]
+    assert list(cbp.outputs) == [Output("o", "prop")]
+    assert list(cbp.inputs) == [State("s", "prop"), State("s2", "prop"), Input("i", "prop")]
     # Test mix.
     cbp = CallbackBlueprint(
         [State("s", "prop"), State("s2", "prop")],
@@ -105,8 +105,8 @@ def test_callback_blueprint():
         [Input("i", "prop")],
         Output("o2", "prop")
     )
-    assert cbp.outputs == [Output("o", "prop"), Output("o2", "prop")]
-    assert cbp.inputs == [State("s", "prop"), State("s2", "prop"), Input("i0", "prop"),
+    assert list(cbp.outputs) == [Output("o", "prop"), Output("o2", "prop")]
+    assert list(cbp.inputs) == [State("s", "prop"), State("s2", "prop"), Input("i0", "prop"),
                           State("s3", "prop"), Input("i", "prop")]
     # Test variables.
     my_input = html.Button()
@@ -115,8 +115,8 @@ def test_callback_blueprint():
         Input(my_input, "n_clicks"),
         Output(my_output, "children")
     )
-    assert cbp.outputs == [Output(my_output, "children")]
-    assert cbp.inputs == [Input(my_input, "n_clicks")]
+    assert list(cbp.outputs) == [Output(my_output, "children")]
+    assert list(cbp.inputs) == [Input(my_input, "n_clicks")]
     # Test kwargs.
     cbp = CallbackBlueprint(
         Input(my_input, "n_clicks"),
