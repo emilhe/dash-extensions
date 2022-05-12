@@ -98,16 +98,10 @@ class DependencyCollection:
         self._re_index()
 
     def __getitem__(self, key: int):
-        e = self.structure
-        for j in self._index[key]:
-            e = e[j]
-        return e
+        return self.get(self._index[key])
 
     def __setitem__(self, key: int, value):
-        e = self.structure
-        for i, j in enumerate(self._index[key]):
-            if i == len(self._index[key]) - 1:
-                e[j] = value
+        return self.set(self._index[key], value)
 
     def __len__(self):
         return len(self._index)
@@ -122,16 +116,29 @@ class DependencyCollection:
                 return i
         return -1
 
-    def append(self, value, key=None):
+    def get(self, multi_index):
+        e = self.structure
+        for j in multi_index:
+            e = e[j]
+        return e
+
+    def set(self, multi_index, value):
+        e = self.structure
+        for i, j in enumerate(multi_index):
+            if i == len(multi_index) - 1:
+                e[j] = value
+
+    def append(self, value, flex_key=None):
         i = len(self._index)
         if isinstance(self.structure, list):
             self.structure.append(value)
             self._re_index()
+            return i
         if isinstance(self.structure, dict):
-            key = i if key is None else key
-            self.structure[key] = value
+            flex_key = f"{DEPENDENCY_APPEND_PREFIX}{i}" if flex_key is None else flex_key
+            self.structure[flex_key] = value
             self._re_index()
-        return f"{DEPENDENCY_APPEND_PREFIX}{i}"
+            return flex_key
 
     def _re_index(self):
         self._index = build_index(self.structure, [], [])
@@ -647,11 +654,11 @@ class LogTransform(DashTransform):
                 continue
             # Add the log component as output.
             single_output = len(callback.outputs) <= 1
-            flex_key = callback.add_output(self.log_config.log_output)
+            out_flex_key = callback.outputs.append(self.log_config.log_output)
             # Modify the callback function accordingly.
-            f = callback._f
+            f = callback.f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback._f = bind_logger(logger, single_output, flex_key)(f)
+            callback.f = bind_logger(logger, single_output, out_flex_key)(f)
 
         return callbacks
 
@@ -659,13 +666,13 @@ class LogTransform(DashTransform):
         return [MultiplexerTransform()]
 
 
-def bind_logger(logger, single_output, flex_key):
+def bind_logger(logger, single_output, out_flex_key):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
             logger.clear()
             outputs = f(*args, **kwargs, dash_logger=logger)
-            return _append_output(outputs, logger.get_output(), single_output, flex_key)
+            return _append_output(outputs, logger.get_output(), single_output, out_flex_key)
 
         return decorated_function
 
@@ -1072,12 +1079,12 @@ class ServersideOutputTransform(DashTransform):
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
             if any(serverside_outputs):
-                f = callback._f
-                callback._f = _unpack_outputs(serverside_outputs)(f)
+                f = callback.f
+                callback.f = _unpack_outputs(serverside_outputs)(f)
         # 3) Apply the caching itself.
         for i, callback in enumerate(serverside_callbacks):
-            f = callback._f
-            callback._f = _pack_outputs(callback)(f)
+            f = callback.f
+            callback.f = _pack_outputs(callback)(f)
         # 4) Strip special args.
         for callback in callbacks:
             for key in ["memoize"]:
@@ -1305,10 +1312,10 @@ def _skip_input(args, kwargs, key=None):
     return args, kwargs
 
 
-def _append_output(outputs, value, single_output, out_key):
+def _append_output(outputs, value, single_output, out_idx):
     # Handle flex signature.
     if isinstance(outputs, dict):
-        outputs[out_key] = value
+        outputs[out_idx] = value
         return outputs
     # Handle single output.
     if single_output:
