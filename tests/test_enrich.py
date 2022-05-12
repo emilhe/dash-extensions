@@ -9,7 +9,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput
+    CycleBreakerInput, DependencyCollection
 
 
 # region Test utils/stubs
@@ -57,6 +57,33 @@ def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
 
 
 # endregion
+
+@pytest.mark.parametrize(
+    'tst, flt',
+    [(dict(a=Input("a", "prop"), b=[Input("b", "prop")], c=dict(ca=[Input("ca1", "prop"), Input("ca2", "prop")])),
+      [Input("a", "prop"), Input("b", "prop"), Input("ca1", "prop"), Input("ca2", "prop")]),
+     ([Input("a", "prop"), Input("b", "prop"), Input("c", "prop")],
+      [Input("a", "prop"), Input("b", "prop"), Input("c", "prop")]),
+     ((Input("a", "prop"), Input("b", "prop"), Input("c", "prop")),
+      [Input("a", "prop"), Input("b", "prop"), Input("c", "prop")]),
+     (Input("a", "prop"),
+      [Input("a", "prop")])
+     ])
+def test_dependency_collection(tst, flt):
+    dc = DependencyCollection(tst)
+    # Test iteration.
+    for i, d in enumerate(dc):
+        assert d == flt[i]
+    # Test access.
+    for i in range(len(dc)):
+        assert dc[i] == flt[i]
+    # Test modification.
+    dc[0] = Input("b", "prop")
+    assert dc[0] == Input("b", "prop")
+    # Test addition.
+    i_new = dc.append(Input("new", "prop"))
+    assert dc[i_new] == Input("new", "prop")
+
 
 def test_callback_blueprint():
     # Test single element.
@@ -106,11 +133,10 @@ def test_flexible_callback_signature():
     cbp = CallbackBlueprint(
         output=[Output("o", "prop")],
         inputs=[Input("i", "prop")],
-        state=[State("s", "prop")],
         hello="world"
     )
-    assert cbp.inputs == [Input("i", "prop"), State("s", "prop")]
-    assert cbp.outputs == [Output("o", "prop")]
+    assert list(cbp.inputs) == [Input("i", "prop")]
+    assert list(cbp.outputs) == [Output("o", "prop")]
     assert cbp.kwargs == dict(hello="world")
     # Test dict grouping.
     cbp = CallbackBlueprint(
@@ -118,8 +144,8 @@ def test_flexible_callback_signature():
         inputs=dict(i=Input("i", "prop"), s=State("s", "prop")),
         hello="world"
     )
-    assert cbp.inputs == [Input("i", "prop"), State("s", "prop")]
-    assert cbp.outputs == [Output("o", "prop"), Output("u", "prop")]
+    assert list(cbp.inputs) == [Input("i", "prop"), State("s", "prop")]
+    assert list(cbp.outputs) == [Output("o", "prop"), Output("u", "prop")]
     assert cbp.kwargs == dict(hello="world")
     # Test complex dict grouping.
     cbp = CallbackBlueprint(
@@ -127,8 +153,8 @@ def test_flexible_callback_signature():
         inputs=dict(w=dict(i=Input("i", "prop"), s=State("s", "prop")), z=dict(i=Input("i2", "prop"))),
         hello="world"
     )
-    assert cbp.inputs == [Input("i", "prop"), Input("i2", "prop"), State("s", "prop")]
-    assert cbp.outputs == [Output("o", "prop"), Output("u", "prop")]
+    assert list(cbp.inputs) == [Input("i", "prop"), State("s", "prop"), Input("i2", "prop")]
+    assert list(cbp.outputs) == [Output("o", "prop"), Output("u", "prop")]
     assert cbp.kwargs == dict(hello="world")
 
 
@@ -246,7 +272,7 @@ def test_multiplexer_transform(dash_duo, args, kwargs):
     ])
     app.clientside_callback("function(x){return 'left'}", Output("log", "children"), Input("left", "n_clicks"))
 
-    @app.callback(Output("log", "children"), Input("right", "n_clicks"))
+    @app.callback(*args, **kwargs)
     def update_right(n_clicks):
         return "right"
 

@@ -50,97 +50,143 @@ from dash.dependencies import DashDependency
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
+
+# region DependencyCollection
+
+def build_index(structure, entry, index):
+    if isinstance(structure, list):
+        for i, s in enumerate(structure):
+            build_index(s, entry + [i], index)
+        return index
+    if isinstance(structure, dict):
+        for k in structure:
+            build_index(structure[k], entry + [k], index)
+        return index
+    if isinstance(structure, DashDependency):
+        index.append(entry)
+        return index
+    raise ValueError(f"Unsupported structure {str(structure)}")
+
+
+def validate_structure(structure, level=0):
+    if isinstance(structure, DashDependency):
+        return [structure] if level == 0 else structure
+    if isinstance(structure, tuple):
+        result = list(structure)
+        for i, entry in enumerate(result):
+            result[i] = validate_structure(entry, level=level+1)
+        return result
+    if isinstance(structure, list):
+        for i, entry in enumerate(structure):
+            structure[i] = validate_structure(entry, level=level+1)
+        return structure
+    if isinstance(structure, dict):
+        for k in structure:
+            structure[k] = validate_structure(structure[k], level=level+1)
+        return structure
+    raise ValueError(f"Unsupported structure {structure}")
+
+
+class DependencyCollection:
+    def __init__(self, structure):
+        self.structure = validate_structure(structure)
+        self.index = None
+        self._re_index()
+
+    def __getitem__(self, key: int):
+        e = self.structure
+        for j in self.index[key]:
+            e = e[j]
+        return e
+
+    def __setitem__(self, key: int, value):
+        e = self.structure
+        for i, j in enumerate(self.index[key]):
+            if i == len(self.index[key]) - 1:
+                e[j] = value
+
+    def __len__(self):
+        return len(self.index)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self._resolve(i)
+
+    def append(self, value, key=None):
+        i = len(self.index)
+        if isinstance(self.structure, list):
+            self.structure.append(value)
+            self._re_index()
+        if isinstance(self.structure, dict):
+            key = i if key is None else key
+            self.structure[key] = value
+            self._re_index()
+        return i
+
+    def _resolve(self, i):
+        e = self.structure
+        for j in self.index[i]:
+            e = e[j]
+        return e
+
+    def _re_index(self):
+        self.index = build_index(self.structure, [], [])
+
+
+# endregion
+
 # region Dash blueprint
 
-CbInput = Union[State, Input]
+def collect_args(args: Union[Tuple[Any], List[Any]], inputs, outputs):
+    for arg in args:
+        if isinstance(arg, (list, tuple)):
+            collect_args(arg, inputs, outputs)
+            continue
+        if isinstance(arg, Output):
+            outputs.append(arg)
+            continue
+        if isinstance(arg, (Input, State)):
+            inputs.append(arg)
+            continue
+        # If we get here, the argument was not recognized.
+        raise ValueError(f"Unsupported argument: {arg}")
+    return inputs, outputs
 
 
 class CallbackBlueprint:
     def __init__(self, *args, **kwargs):
-        self.outputs: List[Output] = []
-        self.inputs: List[CbInput] = []
-        self.input_indices = None
-        self.output_grouping = None
         # Collect args "normally".
-        self._collect_args(args)
+        self.inputs, self.outputs = collect_args(args, [], [])
         # Flexible signature handling via keyword arguments. If provided, it takes precedence.
         if "output" in kwargs:
-            output_arg = dict(output=kwargs.pop("output"))
-            self.output_grouping = extract_grouped_output_callback_args(None, output_arg)
-            self.outputs = flatten_grouping(self.output_grouping)
+            self.outputs = DependencyCollection(kwargs.pop("output"))
         if "inputs" in kwargs:
-            input_state_args = dict(inputs=kwargs.pop("inputs"), state=kwargs.pop("state", None))
-            inputs_state = extract_grouped_input_state_callback_args(None, input_state_args)
-            flat_inputs, flat_state, input_state_indices = compute_input_state_grouping_indices(inputs_state)
-            self.inputs = flat_inputs + flat_state  # TODO: Is this correct?
-            self.input_indices = input_state_indices
+            self.inputs = DependencyCollection(kwargs.pop("inputs"))
+        if "state" in kwargs:
+            raise ValueError("Please use the 'inputs' keyword instead of the 'state' keyword.")
         # Collect the rest.
         self.kwargs: Dict[str, Any] = kwargs
-        self._f = None
+        self.f = None
 
-    def _collect_args(self, args: Union[Tuple[Any], List[Any]]):
-        for arg in args:
-            if isinstance(arg, (list, tuple)):
-                self._collect_args(arg)
-                continue
-            if isinstance(arg, Output):
-                self.outputs.append(arg)
-                continue
-            # TODO: Split in input/state or not?
-            if isinstance(arg, (Input, State)):
-                self.inputs.append(arg)
-                continue
-            # If we get here, the argument was not recognized.
-            msg = f"Callback blueprint received an unsupported argument: {arg}"
-            raise ValueError(msg)
-
-    @staticmethod
-    def _add_flex(dep: DashDependency, dst, value, grouping, flex_key=None) -> Union[str, int, None]:
-        next_index = len(dst)
-        dst.append(dep)
-        # Check if flex signature.
-        if grouping is None:
-            return next_index
-        # Handle flex signature.
-        if isinstance(grouping, list):
-            grouping.append(value)
-            return next_index
-        if isinstance(grouping, dict):
-            flex_key = f"{dep.component_id}_{dep.component_property}" if flex_key is None else flex_key
-            grouping[flex_key] = value
-            return flex_key
-        raise ValueError("Flex add failed.")
-
-    def add_input(self, i: CbInput, flex_key=None) -> Union[str, int, None]:
-        return self._add_flex(i, self.inputs, len(self.inputs), self.input_indices, flex_key)
-
-    def add_output(self, o: Output, flex_key=None) -> Union[str, int, None]:
-        return self._add_flex(o, self.outputs, o, self.output_grouping, flex_key)
-
-    @property
-    def f(self):
-        # For clientside callbacks, don't do flexible callback stuff.
-        if isinstance(self._f, (str, ClientsideFunction)):
-            return self._f
-        # Normal callback, don't do anything.
-        if self.input_indices is None and self.output_grouping is None:
-            return self._f
-
-        # Flexible callback, apply packing stuff.
-
-        def apply_grouping(f):
-            @functools.wraps(f)
-            def decorated_function(*args):
-                f_args, f_kwargs = validate_and_group_input_args(args, self.input_indices)
-                return f(*f_args, **f_kwargs)
-
-            return decorated_function
-
-        return apply_grouping(self._f)
-
-    @f.setter
-    def f(self, f):
-        self._f = f
+    def register(self, app: dash.Dash):
+        args = []
+        dependency_kwargs = {}
+        # Collect outputs.
+        if isinstance(self.outputs, DependencyCollection):
+            dependency_kwargs["output"] = self.outputs.structure
+        else:
+            o = self.outputs if len(self.outputs) > 1 else self.outputs[0]  # TODO: Is this still needed?
+            args.append(o)
+        # Collect inputs.
+        if isinstance(self.inputs, DependencyCollection):
+            dependency_kwargs["inputs"] = self.inputs.structure
+        else:
+            args.append(self.inputs)
+        # Do binding.
+        if isinstance(self.f, (str, ClientsideFunction)):
+            app.clientside_callback(self.f, *args, **dependency_kwargs, **self.kwargs)
+        else:
+            app.callback(*args, **dependency_kwargs, **self.kwargs)(self.f)
 
     @property
     def uid(self) -> str:
@@ -204,15 +250,8 @@ class DashBlueprint:
             app.blueprint.clientside_callbacks += clientside_callbacks
             return
         # Register callbacks on the "real" app object.
-        for cbp in callbacks:
-            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
-            if cbp.output_grouping:
-                app.callback(cbp.inputs, output=cbp.output_grouping, **cbp.kwargs)(cbp.f)
-            else:
-                app.callback(o, cbp.inputs, **cbp.kwargs)(cbp.f)
-        for cbp in clientside_callbacks:
-            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
-            app.clientside_callback(cbp.f, o, cbp.inputs, **cbp.kwargs)
+        for cbp in callbacks + clientside_callbacks:
+            cbp.register(app)
 
     def _resolve_callbacks(self) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
         """
