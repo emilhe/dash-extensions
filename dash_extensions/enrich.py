@@ -16,6 +16,7 @@ from dash import (  # lgtm [py/unused-import]
     no_update,
     Output,
     State,
+    Input,
     ClientsideFunction,
     MATCH,
     ALL,
@@ -39,49 +40,156 @@ from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple
 from datetime import datetime
-
 from dash_extensions import CycleBreaker
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
 
-# region Enriched dependencies
+DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
 
-class Input(dash.Input):
-    def __init__(self, component_id, component_property, break_cycle=False):
-        super().__init__(component_id, component_property)
-        self.break_cycle = break_cycle
+# region DependencyCollection
+
+def build_index(structure, entry, index):
+    if isinstance(structure, list):
+        for i, s in enumerate(structure):
+            build_index(s, entry + [i], index)
+        return index
+    if isinstance(structure, dict):
+        for k in structure:
+            build_index(structure[k], entry + [k], index)
+        return index
+    if isinstance(structure, DashDependency):
+        index.append(entry)
+        return index
+    raise ValueError(f"Unsupported structure {str(structure)}")
+
+
+def validate_structure(structure, level=0):
+    if isinstance(structure, DashDependency):
+        if level == 0:
+            return [structure]
+        return structure
+    if isinstance(structure, tuple):
+        result = list(structure)
+        for i, entry in enumerate(result):
+            result[i] = validate_structure(entry, level=level+1)
+        return result
+    if isinstance(structure, list):
+        for i, entry in enumerate(structure):
+            structure[i] = validate_structure(entry, level=level+1)
+        return structure
+    if isinstance(structure, dict):
+        for k in structure:
+            structure[k] = validate_structure(structure[k], level=level+1)
+        return structure
+    raise ValueError(f"Unsupported structure {structure}")
+
+
+class DependencyCollection:
+    def __init__(self, structure, keyword=None):
+        self.structure = validate_structure(structure)
+        self.keyword = keyword
+        self._index = None
+        self._re_index()
+
+    def __getitem__(self, key: int):
+        return self.get(self._index[key])
+
+    def __setitem__(self, key: int, value):
+        return self.set(self._index[key], value)
+
+    def __len__(self):
+        return len(self._index)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
+    def index(self, value):
+        for i in range(len(self)):
+            if self[i] == value:
+                return i
+        return -1
+
+    def get(self, multi_index):
+        e = self.structure
+        for j in multi_index:
+            e = e[j]
+        return e
+
+    def set(self, multi_index, value):
+        e = self.structure
+        for i, j in enumerate(multi_index):
+            if i == len(multi_index) - 1:
+                e[j] = value
+
+    def append(self, value, flex_key=None):
+        i = len(self._index)
+        if isinstance(self.structure, list):
+            self.structure.append(value)
+            self._re_index()
+            return i
+        if isinstance(self.structure, dict):
+            flex_key = f"{DEPENDENCY_APPEND_PREFIX}{i}" if flex_key is None else flex_key
+            self.structure[flex_key] = value
+            self._re_index()
+            return flex_key
+
+    def _re_index(self):
+        self._index = build_index(self.structure, [], [])
+
 
 # endregion
 
 # region Dash blueprint
 
-CbInput = Union[State, Input]
+def collect_args(args: Union[Tuple[Any], List[Any]], inputs, outputs):
+    for arg in args:
+        if isinstance(arg, (list, tuple)):
+            collect_args(arg, inputs, outputs)
+            continue
+        if isinstance(arg, Output):
+            outputs.append(arg)
+            continue
+        if isinstance(arg, (Input, State)):
+            inputs.append(arg)
+            continue
+        # If we get here, the argument was not recognized.
+        raise ValueError(f"Unsupported argument: {arg}")
+    return DependencyCollection(inputs), DependencyCollection(outputs)
 
 
 class CallbackBlueprint:
     def __init__(self, *args, **kwargs):
-        self.outputs: List[Output] = []
-        self.inputs: List[CbInput] = []
-        self._collect_args(args)
+        # Collect args "normally".
+        self.inputs, self.outputs = collect_args(args, [], [])
+        # Flexible signature handling via keyword arguments. If provided, it takes precedence.
+        if "output" in kwargs:
+            self.outputs = DependencyCollection(kwargs.pop("output"), keyword="output")
+        if "inputs" in kwargs:
+            self.inputs = DependencyCollection(kwargs.pop("inputs"), keyword="inputs")
+        if "state" in kwargs:
+            raise ValueError("Please use the 'inputs' keyword instead of the 'state' keyword.")
+        # Collect the rest.
         self.kwargs: Dict[str, Any] = kwargs
         self.f = None
 
-    def _collect_args(self, args: Union[Tuple[Any], List[Any]]):
-        for arg in args:
-            if isinstance(arg, (list, tuple)):
-                self._collect_args(arg)
-                continue
-            if isinstance(arg, Output):
-                self.outputs.append(arg)
-                continue
-            # TODO: Split in input/state or not?
-            if isinstance(arg, (Input, State)):
-                self.inputs.append(arg)
-                continue
-            # If we get here, the argument was not recognized.
-            msg = f"Callback blueprint received an unsupported argument: {arg}"
-            raise ValueError(msg)
+    def register(self, app: dash.Dash):
+        # Collect dependencies.
+        dep_args, dep_kwargs = [], {}
+        for dep_col in [self.outputs, self.inputs]:
+            s = dep_col.structure
+            if isinstance(s, list) and len(s) == 1:
+                s = s[0]
+            if dep_col.keyword is None:
+                dep_args.append(s)
+            else:
+                dep_kwargs[dep_col.keyword] = s
+        # Do binding.
+        if isinstance(self.f, (str, ClientsideFunction)):
+            app.clientside_callback(self.f, *dep_args, **dep_kwargs, **self.kwargs)
+        else:
+            app.callback(*dep_args, **dep_kwargs, **self.kwargs)(self.f)
 
     @property
     def uid(self) -> str:
@@ -145,12 +253,8 @@ class DashBlueprint:
             app.blueprint.clientside_callbacks += clientside_callbacks
             return
         # Register callbacks on the "real" app object.
-        for cbp in callbacks:
-            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
-            app.callback(o, cbp.inputs, **cbp.kwargs)(cbp.f)
-        for cbp in clientside_callbacks:
-            o = cbp.outputs if len(cbp.outputs) > 1 else cbp.outputs[0]
-            app.clientside_callback(cbp.f, o, cbp.inputs, **cbp.kwargs)
+        for cbp in callbacks + clientside_callbacks:
+            cbp.register(app)
 
     def _resolve_callbacks(self) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
         """
@@ -393,7 +497,7 @@ class BlockingCallbackTransform(DashTransform):
             self.blueprint.clientside_callback(
                 start_callback,
                 [Output(start_client_id, "data"), Output(start_blocked_id, "data")],
-                callback.inputs + [Input(end_blocked_id, "dst")],
+                list(callback.inputs) + [Input(end_blocked_id, "dst")],
                 [State(start_client_id, "data"), State(end_client_id, "data")],
             )
             # Bind end signal callback.
@@ -413,23 +517,26 @@ class BlockingCallbackTransform(DashTransform):
             )
             # Modify the original callback to send finished signal.
             single_output = len(callback.outputs) <= 1
-            callback.outputs.append(Output(end_server_id, "data"))
-            # Modify the original callback to not trigger on inputs, but the new special trigger.
-            new_state = [State(item.component_id, item.component_property) for item in callback.inputs]
-            callback.inputs = [Input(start_client_id, "data")] + new_state
+            out_flex_key = callback.outputs.append(Output(end_server_id, "data"))
+            # Change original inputs to state.
+            for i, item in enumerate(callback.inputs):
+                callback.inputs[i] = State(item.component_id, item.component_property)
+            # Add new input trigger.
+            in_flex_key = callback.inputs.append(Input(start_client_id, "data"))
             # Modify the callback function accordingly.
             f = callback.f
-            callback.f = skip_input_signal_add_output_signal(single_output)(f)
+            callback.f = skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key)(f)
 
         return callbacks
 
 
-def skip_input_signal_add_output_signal(single_output: bool):
+def skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key):
     def wrapper(f):
         @functools.wraps(f)
-        def decorated_function(*args):
-            value = f(*args[1:])
-            return _as_output_list(value, single_output) + [datetime.utcnow().timestamp()]
+        def decorated_function(*args, **kwargs):
+            args, kwargs = _skip_input(args, kwargs, in_flex_key)
+            outputs = f(*args, **kwargs)
+            return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
 
         return decorated_function
 
@@ -542,11 +649,11 @@ class LogTransform(DashTransform):
                 continue
             # Add the log component as output.
             single_output = len(callback.outputs) <= 1
-            callback.outputs.append(self.log_config.log_output)
+            out_flex_key = callback.outputs.append(self.log_config.log_output)
             # Modify the callback function accordingly.
             f = callback.f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback.f = bind_logger(logger, single_output)(f)
+            callback.f = bind_logger(logger, single_output, out_flex_key)(f)
 
         return callbacks
 
@@ -554,13 +661,13 @@ class LogTransform(DashTransform):
         return [MultiplexerTransform()]
 
 
-def bind_logger(logger, single_output):
+def bind_logger(logger, single_output, out_flex_key):
     def wrapper(f):
         @functools.wraps(f)
-        def decorated_function(*args):
+        def decorated_function(*args, **kwargs):
             logger.clear()
-            value = f(*args, logger)
-            return _as_output_list(value, single_output) + [logger.get_output()]
+            outputs = f(*args, **kwargs, dash_logger=logger)
+            return _append_output(outputs, logger.get_output(), single_output, out_flex_key)
 
         return decorated_function
 
@@ -586,7 +693,7 @@ class CycleBreakerTransform(DashTransform):
         # Update inputs.
         for c in callbacks + clientside_callbacks:
             for i in c.inputs:
-                if isinstance(i, Input) and i.break_cycle:
+                if isinstance(i, CycleBreakerInput):
                     cid = self._cycle_break_id(i)
                     cycle_inputs[cid] = (i.component_id, i.component_property)
                     i.component_id = cid
@@ -605,6 +712,11 @@ class CycleBreakerTransform(DashTransform):
     @staticmethod
     def _cycle_break_id(d: DashDependency):
         return f"{str(d).replace('.', '_')}_breaker"
+
+
+class CycleBreakerInput(Input):
+    def __init__(self, component_id, component_property):
+        super().__init__(component_id, component_property)
 
 
 # endregion
@@ -979,9 +1091,9 @@ class ServersideOutputTransform(DashTransform):
 def _unpack_outputs(serverside_outputs):
     def unpack(f):
         @functools.wraps(f)
-        def decorated_function(*args):
+        def decorated_function(*args, **kwargs):
             if not any(serverside_outputs):
-                return f(*args)
+                return f(*args, **kwargs)
             args = list(args)
             for i, serverside_output in enumerate(serverside_outputs):
                 # Just skip elements that are not stored server side.
@@ -993,7 +1105,7 @@ def _unpack_outputs(serverside_outputs):
                 except TypeError as ex:
                     # TODO: Should we do anything about this?
                     args[i] = None
-            return f(*args)
+            return f(*args, **kwargs)
 
         return decorated_function
 
@@ -1005,7 +1117,7 @@ def _pack_outputs(callback):
 
     def packed_callback(f):
         @functools.wraps(f)
-        def decorated_function(*args):
+        def decorated_function(*args, **kwargs):
             multi_output = callback.multi_output
             # If memoize is enabled, we check if the cache already has a valid value.
             if memoize:
@@ -1032,7 +1144,7 @@ def _pack_outputs(callback):
                     ]
                     return results if multi_output else results[0]
             # Do the update.
-            data = f(*args)
+            data = f(*args, **kwargs)
             data = list(data) if multi_output else [data]
             if callable(memoize):
                 data = memoize(data)
@@ -1183,10 +1295,28 @@ def _as_list(item):
     return [item]
 
 
-def _as_output_list(item, single_output: bool):
+def _skip_input(args, kwargs, key=None):
+    if isinstance(key, str):
+        kwargs.pop(key)
+    else:
+        args = list(args)
+        if key is not None:
+            args.pop(key)
+        else:
+            args.pop()
+    return args, kwargs
+
+
+def _append_output(outputs, value, single_output, out_idx):
+    # Handle flex signature.
+    if isinstance(outputs, dict):
+        outputs[out_idx] = value
+        return outputs
+    # Handle single output.
     if single_output:
-        return [item]
-    return _as_list(item)
+        return [outputs, value]
+    # Finally, the "normal" case.
+    return _as_list(outputs) + [value]
 
 
 def _create_callback_id(item):
