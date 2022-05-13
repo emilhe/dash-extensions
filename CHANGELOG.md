@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.2] - NOT RELEASED
+## [0.1.2] - 13-05-22
 
 ### Added
 
@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Added `CycleBreakerInput` component, which is to be used instead of the `break_cycle` keyword in 0.1.1
+- Fixed introduced bug when mixing imports from `dash` and `dash_extensions.enrich`
 
 ## [0.1.1] - 10-05-22
 
