@@ -47,6 +47,7 @@ _wildcard_values = list(_wildcard_mappings.values())
 
 DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
 
+
 # region DependencyCollection
 
 def build_index(structure, entry, index):
@@ -72,15 +73,15 @@ def validate_structure(structure, level=0):
     if isinstance(structure, tuple):
         result = list(structure)
         for i, entry in enumerate(result):
-            result[i] = validate_structure(entry, level=level+1)
+            result[i] = validate_structure(entry, level=level + 1)
         return result
     if isinstance(structure, list):
         for i, entry in enumerate(structure):
-            structure[i] = validate_structure(entry, level=level+1)
+            structure[i] = validate_structure(entry, level=level + 1)
         return structure
     if isinstance(structure, dict):
         for k in structure:
-            structure[k] = validate_structure(structure[k], level=level+1)
+            structure[k] = validate_structure(structure[k], level=level + 1)
         return structure
     raise ValueError(f"Unsupported structure {structure}")
 
@@ -1259,6 +1260,103 @@ class NoOutputTransform(DashTransform):
 
     def sort_key(self):
         return 0
+
+
+# endregion
+
+# region [Magic] transform
+
+
+class ListOutput(Output):
+    """
+    Like a normal Output, but enables list manipulation.
+    """
+
+
+class DictOutput(Output):
+    """
+    Like a normal Output, but enables list manipulation.
+    """
+
+
+class ContainerTransform(DashTransform):
+    def __init__(self):
+        super().__init__()
+        self.components = []
+
+    def transform_layout(self, layout):
+        children = _as_list(layout.children) + self.components
+        layout.children = children
+
+    def _apply_element(self, callback, output):
+        # Append new relay component.
+        original_id = output.component_id
+        relay_id = _relay_id(original_id)
+        relay_component = dcc.Store(id=relay_id)
+        self.components.append(relay_component)
+        # Modify callback in-place to route output to the relay.
+        callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
+        # Add clientside callback to perform modifications.
+        # TODO: These are OUTPUT props
+        app.clientside_callback(f"""function(xs, current){{
+            // Handle empty init call.
+            if (typeof xs === 'undefined'){{
+                return window.dash_clientside.no_update;
+            }}
+            // Handle non-list actions (most likely due to user error).
+            if (!(Array.isArray(xs))){{
+                console.log("Action input must be array for component {original_id}, but was not.");
+                console.log(xs);
+                console.log("Update will be skipped.");
+                return window.dash_clientside.no_update;
+            }}
+            // Handle actions.
+            for (const x of xs) {{
+                switch(x.action) {{
+                  case "set":
+                    current = x;
+                    break;
+                  case "append":
+                    current.push(x.item)
+                    break;
+                  case "extend":
+                    current = current.concat(x.array);
+                    break;
+                  case "insert":
+                    current = current.splice(x.index, 0, x.value);
+                    break;
+                  case "remove":
+                    current = current.filter(function(ele){{
+                        return ele != x.value;
+                    }});
+                  case "pop":
+                    current.splice(x.index, 1);
+                  case "reverse":
+                    current.reverse();
+                  case "sort":
+                    // TODO: Make it possible to inject sorting function
+                    current.sort();
+                  case "clear":
+                    current = []             
+                  default:
+                    console.log("Received unknown action for component {original_id}.");
+                    console.log(x);
+                    console.log("Update will be skipped.");
+                }}
+            }}
+            return current;
+        }}""", output, Input("store_relay", "data"), State(output.component_id, output.component_property))
+
+    def apply_serverside(self, callbacks):
+        for callback in callbacks:
+            for output in callback.outputs:
+                if isinstance(output, ListOutput):
+                    self._apply_element(callback, output)
+        return callbacks
+
+
+def _relay_id(uid):
+    return f"{uid}_relay"
 
 
 # endregion
