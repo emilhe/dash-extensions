@@ -1272,14 +1272,6 @@ class ListOutput(Output):
     Like a normal Output, but enables list manipulation.
     """
 
-
-class DictOutput(Output):
-    """
-    Like a normal Output, but enables dict manipulation.
-    """
-
-
-class ListOperation:
     @staticmethod
     def append(item):
         return dict(op="append", item=item)
@@ -1313,33 +1305,39 @@ class ListOperation:
         return dict(op="reverse")
 
 
+
+class DictOutput(Output):
+    """
+    Like a normal Output, but enables dict manipulation.
+    """
+
 class ListProxy:
     def __init__(self):
         self.operations = []
 
     def append(self, item):
-        self.operations.append(ListOperation.append(item))
+        self.operations.append(ListOutput.append(item))
 
     def extend(self, iterable):
-        self.operations.append(ListOperation.extend(iterable))
+        self.operations.append(ListOutput.extend(iterable))
 
     def insert(self, index, item):
-        self.operations.append(ListOperation.insert(index, item))
+        self.operations.append(ListOutput.insert(index, item))
 
     def remove(self, item):
-        self.operations.append(ListOperation.remove(item))
+        self.operations.append(ListOutput.remove(item))
 
     def pop(self, index):
         self.operations.pop(index)
 
     def clear(self):
-        self.operations.append(ListOperation.clear())
+        self.operations.append(ListOutput.clear())
 
     def sort(self):
-        self.operations.append(ListOperation.sort())
+        self.operations.append(ListOutput.sort())
 
     def reverse(self):
-        self.operations.append(ListOperation.reverse())
+        self.operations.append(ListOutput.reverse())
 
     def apply(self):
         return self.operations
