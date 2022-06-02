@@ -1275,84 +1275,163 @@ class ListOutput(Output):
 
 class DictOutput(Output):
     """
-    Like a normal Output, but enables list manipulation.
+    Like a normal Output, but enables dict manipulation.
     """
+
+
+class ListOperation:
+    @staticmethod
+    def append(item):
+        return dict(op="append", item=item)
+
+    @staticmethod
+    def extend(iterable):
+        return dict(op="extend", array=list(iterable))
+
+    @staticmethod
+    def insert(index, item):
+        return dict(op="insert", item=item, index=index)
+
+    @staticmethod
+    def remove(item):
+        return dict(op="remove", item=item)
+
+    @staticmethod
+    def pop(index):
+        return dict(op="remove", index=index)
+
+    @staticmethod
+    def clear():
+        return dict(op="clear")
+
+    @staticmethod
+    def sort():
+        return dict(op="sort")
+
+    @staticmethod
+    def reverse():
+        return dict(op="reverse")
+
+
+class ListProxy:
+    def __init__(self):
+        self.operations = []
+
+    def append(self, item):
+        self.operations.append(ListOperation.append(item))
+
+    def extend(self, iterable):
+        self.operations.append(ListOperation.extend(iterable))
+
+    def insert(self, index, item):
+        self.operations.append(ListOperation.insert(index, item))
+
+    def remove(self, item):
+        self.operations.append(ListOperation.remove(item))
+
+    def pop(self, index):
+        self.operations.pop(index)
+
+    def clear(self):
+        self.operations.append(ListOperation.clear())
+
+    def sort(self):
+        self.operations.append(ListOperation.sort())
+
+    def reverse(self):
+        self.operations.append(ListOperation.reverse())
+
+    def apply(self):
+        return self.operations
 
 
 class ContainerTransform(DashTransform):
     def __init__(self):
         super().__init__()
         self.components = []
+        self.list_outputs = []
+        self.dict_outputs = []
+        self.blueprint = DashBlueprint()
 
     def transform_layout(self, layout):
         children = _as_list(layout.children) + self.components
         layout.children = children
 
-    def _apply_element(self, callback, output):
-        # Append new relay component.
+    def _apply_list(self, callback, output):
         original_id = output.component_id
         relay_id = _relay_id(original_id)
-        relay_component = dcc.Store(id=relay_id)
-        self.components.append(relay_component)
+        if str(output) not in self.list_outputs:
+            # Append new relay component.
+            relay_component = dcc.Store(id=relay_id)
+            self.components.append(relay_component)
+            # Add clientside callback to perform modifications.
+            self.blueprint.clientside_callback(f"""function(operations, current){{
+                // Handle empty init call.
+                if (typeof operations === 'undefined'){{
+                    return window.dash_clientside.no_update;
+                }}
+                // Map non-list actions to list to enable iteration.
+                if (!(Array.isArray(operations))){{
+                    operations = [operations];
+                }}
+                // Handle action(s).
+                for (const x of operations) {{
+                    switch(x.op) {{
+                      case "append":
+                        current.push(x.item)
+                        break;
+                      case "extend":
+                        current = current.concat(x.array);
+                        break;
+                      case "insert":
+                        current = current.splice(x.index, 0, x.item);
+                        break;
+                      case "remove":
+                        current = current.filter(function(ele){{
+                            return ele != x.item;
+                        }});
+                        break;
+                      case "pop":
+                        current.splice(x.index, 1);
+                        break;
+                      case "reverse":
+                        current.reverse();
+                        break;
+                      case "sort":
+                        // TODO: Make it possible to inject sorting function
+                        current.sort();
+                        break;
+                      case "clear":
+                        current = []             
+                        break;
+                      default:
+                        console.log("Received unknown action for component {original_id}.");
+                        console.log(x);
+                        console.log("Update will be skipped.");
+                    }}
+                }}
+                return current;
+            }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
+            # Record binding.
+            self.list_outputs.append(str(output))
         # Modify callback in-place to route output to the relay.
         callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
-        # Add clientside callback to perform modifications.
-        # TODO: These are OUTPUT props
-        app.clientside_callback(f"""function(xs, current){{
-            // Handle empty init call.
-            if (typeof xs === 'undefined'){{
-                return window.dash_clientside.no_update;
-            }}
-            // Handle non-list actions (most likely due to user error).
-            if (!(Array.isArray(xs))){{
-                console.log("Action input must be array for component {original_id}, but was not.");
-                console.log(xs);
-                console.log("Update will be skipped.");
-                return window.dash_clientside.no_update;
-            }}
-            // Handle actions.
-            for (const x of xs) {{
-                switch(x.action) {{
-                  case "set":
-                    current = x;
-                    break;
-                  case "append":
-                    current.push(x.item)
-                    break;
-                  case "extend":
-                    current = current.concat(x.array);
-                    break;
-                  case "insert":
-                    current = current.splice(x.index, 0, x.value);
-                    break;
-                  case "remove":
-                    current = current.filter(function(ele){{
-                        return ele != x.value;
-                    }});
-                  case "pop":
-                    current.splice(x.index, 1);
-                  case "reverse":
-                    current.reverse();
-                  case "sort":
-                    // TODO: Make it possible to inject sorting function
-                    current.sort();
-                  case "clear":
-                    current = []             
-                  default:
-                    console.log("Received unknown action for component {original_id}.");
-                    console.log(x);
-                    console.log("Update will be skipped.");
-                }}
-            }}
-            return current;
-        }}""", output, Input("store_relay", "data"), State(output.component_id, output.component_property))
+        # TODO: Maybe add INPUT operations also?
+
+    def _apply_dict(self, callback, output):
+        return None
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
             for output in callback.outputs:
                 if isinstance(output, ListOutput):
-                    self._apply_element(callback, output)
+                    self._apply_list(callback, output)
+                if isinstance(output, DictOutput):
+                    self._apply_dict(callback, output)
         return callbacks
+
+    def apply_clientside(self, callbacks):
+        return callbacks + self.blueprint.clientside_callbacks
 
 
 def _relay_id(uid):
