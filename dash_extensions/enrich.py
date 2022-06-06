@@ -1306,12 +1306,6 @@ class ListOutput(Output):
         return dict(op="reverse")
 
 
-class DictOutput(Output):
-    """
-    Like a normal Output, but enables dict manipulation.
-    """
-
-
 class ListProxy:
     def __init__(self):
         self.operations = []
@@ -1344,6 +1338,48 @@ class ListProxy:
         return self.operations
 
 
+class DictOutput(Output):
+    """
+    Like a normal Output, but enables dict manipulation.
+    """
+
+    @staticmethod
+    def clear():
+        return dict(op="clear")
+
+    @staticmethod
+    def pop(key):
+        return dict(op="pop", key=key)
+
+    @staticmethod
+    def update(obj):
+        return dict(op="update", obj=obj)
+
+    @staticmethod
+    def set(key, value):
+        return dict(op="set", key=key, value=value)
+
+
+class DictProxy:
+    def __init__(self):
+        self.operations = []
+
+    def __setitem__(self, key, value):
+        self.operations.append(DictOutput.set(key, value))
+
+    def pop(self, key):
+        self.operations.append(DictOutput.pop(key))
+
+    def clear(self):
+        self.operations.append(DictOutput.clear())
+
+    def update(self, obj):
+        self.operations.append(DictOutput.update(obj))
+
+    def apply(self):
+        return self.operations
+
+
 class ContainerTransform(DashTransform):
     def __init__(self):
         super().__init__()
@@ -1358,7 +1394,7 @@ class ContainerTransform(DashTransform):
 
     def _apply_list(self, callback, output):
         original_id = output.component_id
-        relay_id = _relay_id(original_id)
+        relay_id = _relay_id(original_id, "list")
         if str(output) not in self.list_outputs:
             # Append new relay component.
             relay_component = dcc.Store(id=relay_id)
@@ -1415,10 +1451,53 @@ class ContainerTransform(DashTransform):
             self.list_outputs.append(str(output))
         # Modify callback in-place to route output to the relay.
         callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
-        # TODO: Maybe add INPUT operations also?
 
     def _apply_dict(self, callback, output):
-        return None
+        original_id = output.component_id
+        relay_id = _relay_id(original_id, "dict")
+        if str(output) not in self.dict_outputs:
+            # Append new relay component.
+            relay_component = dcc.Store(id=relay_id)
+            self.components.append(relay_component)
+            # Add clientside callback to perform modifications.
+            self.blueprint.clientside_callback(f"""function(operations, current){{
+                // Handle empty init call.
+                if (typeof operations === 'undefined'){{
+                    return window.dash_clientside.no_update;
+                }}
+                // Map non-list actions to list to enable iteration.
+                if (!(Array.isArray(operations))){{
+                    operations = [operations];
+                }}
+                // Handle action(s).
+                for (const x of operations) {{
+                    switch(x.op) {{
+                      case "set":
+                        current[x.key] = x.value;
+                        break;
+                      case "pop":
+                        delete current[x.key];
+                        break;
+                      case "clear":
+                        current = {{}};             
+                        break;
+                      case "update":
+                        current = {{
+                            ...current,
+                            ...x.obj
+                        }};
+                      default:
+                        console.log("Received unknown action for component {original_id}.");
+                        console.log(x);
+                        console.log("Update will be skipped.");
+                    }}
+                }}
+                return current;
+            }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
+            # Record binding.
+            self.dict_outputs.append(str(output))
+        # Modify callback in-place to route output to the relay.
+        callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
@@ -1436,8 +1515,8 @@ class ContainerTransform(DashTransform):
         return [MultiplexerTransform()]
 
 
-def _relay_id(uid):
-    return f"{uid}_relay"
+def _relay_id(uid, prefix):
+    return f"{uid}_{prefix}_relay"
 
 
 # endregion

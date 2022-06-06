@@ -10,7 +10,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection, ContainerTransform, ListOutput
+    CycleBreakerInput, DependencyCollection, ContainerTransform, ListOutput, DictOutput
 
 
 # region Test utils/stubs
@@ -577,3 +577,44 @@ def test_list_output(dash_duo):
     proxy_list.clear()
     dash_duo.find_element("#clear").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+
+
+def test_dict_output(dash_duo):
+    pop_key = "some_key2"
+    update_dict = dict(key="value", some="stuff", foo="bar")
+    gui_actions = dict(
+        set=lambda x: DictOutput.set(f"some_key{x}", f"some_value{x}"),
+        clear=lambda x: DictOutput.clear(),
+        pop=lambda x: DictOutput.pop(pop_key),
+        update=lambda x: DictOutput.update(update_dict),
+    )
+    action_buttons = [html.Button(k, id=k) for k in gui_actions]
+    app = DashProxy(transforms=[ContainerTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
+    for k in gui_actions:
+        app.callback(DictOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
+    app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
+    # Start stuff.
+    proxy_dict = {}
+    dash_duo.start_server(app)
+    # Check empty after clear.
+    dash_duo.find_element("#clear").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    # Check set.
+    proxy_dict["some_key1"] = "some_value1"
+    dash_duo.find_element("#set").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    proxy_dict["some_key2"] = "some_value2"
+    dash_duo.find_element("#set").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    proxy_dict["some_key3"] = "some_value3"
+    dash_duo.find_element("#set").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    # Check pop.
+    proxy_dict.pop(pop_key)
+    dash_duo.find_element("#pop").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    # Check update.
+    proxy_dict.update(update_dict)
+    dash_duo.find_element("#update").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
