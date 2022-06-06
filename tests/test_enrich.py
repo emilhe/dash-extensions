@@ -517,6 +517,9 @@ def test_list_output(dash_duo):
         sort=lambda x: ListOutput.sort(),
         reverse=lambda x: ListOutput.reverse(),
         clear=lambda x: ListOutput.clear(),
+        insert=lambda x: ListOutput.insert(4, "hest"),
+        remove=lambda x: ListOutput.remove(3),
+        pop=lambda x: ListOutput.pop(3),
     )
     action_buttons = [html.Button(k, id=k) for k in gui_actions]
     app = DashProxy(transforms=[ContainerTransform()], prevent_initial_callbacks=True)
@@ -540,6 +543,9 @@ def test_list_output(dash_duo):
     proxy_list.append(3)
     dash_duo.find_element("#append").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.append(4)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
     # Check extend.
     proxy_list.extend([1, 1])
     dash_duo.find_element("#extend").click()
@@ -547,13 +553,25 @@ def test_list_output(dash_duo):
     proxy_list.extend([2, 2])
     dash_duo.find_element("#extend").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check extend.
+    # Check sort.
     proxy_list.sort()
     dash_duo.find_element("#sort").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check extend.
+    # Check reverse.
     proxy_list.reverse()
     dash_duo.find_element("#reverse").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check remove.
+    proxy_list.remove(3)
+    dash_duo.find_element("#remove").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check pop.
+    proxy_list.pop(3)
+    dash_duo.find_element("#pop").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check insert.
+    proxy_list.insert(4, "hest")
+    dash_duo.find_element("#insert").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
     # Check empty after clear.
     proxy_list.clear()

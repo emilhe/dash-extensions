@@ -1286,11 +1286,12 @@ class ListOutput(Output):
 
     @staticmethod
     def remove(item):
+        # NB: Remove ALL occurances of item, not just the first one.
         return dict(op="remove", item=item)
 
     @staticmethod
     def pop(index):
-        return dict(op="remove", index=index)
+        return dict(op="pop", index=index)
 
     @staticmethod
     def clear():
@@ -1382,7 +1383,7 @@ class ContainerTransform(DashTransform):
                         current = current.concat(x.array);
                         break;
                       case "insert":
-                        current = current.splice(x.index, 0, x.item);
+                        current.splice(x.index, 0, x.item);
                         break;
                       case "remove":
                         current = current.filter(function(ele){{
