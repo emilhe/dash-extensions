@@ -1,4 +1,5 @@
 import decimal
+import json
 import os
 import time
 
@@ -9,7 +10,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection
+    CycleBreakerInput, DependencyCollection, ContainerTransform, ListOutput
 
 
 # region Test utils/stubs
@@ -107,7 +108,7 @@ def test_callback_blueprint():
     )
     assert list(cbp.outputs) == [Output("o", "prop"), Output("o2", "prop")]
     assert list(cbp.inputs) == [State("s", "prop"), State("s2", "prop"), Input("i0", "prop"),
-                          State("s3", "prop"), Input("i", "prop")]
+                                State("s3", "prop"), Input("i", "prop")]
     # Test variables.
     my_input = html.Button()
     my_output = html.Div()
@@ -507,3 +508,54 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
     c = dash_duo.find_element("#celsius")
     c.send_keys("100")
     dash_duo.wait_for_text_to_equal("#fahrenheit", "212", timeout=1)
+
+
+def test_list_output(dash_duo):
+    gui_actions = dict(
+        append=lambda x: ListOutput.append(x),
+        extend=lambda x: ListOutput.extend([x, x]),
+        sort=lambda x: ListOutput.sort(),
+        reverse=lambda x: ListOutput.reverse(),
+        clear=lambda x: ListOutput.clear(),
+    )
+    action_buttons = [html.Button(k, id=k) for k in gui_actions]
+    app = DashProxy(transforms=[ContainerTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
+    for k in gui_actions:
+        app.callback(ListOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
+    app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
+    # Start stuff.
+    proxy_list = []
+    dash_duo.start_server(app)
+    # Check empty after clear.
+    dash_duo.find_element("#clear").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check append.
+    proxy_list.append(1)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.append(2)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.append(3)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check extend.
+    proxy_list.extend([1, 1])
+    dash_duo.find_element("#extend").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.extend([2, 2])
+    dash_duo.find_element("#extend").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check extend.
+    proxy_list.sort()
+    dash_duo.find_element("#sort").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check extend.
+    proxy_list.reverse()
+    dash_duo.find_element("#reverse").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check empty after clear.
+    proxy_list.clear()
+    dash_duo.find_element("#clear").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)

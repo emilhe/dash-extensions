@@ -1305,11 +1305,11 @@ class ListOutput(Output):
         return dict(op="reverse")
 
 
-
 class DictOutput(Output):
     """
     Like a normal Output, but enables dict manipulation.
     """
+
 
 class ListProxy:
     def __init__(self):
@@ -1430,6 +1430,9 @@ class ContainerTransform(DashTransform):
 
     def apply_clientside(self, callbacks):
         return callbacks + self.blueprint.clientside_callbacks
+
+    def get_dependent_transforms(self):
+        return [MultiplexerTransform()]
 
 
 def _relay_id(uid):
