@@ -10,7 +10,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection, ContainerTransform, ListOutput, DictOutput
+    CycleBreakerInput, DependencyCollection, OperatorTransform, OperatorOutput, Operator
 
 
 # region Test utils/stubs
@@ -512,20 +512,20 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
 
 def test_list_output(dash_duo):
     gui_actions = dict(
-        append=lambda x: ListOutput.append(x),
-        extend=lambda x: ListOutput.extend([x, x]),
-        sort=lambda x: ListOutput.sort(),
-        reverse=lambda x: ListOutput.reverse(),
-        clear=lambda x: ListOutput.clear(),
-        insert=lambda x: ListOutput.insert(4, "hest"),
-        remove=lambda x: ListOutput.remove(3),
-        pop=lambda x: ListOutput.pop(3),
+        append=lambda x: Operator().list.append(x).apply(),
+        extend=lambda x: Operator().list.extend([x, x]).apply(),
+        sort=lambda x: Operator().list.sort().apply(),
+        reverse=lambda x: Operator().list.reverse().apply(),
+        clear=lambda x: Operator().list.clear().apply(),
+        insert=lambda x: Operator().list.insert(4, "hest").apply(),
+        remove=lambda x: Operator().list.remove(3).apply(),
+        pop=lambda x: Operator().list.pop(3).apply(),
     )
     action_buttons = [html.Button(k, id=k) for k in gui_actions]
-    app = DashProxy(transforms=[ContainerTransform()], prevent_initial_callbacks=True)
+    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
     app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
     for k in gui_actions:
-        app.callback(ListOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
+        app.callback(OperatorOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
     app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
     # Start stuff.
     proxy_list = []
@@ -583,16 +583,16 @@ def test_dict_output(dash_duo):
     pop_key = "some_key2"
     update_dict = dict(key="value", some="stuff", foo="bar")
     gui_actions = dict(
-        set=lambda x: DictOutput.set(f"some_key{x}", f"some_value{x}"),
-        clear=lambda x: DictOutput.clear(),
-        pop=lambda x: DictOutput.pop(pop_key),
-        update=lambda x: DictOutput.update(update_dict),
+        set=lambda x: Operator().dict.set(f"some_key{x}", f"some_value{x}").apply(),
+        clear=lambda x: Operator().dict.clear().apply(),
+        pop=lambda x: Operator().dict.pop(pop_key).apply(),
+        update=lambda x: Operator().dict.update(update_dict).apply(),
     )
     action_buttons = [html.Button(k, id=k) for k in gui_actions]
-    app = DashProxy(transforms=[ContainerTransform()], prevent_initial_callbacks=True)
+    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
     app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
     for k in gui_actions:
-        app.callback(DictOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
+        app.callback(OperatorOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
     app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
     # Start stuff.
     proxy_dict = {}

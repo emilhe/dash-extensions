@@ -7,6 +7,8 @@ import logging
 import pickle
 import secrets
 import uuid
+from itertools import chain
+
 import plotly
 import dash
 
@@ -38,7 +40,7 @@ from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
-from typing import Dict, Callable, List, Union, Any, Tuple
+from typing import Dict, Callable, List, Union, Any, Tuple, Optional
 from datetime import datetime
 from dash_extensions import CycleBreaker
 
@@ -1266,136 +1268,118 @@ class NoOutputTransform(DashTransform):
 
 # region [Magic] transform
 
-
-class ListOutput(Output):
+class OperatorOutput(Output):
     """
     Like a normal Output, but enables list manipulation.
     """
 
-    @staticmethod
-    def append(item):
-        return dict(op="append", item=item)
 
-    @staticmethod
-    def extend(iterable):
-        return dict(op="extend", array=list(iterable))
+class Operator:
+    def __init__(self, path: Optional[List] = None, operations: Optional[List] = None):
+        self.path = path if path is not None else []
+        self.operations = operations if operations is not None else []
 
-    @staticmethod
-    def insert(index, item):
-        return dict(op="insert", item=item, index=index)
+    def __getitem__(self, key):
+        return Operator(self.path + [key], operations=self.operations)
 
-    @staticmethod
-    def remove(item):
-        # NB: Remove ALL occurances of item, not just the first one.
-        return dict(op="remove", item=item)
+    def __setitem__(self, key, item):
+        self.path += [key]
+        return self.assign(item)
 
-    @staticmethod
-    def pop(index):
-        return dict(op="pop", index=index)
+    def collect(self, opr, **kwargs):
+        self.operations.append(dict(opr=opr, pth=self.path, **kwargs))
+        self.path = []
+        return self
 
-    @staticmethod
-    def clear():
-        return dict(op="clear")
+    @property
+    def list(self):
+        return ListOperator(self)
 
-    @staticmethod
-    def sort():
-        return dict(op="sort")
+    @property
+    def dict(self):
+        return DictOperator(self)
 
-    @staticmethod
-    def reverse():
-        return dict(op="reverse")
+    def assign(self, item):
+        return self.collect("assign", item=item)
+
+    def apply(self):
+        return self.operations
 
 
-class ListProxy:
-    def __init__(self):
-        self.operations = []
+class ListOperator:
+    def __init__(self, operator: Optional[Operator] = None):
+        self.operator = operator
+
+    def _collect(self, opr, **kwargs):
+        return self.operator.collect(f"list_{opr}", **kwargs)
+
+    def apply(self):
+        return self.operator.apply()
 
     def append(self, item):
-        self.operations.append(ListOutput.append(item))
+        return self._collect("append", item=item)
 
     def extend(self, iterable):
-        self.operations.append(ListOutput.extend(iterable))
+        return self._collect("extend", array=list(iterable))
 
     def insert(self, index, item):
-        self.operations.append(ListOutput.insert(index, item))
+        return self._collect("insert", item=item, index=index)
 
     def remove(self, item):
-        self.operations.append(ListOutput.remove(item))
+        # NB: Remove ALL occurances of item, not just the first one.
+        return self._collect("remove", item=item)
 
     def pop(self, index):
-        self.operations.pop(index)
+        return self._collect("pop", index=index)
 
     def clear(self):
-        self.operations.append(ListOutput.clear())
+        return self._collect("clear")
 
     def sort(self):
-        self.operations.append(ListOutput.sort())
+        return self._collect("sort")
 
     def reverse(self):
-        self.operations.append(ListOutput.reverse())
+        return self._collect("reverse")
+
+
+class DictOperator:
+    def __init__(self, operator: Optional[Operator] = None):
+        self.operator = operator
+
+    def _collect(self, opr, **kwargs):
+        return self.operator.collect(f"dict_{opr}", **kwargs)
 
     def apply(self):
-        return self.operations
+        return self.operator.apply()
 
-
-class DictOutput(Output):
-    """
-    Like a normal Output, but enables dict manipulation.
-    """
-
-    @staticmethod
-    def clear():
-        return dict(op="clear")
-
-    @staticmethod
-    def pop(key):
-        return dict(op="pop", key=key)
-
-    @staticmethod
-    def update(obj):
-        return dict(op="update", obj=obj)
-
-    @staticmethod
-    def set(key, value):
-        return dict(op="set", key=key, value=value)
-
-
-class DictProxy:
-    def __init__(self):
-        self.operations = []
-
-    def __setitem__(self, key, value):
-        self.operations.append(DictOutput.set(key, value))
+    def set(self, key, item):
+        return self._collect("set", key=key, item=item)
 
     def pop(self, key):
-        self.operations.append(DictOutput.pop(key))
-
-    def clear(self):
-        self.operations.append(DictOutput.clear())
+        return self._collect("pop", key=key)
 
     def update(self, obj):
-        self.operations.append(DictOutput.update(obj))
+        return self._collect("update", obj=obj)
 
-    def apply(self):
-        return self.operations
+    def clear(self):
+        return self._collect("clear")
 
 
-class ContainerTransform(DashTransform):
+class OperatorTransform(DashTransform):
     def __init__(self):
         super().__init__()
         self.components = []
-        self.list_outputs = []
-        self.dict_outputs = []
+        self.operator_outputs = []
         self.blueprint = DashBlueprint()
 
     def transform_layout(self, layout):
         children = _as_list(layout.children) + self.components
         layout.children = children
 
-    def _apply_list(self, callback, output):
+    def _apply(self, callback, output):
         original_id = output.component_id
-        relay_id = _relay_id(original_id, "list")
-        if str(output) not in self.list_outputs:
+        relay_id = _relay_id(original_id)
+        if str(output) not in self.operator_outputs:
             # Append new relay component.
             relay_component = dcc.Store(id=relay_id)
             self.components.append(relay_component)
@@ -1411,81 +1395,54 @@ class ContainerTransform(DashTransform):
                 }}
                 // Handle action(s).
                 for (const x of operations) {{
-                    switch(x.op) {{
-                      case "append":
+                    switch(x.opr) {{
+                      case "assign":
+                        current = x.item;             
+                        break;
+                      // List action(s).
+                      case "list_append":
                         current.push(x.item)
                         break;
-                      case "extend":
+                      case "list_extend":
                         current = current.concat(x.array);
                         break;
-                      case "insert":
+                      case "list_insert":
                         current.splice(x.index, 0, x.item);
                         break;
-                      case "remove":
+                      case "list_remove":
                         current = current.filter(function(ele){{
                             return ele != x.item;
                         }});
                         break;
-                      case "pop":
+                      case "list_pop":
                         current.splice(x.index, 1);
                         break;
-                      case "reverse":
+                      case "list_reverse":
                         current.reverse();
                         break;
-                      case "sort":
+                      case "list_sort":
                         // TODO: Make it possible to inject sorting function
                         current.sort();
                         break;
-                      case "clear":
+                      case "list_clear":
                         current = []             
                         break;
-                      default:
-                        console.log("Received unknown action for component {original_id}.");
-                        console.log(x);
-                        console.log("Update will be skipped.");
-                    }}
-                }}
-                return current;
-            }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
-            # Record binding.
-            self.list_outputs.append(str(output))
-        # Modify callback in-place to route output to the relay.
-        callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
-
-    def _apply_dict(self, callback, output):
-        original_id = output.component_id
-        relay_id = _relay_id(original_id, "dict")
-        if str(output) not in self.dict_outputs:
-            # Append new relay component.
-            relay_component = dcc.Store(id=relay_id)
-            self.components.append(relay_component)
-            # Add clientside callback to perform modifications.
-            self.blueprint.clientside_callback(f"""function(operations, current){{
-                // Handle empty init call.
-                if (typeof operations === 'undefined'){{
-                    return window.dash_clientside.no_update;
-                }}
-                // Map non-list actions to list to enable iteration.
-                if (!(Array.isArray(operations))){{
-                    operations = [operations];
-                }}
-                // Handle action(s).
-                for (const x of operations) {{
-                    switch(x.op) {{
-                      case "set":
-                        current[x.key] = x.value;
+                      // Dict action(s).
+                      case "dict_set":
+                        current[x.key] = x.item;
                         break;
-                      case "pop":
+                      case "dict_pop":
                         delete current[x.key];
                         break;
-                      case "clear":
+                      case "dict_clear":
                         current = {{}};             
                         break;
-                      case "update":
+                      case "dict_update":
                         current = {{
                             ...current,
                             ...x.obj
                         }};
+                      // Unknown action(s).
                       default:
                         console.log("Received unknown action for component {original_id}.");
                         console.log(x);
@@ -1495,17 +1452,15 @@ class ContainerTransform(DashTransform):
                 return current;
             }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
             # Record binding.
-            self.dict_outputs.append(str(output))
+            self.operator_outputs.append(str(output))
         # Modify callback in-place to route output to the relay.
         callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
             for output in callback.outputs:
-                if isinstance(output, ListOutput):
-                    self._apply_list(callback, output)
-                if isinstance(output, DictOutput):
-                    self._apply_dict(callback, output)
+                if isinstance(output, OperatorOutput):
+                    self._apply(callback, output)
         return callbacks
 
     def apply_clientside(self, callbacks):
@@ -1515,8 +1470,8 @@ class ContainerTransform(DashTransform):
         return [MultiplexerTransform()]
 
 
-def _relay_id(uid, prefix):
-    return f"{uid}_{prefix}_relay"
+def _relay_id(uid):
+    return f"{uid}_operator_relay"
 
 
 # endregion
