@@ -497,7 +497,7 @@ class BlockingCallbackTransform(DashTransform):
             self.blueprint.clientside_callback(
                 start_callback,
                 [Output(start_client_id, "data"), Output(start_blocked_id, "data")],
-                list(callback.inputs) + [Input(end_blocked_id, "dst")],
+                [Input(end_blocked_id, "dst")] + list(callback.inputs),
                 [State(start_client_id, "data"), State(end_client_id, "data")],
             )
             # Bind end signal callback.
