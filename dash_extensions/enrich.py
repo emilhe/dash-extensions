@@ -47,6 +47,7 @@ _wildcard_values = list(_wildcard_mappings.values())
 
 DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
 
+
 # region DependencyCollection
 
 def build_index(structure, entry, index):
@@ -72,15 +73,15 @@ def validate_structure(structure, level=0):
     if isinstance(structure, tuple):
         result = list(structure)
         for i, entry in enumerate(result):
-            result[i] = validate_structure(entry, level=level+1)
+            result[i] = validate_structure(entry, level=level + 1)
         return result
     if isinstance(structure, list):
         for i, entry in enumerate(structure):
-            structure[i] = validate_structure(entry, level=level+1)
+            structure[i] = validate_structure(entry, level=level + 1)
         return structure
     if isinstance(structure, dict):
         for k in structure:
-            structure[k] = validate_structure(structure[k], level=level+1)
+            structure[k] = validate_structure(structure[k], level=level + 1)
         return structure
     raise ValueError(f"Unsupported structure {structure}")
 
@@ -1044,6 +1045,13 @@ class ServersideOutputTransform(DashTransform):
 
     # NOTE: Doesn't make sense for clientside callbacks.
 
+    def _get_attr_with_default(self, output, attr):
+        if hasattr(output, attr):
+            value = getattr(output, attr)
+            if value is not None:
+                return value
+        return getattr(self, attr)
+
     def apply_serverside(self, callbacks):
         # 1) Create index.
         serverside_callbacks = []
@@ -1060,9 +1068,9 @@ class ServersideOutputTransform(DashTransform):
                 # Set default values.
                 if not isinstance(output, ServersideOutput) and not memoize:
                     continue
-                output.backend = output.backend if output.backend is not None else self.backend
-                output.arg_check = output.arg_check if output.arg_check is not None else self.arg_check
-                output.session_check = output.session_check if output.session_check is not None else self.session_check
+                output.backend = self._get_attr_with_default(output, "backend")
+                output.arg_check = self._get_attr_with_default(output, "arg_check")
+                output.session_check = self._get_attr_with_default(output, "session_check")
             # Keep track of server side callbacks.
             if serverside or memoize:
                 serverside_callbacks.append(callback)
