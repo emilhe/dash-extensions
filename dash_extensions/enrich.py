@@ -4,8 +4,8 @@ import functools
 import hashlib
 import json
 import logging
-import pickle
 import secrets
+import struct
 import uuid
 import plotly
 import dash
@@ -1201,17 +1201,24 @@ class FileSystemStore(FileSystemCache):
     def __init__(self, cache_dir="file_system_store", **kwargs):
         super().__init__(cache_dir, **kwargs)
 
-    def get(self, key, ignore_expired=False):
+    def get(self, key: str, ignore_expired=False):
         if not ignore_expired:
             return super().get(key)
         # TODO: This part must be implemented for each type of cache.
         filename = self._get_filename(key)
         try:
-            with open(filename, "rb") as f:
-                _ = pickle.load(f)  # ignore time
-                return pickle.load(f)
-        except (IOError, OSError, pickle.PickleError):
-            return None
+            with self._safe_stream_open(filename, "rb") as f:
+                _ = struct.unpack("I", f.read(4))[0]
+                return self.serializer.load(f)
+        except FileNotFoundError:
+            pass
+        except (OSError, EOFError, struct.error):
+            logging.warning(
+                "Exception raised while handling cache file '%s'",
+                filename,
+                exc_info=True,
+            )
+        return None
 
 
 class RedisStore(RedisCache):
