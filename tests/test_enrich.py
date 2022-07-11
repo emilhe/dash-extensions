@@ -618,3 +618,5 @@ def test_dict_output(dash_duo):
     proxy_dict.update(update_dict)
     dash_duo.find_element("#update").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+
+def test_index_accessor():

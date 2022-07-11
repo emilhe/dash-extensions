@@ -1270,7 +1270,7 @@ class NoOutputTransform(DashTransform):
 
 class OperatorOutput(Output):
     """
-    Like a normal Output, but enables list manipulation.
+    Like a normal Output, but enables list and dict manipulations.
     """
 
 
@@ -1392,6 +1392,11 @@ class OperatorTransform(DashTransform):
                 // Map non-list actions to list to enable iteration.
                 if (!(Array.isArray(operations))){{
                     operations = [operations];
+                }}
+                // Path mapping.
+                const drill = (obj, path, level=0) => {{
+                    if(level === path.length){{return obj;}}
+                  return drill(obj[path[level]], path, level+1);
                 }}
                 // Handle action(s).
                 for (const x of operations) {{

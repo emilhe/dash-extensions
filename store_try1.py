@@ -3,7 +3,7 @@ from dash_extensions.enrich import DashProxy, html, dcc, Output, Input, Multiple
 
 
 gui_actions = dict(
-    append=lambda x: Operator().list.append(x).apply(),
+    append=lambda x: Operator().list.append(x), #.apply(),
     extend=lambda x: Operator().list.extend([x, x]).apply(),
     sort=lambda x: Operator().list.sort().apply(),
     reverse=lambda x: Operator().list.reverse().apply(),
