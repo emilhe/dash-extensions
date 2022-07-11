@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 11-07-22
+
+### Changed
+
+- Drop spurious `Burger` references as reported in #188
+- Update to `flask-caching==2.0.0`, with the `FileSystemStore` code changed accordingly. Should fix #181
+- Add extra attribute check to address issue in #185
+- Updated various dependencies
+
 ## [0.1.3] - 13-05-22
 
 ### Added
