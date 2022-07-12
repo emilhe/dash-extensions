@@ -1393,58 +1393,63 @@ class OperatorTransform(DashTransform):
                 if (!(Array.isArray(operations))){{
                     operations = [operations];
                 }}
-                // Path mapping.
-                const drill = (obj, path, level=0) => {{
-                    if(level === path.length){{return obj;}}
-                  return drill(obj[path[level]], path, level+1);
+                // Function for resolving sub elements.
+                const drill = (obj, pth, lvl=0) => {{
+                    if(lvl === pth.length){{return obj;}}
+                    return drill(obj[pth[lvl]], pth, lvl+1);
                 }}
-                // Handle action(s).
+                // Wrap current in list to enable index access.
+                lst = [current];
+                // Action.
                 for (const x of operations) {{
+                    let pth = [0].concat(x.pth);
+                    let idx = pth[pth.length - 1];
+                    let obj = drill(lst, pth.slice(0,-1));
                     switch(x.opr) {{
                       case "assign":
-                        current = x.item;             
+                        obj[idx] = x.item;             
                         break;
                       // List action(s).
                       case "list_append":
-                        current.push(x.item)
+                        obj[idx].push(x.item)
                         break;
                       case "list_extend":
-                        current = current.concat(x.array);
+                        obj[idx] = obj[idx].concat(x.array);
                         break;
                       case "list_insert":
-                        current.splice(x.index, 0, x.item);
+                        obj[idx].splice(x.index, 0, x.item);
                         break;
                       case "list_remove":
-                        current = current.filter(function(ele){{
+                        obj[idx] = obj[idx].filter(function(ele){{
                             return ele != x.item;
                         }});
                         break;
                       case "list_pop":
-                        current.splice(x.index, 1);
+                        obj[idx].splice(x.index, 1);
                         break;
                       case "list_reverse":
-                        current.reverse();
+                        obj[idx].reverse();
                         break;
                       case "list_sort":
                         // TODO: Make it possible to inject sorting function
-                        current.sort();
+                        obj[idx].sort();
                         break;
                       case "list_clear":
-                        current = []             
+                        obj[idx] = []             
                         break;
                       // Dict action(s).
                       case "dict_set":
-                        current[x.key] = x.item;
+                        obj[idx][x.key] = x.item;
                         break;
                       case "dict_pop":
-                        delete current[x.key];
+                        delete obj[idx][x.key];
                         break;
                       case "dict_clear":
-                        current = {{}};             
+                        obj[idx] = {{}};             
                         break;
                       case "dict_update":
-                        current = {{
-                            ...current,
+                        obj[idx] = {{
+                            ...obj[idx],
                             ...x.obj
                         }};
                       // Unknown action(s).
@@ -1454,7 +1459,7 @@ class OperatorTransform(DashTransform):
                         console.log("Update will be skipped.");
                     }}
                 }}
-                return current;
+                return lst[0];
             }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
             # Record binding.
             self.operator_outputs.append(str(output))
