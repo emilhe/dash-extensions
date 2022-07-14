@@ -512,14 +512,14 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
 
 def test_list_output(dash_duo):
     gui_actions = dict(
-        append=lambda x: Operator().list.append(x).apply(),
-        extend=lambda x: Operator().list.extend([x, x]).apply(),
-        sort=lambda x: Operator().list.sort().apply(),
-        reverse=lambda x: Operator().list.reverse().apply(),
-        clear=lambda x: Operator().list.clear().apply(),
-        insert=lambda x: Operator().list.insert(4, "hest").apply(),
-        remove=lambda x: Operator().list.remove(3).apply(),
-        pop=lambda x: Operator().list.pop(3).apply(),
+        append=lambda x: Operator().list.append(x),
+        extend=lambda x: Operator().list.extend([x, x]),
+        sort=lambda x: Operator().list.sort(),
+        reverse=lambda x: Operator().list.reverse(),
+        clear=lambda x: Operator().list.clear(),
+        insert=lambda x: Operator().list.insert(4, "hest"),
+        remove=lambda x: Operator().list.remove(3),
+        pop=lambda x: Operator().list.pop(3),
     )
     action_buttons = [html.Button(k, id=k) for k in gui_actions]
     app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
@@ -583,10 +583,10 @@ def test_dict_output(dash_duo):
     pop_key = "some_key2"
     update_dict = dict(key="value", some="stuff", foo="bar")
     gui_actions = dict(
-        set=lambda x: Operator().dict.set(f"some_key{x}", f"some_value{x}").apply(),
-        clear=lambda x: Operator().dict.clear().apply(),
-        pop=lambda x: Operator().dict.pop(pop_key).apply(),
-        update=lambda x: Operator().dict.update(update_dict).apply(),
+        set=lambda x: Operator().dict.set(f"some_key{x}", f"some_value{x}"),
+        clear=lambda x: Operator().dict.clear(),
+        pop=lambda x: Operator().dict.pop(pop_key),
+        update=lambda x: Operator().dict.update(update_dict),
     )
     action_buttons = [html.Button(k, id=k) for k in gui_actions]
     app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
@@ -619,4 +619,4 @@ def test_dict_output(dash_duo):
     dash_duo.find_element("#update").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
 
-def test_index_accessor():
+# def test_index_accessor():

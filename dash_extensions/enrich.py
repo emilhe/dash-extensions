@@ -1473,12 +1473,23 @@ class OperatorTransform(DashTransform):
                         console.log("Update will be skipped.");
                     }}
                 }}
-                return lst[0];
+                // Make sure out ref != input ref (otherwise, React can get confused)
+                const result = lst[0];
+                if(Array.isArray(result)){{
+                    return Array.from(result)
+                }}
+                if(typeof result === 'object'){{
+                    return Object.assign({{}}, result);
+                }}
+                return result;
             }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
             # Record binding.
             self.operator_outputs.append(str(output))
         # Modify callback in-place to route output to the relay.
         callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
+        # Run apply if needed.
+        f = callback.f
+        callback.f = apply_operator()(f)
 
     def apply_serverside(self, callbacks):
         for callback in callbacks:
@@ -1492,6 +1503,22 @@ class OperatorTransform(DashTransform):
 
     def get_dependent_transforms(self):
         return [MultiplexerTransform()]
+
+
+def apply_operator():
+    def wrapper(f):
+        @functools.wraps(f)
+        def decorated_function(*args):
+            output = f(*args)
+            if isinstance(output, Operator):
+                return output.apply()
+            if hasattr(output, "__len__"):
+                output = [o.apply() if isinstance(o, Operator) else o for o in output]
+            return output
+
+        return decorated_function
+
+    return wrapper
 
 
 def _relay_id(uid):
@@ -1514,6 +1541,7 @@ class Dash(DashProxy):
             CycleBreakerTransform(),
             BlockingCallbackTransform(),
             ServersideOutputTransform(**output_defaults),
+            OperatorTransform()
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
 
