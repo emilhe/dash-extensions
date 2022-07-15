@@ -327,6 +327,34 @@ def test_prefix_id_transform(dash_duo, flex):
     _basic_dash_proxy_test(dash_duo, app, ["x-log_server", "x-log_client"], "x-btn")
 
 
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([Output("log", "children"), Input("right", "n_clicks")], dict()),
+     ([], dict(output=[Output("log", "children")], inputs=dict(n_clicks=Input("right", "n_clicks"))))])
+def test_multiplexer_and_prefix_transform(dash_duo, args, kwargs):
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[PrefixIdTransform("prefix"), MultiplexerTransform()])
+    app.layout = html.Div([
+        html.Button(id="left"),
+        html.Button(id="right"),
+        html.Div(id="log"),
+    ])
+    app.clientside_callback("function(x){return 'left'}", Output("log", "children"), Input("left", "n_clicks"))
+
+    @app.callback(*args, **kwargs)
+    def update_right(n_clicks):
+        return ["right"]
+
+    # Check that the app works.
+    dash_duo.start_server(app)
+    log = dash_duo.find_element("#prefix-log")
+    assert log.text == ""
+    dash_duo.find_element("#prefix-left").click()
+    dash_duo.wait_for_text_to_equal("#prefix-log", "left", timeout=0.1)
+    assert log.text == "left"
+    dash_duo.find_element("#prefix-right").click()
+    dash_duo.wait_for_text_to_equal("#prefix-log", "right", timeout=0.1)
+    assert log.text == "right"
+
 def test_global_blueprint(dash_duo):
     app = _get_basic_dash_proxy()
     clientside_callback("function(x){return x;}",

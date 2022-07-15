@@ -32,6 +32,9 @@ from dash import (  # lgtm [py/unused-import]
     callback_context,
     callback,
     clientside_callback,
+    page_container,
+    page_registry,
+    register_page
 )
 from dash._utils import patch_collections_abc
 from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
@@ -991,9 +994,9 @@ class MultiplexerTransform(DashTransform):
             mp_id = _mp_id(output, i)
             mp_id_escaped = _escape_wildcards(mp_id)
             # Create proxy element.
-            proxies.append(_mp_element(mp_id_escaped))
+            proxies.append(_mp_element(mp_id_escaped.copy()))
             # Assign proxy element as output.
-            callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped, _mp_prop())
+            callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped.copy(), _mp_prop())
             # Create proxy input.
             inputs.append(Input(mp_id, _mp_prop()))
         # Collect proxy elements to add to layout.
