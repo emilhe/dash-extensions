@@ -7,8 +7,6 @@ import logging
 import secrets
 import struct
 import uuid
-from itertools import chain
-
 import plotly
 import dash
 
