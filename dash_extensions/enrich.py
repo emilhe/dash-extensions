@@ -1213,6 +1213,8 @@ class FileSystemStore(FileSystemCache):
         super().__init__(cache_dir, **kwargs)
 
     def get(self, key: str, ignore_expired=False):
+        if key is None:
+            return None
         if not ignore_expired:
             return super().get(key)
         # TODO: This part must be implemented for each type of cache.
