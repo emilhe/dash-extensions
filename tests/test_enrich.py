@@ -685,3 +685,28 @@ def test_index_accessor(dash_duo):
     data[1]['foo'][0] = some_value
     dash_duo.find_element("#composite").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+
+
+def test_composite_operator(dash_duo):
+    data = [1, 2, 3, 4, 5]
+    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div([html.Button(id="action"), dcc.Store(id="store", data=data), html.Div(id="log")])
+    app.callback(Output("log", "children"), Input("store", "data"))(lambda x: json.dumps(x))
+
+    @app.callback(OperatorOutput("store", "data"), Input("action", "n_clicks"))
+    def action(_):
+        o = Operator()
+        o[2] = 7
+        o[4] = -1
+        o.list.sort()
+        return o
+
+    # Start stuff.
+    dash_duo.start_server(app)
+    # Test stuff.
+    data[2] = 7
+    data[4] = -1
+    data = sorted(data)
+    dash_duo.find_element("#action").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+
