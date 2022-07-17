@@ -355,6 +355,7 @@ def test_multiplexer_and_prefix_transform(dash_duo, args, kwargs):
     dash_duo.wait_for_text_to_equal("#prefix-log", "right", timeout=0.1)
     assert log.text == "right"
 
+
 def test_global_blueprint(dash_duo):
     app = _get_basic_dash_proxy()
     clientside_callback("function(x){return x;}",
@@ -647,4 +648,40 @@ def test_dict_output(dash_duo):
     dash_duo.find_element("#update").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
 
-# def test_index_accessor():
+
+def test_index_accessor(dash_duo):
+    some_value = "some_value"
+    gui_actions = [
+        dict(id="list_idx", opr=lambda x: Operator()[1].assign(some_value), data=["bar", "bar", "bar"]),
+        dict(id="dict_key", opr=lambda x: Operator()['foo'].assign(some_value), data={"foo": "bar", "foo2": "bar2"}),
+        dict(id="composite", opr=lambda x: Operator()[1]['foo'][0].assign(some_value),
+             data=[
+                 "bar",
+                 {"foo": ["bar", "bar", "bar"], "foo2": "bar2"},
+                 "bar"
+             ]),
+    ]
+    action_buttons = [html.Button(e['id'], id=e['id']) for e in gui_actions]
+    stores = [dcc.Store(data=e['data'], id=f"store_{e['id']}") for e in gui_actions]
+    app = DashProxy(transforms=[OperatorTransform(), MultiplexerTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div(action_buttons + stores + [html.Div(id="log")])
+    for e in gui_actions:
+        app.callback(OperatorOutput(f"store_{e['id']}", "data"), Input(e['id'], "n_clicks"))(e['opr'])
+        app.callback(Output("log", "children"), Input(f"store_{e['id']}", "data"))(lambda x: json.dumps(x))
+    # Start stuff.
+    dash_duo.start_server(app)
+    # Check list_index.
+    data = gui_actions[0]['data']
+    data[1] = some_value
+    dash_duo.find_element("#list_idx").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+    # Check dict_key.
+    data = gui_actions[1]['data']
+    data['foo'] = some_value
+    dash_duo.find_element("#dict_key").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+    # Check composite.
+    data = gui_actions[2]['data']
+    data[1]['foo'][0] = some_value
+    dash_duo.find_element("#composite").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
