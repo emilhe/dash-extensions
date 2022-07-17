@@ -1,4 +1,5 @@
 import decimal
+import json
 import os
 import time
 
@@ -9,7 +10,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection
+    CycleBreakerInput, DependencyCollection, OperatorTransform, OperatorOutput, Operator
 
 
 # region Test utils/stubs
@@ -107,7 +108,7 @@ def test_callback_blueprint():
     )
     assert list(cbp.outputs) == [Output("o", "prop"), Output("o2", "prop")]
     assert list(cbp.inputs) == [State("s", "prop"), State("s2", "prop"), Input("i0", "prop"),
-                          State("s3", "prop"), Input("i", "prop")]
+                                State("s3", "prop"), Input("i", "prop")]
     # Test variables.
     my_input = html.Button()
     my_output = html.Div()
@@ -326,6 +327,35 @@ def test_prefix_id_transform(dash_duo, flex):
     _basic_dash_proxy_test(dash_duo, app, ["x-log_server", "x-log_client"], "x-btn")
 
 
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([Output("log", "children"), Input("right", "n_clicks")], dict()),
+     ([], dict(output=[Output("log", "children")], inputs=dict(n_clicks=Input("right", "n_clicks"))))])
+def test_multiplexer_and_prefix_transform(dash_duo, args, kwargs):
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[PrefixIdTransform("prefix"), MultiplexerTransform()])
+    app.layout = html.Div([
+        html.Button(id="left"),
+        html.Button(id="right"),
+        html.Div(id="log"),
+    ])
+    app.clientside_callback("function(x){return 'left'}", Output("log", "children"), Input("left", "n_clicks"))
+
+    @app.callback(*args, **kwargs)
+    def update_right(n_clicks):
+        return ["right"]
+
+    # Check that the app works.
+    dash_duo.start_server(app)
+    log = dash_duo.find_element("#prefix-log")
+    assert log.text == ""
+    dash_duo.find_element("#prefix-left").click()
+    dash_duo.wait_for_text_to_equal("#prefix-log", "left", timeout=0.1)
+    assert log.text == "left"
+    dash_duo.find_element("#prefix-right").click()
+    dash_duo.wait_for_text_to_equal("#prefix-log", "right", timeout=0.1)
+    assert log.text == "right"
+
+
 def test_global_blueprint(dash_duo):
     app = _get_basic_dash_proxy()
     clientside_callback("function(x){return x;}",
@@ -507,3 +537,176 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
     c = dash_duo.find_element("#celsius")
     c.send_keys("100")
     dash_duo.wait_for_text_to_equal("#fahrenheit", "212", timeout=1)
+
+
+def test_list_output(dash_duo):
+    gui_actions = dict(
+        append=lambda x: Operator().list.append(x),
+        extend=lambda x: Operator().list.extend([x, x]),
+        sort=lambda x: Operator().list.sort(),
+        reverse=lambda x: Operator().list.reverse(),
+        clear=lambda x: Operator().list.clear(),
+        insert=lambda x: Operator().list.insert(4, "hest"),
+        remove=lambda x: Operator().list.remove(3),
+        pop=lambda x: Operator().list.pop(3),
+    )
+    action_buttons = [html.Button(k, id=k) for k in gui_actions]
+    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
+    for k in gui_actions:
+        app.callback(OperatorOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
+    app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
+    # Start stuff.
+    proxy_list = []
+    dash_duo.start_server(app)
+    # Check empty after clear.
+    dash_duo.find_element("#clear").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check append.
+    proxy_list.append(1)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.append(2)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.append(3)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.append(4)
+    dash_duo.find_element("#append").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check extend.
+    proxy_list.extend([1, 1])
+    dash_duo.find_element("#extend").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    proxy_list.extend([2, 2])
+    dash_duo.find_element("#extend").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check sort.
+    proxy_list.sort()
+    dash_duo.find_element("#sort").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check reverse.
+    proxy_list.reverse()
+    dash_duo.find_element("#reverse").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check remove.
+    proxy_list.remove(3)
+    dash_duo.find_element("#remove").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check pop.
+    proxy_list.pop(3)
+    dash_duo.find_element("#pop").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check insert.
+    proxy_list.insert(4, "hest")
+    dash_duo.find_element("#insert").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+    # Check empty after clear.
+    proxy_list.clear()
+    dash_duo.find_element("#clear").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
+
+
+def test_dict_output(dash_duo):
+    pop_key = "some_key2"
+    update_dict = dict(key="value", some="stuff", foo="bar")
+    gui_actions = dict(
+        set=lambda x: Operator().dict.set(f"some_key{x}", f"some_value{x}"),
+        clear=lambda x: Operator().dict.clear(),
+        pop=lambda x: Operator().dict.pop(pop_key),
+        update=lambda x: Operator().dict.update(update_dict),
+    )
+    action_buttons = [html.Button(k, id=k) for k in gui_actions]
+    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
+    for k in gui_actions:
+        app.callback(OperatorOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
+    app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
+    # Start stuff.
+    proxy_dict = {}
+    dash_duo.start_server(app)
+    # Check empty after clear.
+    dash_duo.find_element("#clear").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    # Check set.
+    proxy_dict["some_key1"] = "some_value1"
+    dash_duo.find_element("#set").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    proxy_dict["some_key2"] = "some_value2"
+    dash_duo.find_element("#set").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    proxy_dict["some_key3"] = "some_value3"
+    dash_duo.find_element("#set").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    # Check pop.
+    proxy_dict.pop(pop_key)
+    dash_duo.find_element("#pop").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+    # Check update.
+    proxy_dict.update(update_dict)
+    dash_duo.find_element("#update").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
+
+
+def test_index_accessor(dash_duo):
+    some_value = "some_value"
+    gui_actions = [
+        dict(id="list_idx", opr=lambda x: Operator()[1].assign(some_value), data=["bar", "bar", "bar"]),
+        dict(id="dict_key", opr=lambda x: Operator()['foo'].assign(some_value), data={"foo": "bar", "foo2": "bar2"}),
+        dict(id="composite", opr=lambda x: Operator()[1]['foo'][0].assign(some_value),
+             data=[
+                 "bar",
+                 {"foo": ["bar", "bar", "bar"], "foo2": "bar2"},
+                 "bar"
+             ]),
+    ]
+    action_buttons = [html.Button(e['id'], id=e['id']) for e in gui_actions]
+    stores = [dcc.Store(data=e['data'], id=f"store_{e['id']}") for e in gui_actions]
+    app = DashProxy(transforms=[OperatorTransform(), MultiplexerTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div(action_buttons + stores + [html.Div(id="log")])
+    for e in gui_actions:
+        app.callback(OperatorOutput(f"store_{e['id']}", "data"), Input(e['id'], "n_clicks"))(e['opr'])
+        app.callback(Output("log", "children"), Input(f"store_{e['id']}", "data"))(lambda x: json.dumps(x))
+    # Start stuff.
+    dash_duo.start_server(app)
+    # Check list_index.
+    data = gui_actions[0]['data']
+    data[1] = some_value
+    dash_duo.find_element("#list_idx").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+    # Check dict_key.
+    data = gui_actions[1]['data']
+    data['foo'] = some_value
+    dash_duo.find_element("#dict_key").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+    # Check composite.
+    data = gui_actions[2]['data']
+    data[1]['foo'][0] = some_value
+    dash_duo.find_element("#composite").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+
+
+def test_composite_operator(dash_duo):
+    data = [1, 2, 3, 4, 5]
+    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
+    app.layout = html.Div([html.Button(id="action"), dcc.Store(id="store", data=data), html.Div(id="log")])
+    app.callback(Output("log", "children"), Input("store", "data"))(lambda x: json.dumps(x))
+
+    @app.callback(OperatorOutput("store", "data"), Input("action", "n_clicks"))
+    def action(_):
+        o = Operator()
+        o[2] = 7
+        o[4] = -1
+        o.list.sort()
+        return o
+
+    # Start stuff.
+    dash_duo.start_server(app)
+    # Test stuff.
+    data[2] = 7
+    data[4] = -1
+    data = sorted(data)
+    dash_duo.find_element("#action").click()
+    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
+

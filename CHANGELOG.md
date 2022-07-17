@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5] - UNRELEASED
+
+### Added
+
+- Added `OperatorTransform` and the associated `Operator` class
+
+### Changed
+
+- Fixed bug in `MultiPlexerTransform` occurring when used together with `PrefixIdTransform`
+- Bump `Dash` to version 2.6.0, and added pages import in `enrich` module
+
 ## [0.1.4] - 11-07-22
 
 ### Changed
