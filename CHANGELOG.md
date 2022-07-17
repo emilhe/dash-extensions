@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.5] - UNRELEASED
+## [0.1.5] - 17-07-22
 
 ### Added
 
@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 
 - Fixed bug in `MultiPlexerTransform` occurring when used together with `PrefixIdTransform`
 - Fixed bug [#178](https://github.com/thedirtyfew/dash-extensions/issues/178) occurring when using `ServersideOutput` as `State`
-- Bump `Dash` to version 2.6.0, and added pages import in `enrich` module
+- Bump `Dash` to version >=2.5.0, and added pages import in `enrich` module
 
 ## [0.1.4] - 11-07-22
 
