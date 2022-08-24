@@ -1,59 +1,57 @@
-import React, {Component} from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import {ImgComparisonSlider} from '@img-comparison-slider/react';
 
 /**
  * Before After Image Slider based on https://github.com/sneas/img-comparison-slider
  */
-export default class BeforeAfter extends Component {
-    render() {
-        const {
-            id,
-            setProps,
-            before,
-            after,
-            width,
-            height,
-            hover,
-            value,
-            direction,
-            keyboard,
-            defaultProgress,
-            before_style,
-            after_style,
-            beforeClassName,
-            afterClassName,
-        } = this.props;
+const BeforeAfter = props => {
+    const {
+        id,
+        before,
+        after,
+        width,
+        height,
+        hover,
+        value,
+        direction,
+        keyboard,
+        defaultProgress,
+        before_style,
+        after_style,
+        beforeClassName,
+        afterClassName,
+    } = props;
 
-        return (
-            <div id={id}>
-                <ImgComparisonSlider
-                    hover={hover}
-                    value={defaultProgress || value}
-                    direction={direction}
-                    keyboard={keyboard}
-                >
-                    <img
-                        slot="first"
-                        width={width}
-                        height={height}
-                        src={before}
-                        style={before_style}
-                        className={beforeClassName}
-                    />
-                    <img
-                        slot="second"
-                        width={width}
-                        height={height}
-                        src={after}
-                        style={after_style}
-                        className={afterClassName}
-                    />
-                </ImgComparisonSlider>
-            </div>
-        );
-    }
-}
+    return (
+        <div id={id}>
+            <ImgComparisonSlider
+                hover={hover}
+                value={defaultProgress || value}
+                direction={direction}
+                keyboard={keyboard}
+            >
+                <img
+                    slot="first"
+                    width={width}
+                    height={height}
+                    src={before}
+                    style={before_style}
+                    className={beforeClassName}
+                />
+                <img
+                    slot="second"
+                    width={width}
+                    height={height}
+                    src={after}
+                    style={after_style}
+                    className={afterClassName}
+                />
+            </ImgComparisonSlider>
+        </div>
+    );
+};
+
 
 BeforeAfter.defaultProps = {
     width: '100%',
@@ -151,3 +149,5 @@ BeforeAfter.propTypes = {
      */
     setProps: PropTypes.func,
 };
+
+export default BeforeAfter;
