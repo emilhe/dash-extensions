@@ -38,3 +38,9 @@ jobs:
         poetry run npm run build_no_r
         poetry build
         poetry publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}
+    - name: publish-to-conda
+      uses: fcakyon/conda-publish-action@v1.3
+      with:
+        subdir: 'conda'
+        anacondatoken: ${{ secrets.ANACONDA_TOKEN }}
+        platforms: 'win osx linux'
