@@ -17,6 +17,10 @@ jobs:
     - uses: actions/setup-node@v1
       with:
         node-version: 12
+    - name: GitHub Tag Name example
+      run: |
+        echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
+        echo "Tag name from github.ref_name: ${{  github.ref_name }}"
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
