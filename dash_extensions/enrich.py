@@ -1168,7 +1168,10 @@ def _pack_outputs(callback):
                 if serverside_output or memoize:
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
                     is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
-                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
+                    if callback.kwargs.get("progress") is None:
+                        filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
+                    else:
+                        filtered_args = [arg for i, arg in enumerate(args[1:]) if not is_trigger[i]]
                     unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
                     output.backend.set(unique_id, data[i])
                     # Replace only for server side outputs.
