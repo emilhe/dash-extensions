@@ -1,0 +1,27 @@
+{% set version = "0.1.5" %}
+
+package:
+  name: "dash-extensions"
+  version: {{ version }}
+
+#source:
+#  url: <URL-of-the-source-distribution-of-my-package-on-PyPI>.tar.gz
+#  sha256: <SHA256-of-the-source-distribution-of-my-package-on-PyPI>
+
+build:
+  noarch: python
+  script: python -m pip install .
+
+requirements:
+  host:
+    - python
+    - pip
+    - poetry
+  run:
+    - python
+
+about:
+  license: MIT
+  license_familY: MIT
+  license_file: LICENSE
+  summary: "Extensions for Plotly Dash."
