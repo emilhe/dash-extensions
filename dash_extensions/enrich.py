@@ -184,7 +184,7 @@ class CallbackBlueprint:
         if "output" in kwargs:
             self.outputs = DependencyCollection(kwargs.pop("output"), keyword="output")
         if "inputs" in kwargs:
-            self.inputs = DependencyCollection(dummy_inputs + kwargs.pop("inputs"), keyword="inputs")
+            self.inputs = DependencyCollection(dummy_inputs + _as_list(kwargs.pop("inputs")), keyword="inputs")
         if "state" in kwargs:
             raise ValueError("Please use the 'inputs' keyword instead of the 'state' keyword.")
         # Collect the rest.
