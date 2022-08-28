@@ -326,6 +326,9 @@ class DashProxy(dash.Dash):
     def clientside_callback(self, clientside_function, *args, **kwargs):
         return self.blueprint.clientside_callback(clientside_function, *args, **kwargs)
 
+    def long_callback(self, *_args, **_kwargs):
+        raise NotImplementedError("The 'long_callback(..)' syntax is not supported, please use 'callback(background=True, ...)' instead.")
+
     def _setup_server(self):
         # Register the callbacks.
         self.blueprint.register_callbacks(super())
