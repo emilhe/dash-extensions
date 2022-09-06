@@ -16,9 +16,8 @@ const BeforeAfter = props => {
         value,
         direction,
         keyboard,
-        defaultProgress,
-        before_style,
-        after_style,
+        beforeProps,
+        afterProps,
         beforeClassName,
         afterClassName,
     } = props;
@@ -27,7 +26,7 @@ const BeforeAfter = props => {
         <div id={id}>
             <ImgComparisonSlider
                 hover={hover}
-                value={defaultProgress || value}
+                value={value}
                 direction={direction}
                 keyboard={keyboard}
             >
@@ -36,7 +35,7 @@ const BeforeAfter = props => {
                     width={width}
                     height={height}
                     src={before}
-                    style={before_style}
+                    {...beforeProps}
                     className={beforeClassName}
                 />
                 <img
@@ -44,7 +43,7 @@ const BeforeAfter = props => {
                     width={width}
                     height={height}
                     src={after}
-                    style={after_style}
+                    {...afterProps}
                     className={afterClassName}
                 />
             </ImgComparisonSlider>
@@ -109,37 +108,22 @@ BeforeAfter.propTypes = {
     keyboard: PropTypes.oneOf(['enabled', 'disabled']),
 
     /**
-     * Defines CSS styles of the before image.
-     */
-    before_style: PropTypes.object,
-
-    /**
-     * Defines CSS styles of the after image.
-     */
-    after_style: PropTypes.object,
-
-    /**
      * className of before image. Often used with CSS to style elements with common properties.
      */
     beforeClassName: PropTypes.string,
 
     /**
-     * className of after image. Often used with CSS to style elements with common properties.
+     * className of `after` image. Often used with CSS to style elements with common properties.
      */
     afterClassName: PropTypes.string,
 
     /**
-     * **DEPRECATED** Use `value` instead.
-     */
-    defaultProgress: PropTypes.number,
-
-    /**
-     * **DEPRECATED** Used in v<=0.1.5.
+     * Other props for the `before` Img component. eg {"alt": "description of the first image"}
      */
     beforeProps: PropTypes.object,
 
     /**
-     * **DEPRECATED** Used in v<=0.1.5.
+     *  Other props for the after Img component. eg {"alt": "description of the second image"}
      */
     afterProps: PropTypes.object,
 
