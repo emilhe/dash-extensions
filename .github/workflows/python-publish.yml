@@ -22,7 +22,7 @@ jobs:
       with:
         python-version: '3.9'
     - name: Install poetry
-      uses: Gr1N/setup-poetry@v4
+      uses: Gr1N/setup-poetry@v7
     - name: Cache poetry
       id: cached-poetry-dependencies
       uses: actions/cache@v2
