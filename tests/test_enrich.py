@@ -370,11 +370,11 @@ def test_global_blueprint(dash_duo):
 
 
 @pytest.mark.parametrize(
-    'args, kwargs',
-    [([Output("log", "children"), Input("trigger", "n_intervals")], dict()),
+    'args, kwargs, port',
+    [([Output("log", "children"), Input("trigger", "n_intervals")], dict(), 4757),
      ([], dict(output=[Output("log", "children")],
-               inputs=dict(tick=Input("trigger", "n_intervals"))))])
-def test_blocking_callback_transform(dash_duo, args, kwargs):
+               inputs=dict(tick=Input("trigger", "n_intervals"))), 4758)])
+def test_blocking_callback_transform(dash_duo, args, kwargs, port):
     app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
     app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=500)])
     msg = "Hello world!"
@@ -385,7 +385,7 @@ def test_blocking_callback_transform(dash_duo, args, kwargs):
         return [msg]
 
     # Check that stuff works. It doesn't using a normal Dash object.
-    dash_duo.start_server(app, port=4757)
+    dash_duo.start_server(app, port=port)
     dash_duo.wait_for_text_to_equal("#log", msg, timeout=5)
     assert dash_duo.find_element("#log").text == msg
 
