@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 08-09-22
+
+### Changed
+
+- Improved support for the new `callback(background=True, ...)` syntax adding support for the `set_progress` keyword
+- Added explicit raise of `NotImplementedError` for the (deprecated) `long_callback` syntax
+
 ## [0.1.5] - 17-07-22
 
 ### Added
