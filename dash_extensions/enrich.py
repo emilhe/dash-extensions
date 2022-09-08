@@ -127,12 +127,17 @@ class DependencyCollection:
             if i == len(multi_index) - 1:
                 e[j] = value
 
-    def append(self, value, flex_key=None):
+    def append(self, value, flex_key=None, index=None):
         i = len(self._index)
         if isinstance(self.structure, list):
-            self.structure.append(value)
-            self._re_index()
-            return i
+            if index is not None:
+                self.structure.insert(index, value)
+                self._re_index()
+                return index
+            else:
+                self.structure.append(value)
+                self._re_index()
+                return i
         if isinstance(self.structure, dict):
             flex_key = f"{DEPENDENCY_APPEND_PREFIX}{i}" if flex_key is None else flex_key
             self.structure[flex_key] = value
@@ -174,19 +179,19 @@ class DummyDependency(DashDependency):
 
 class CallbackBlueprint:
     def __init__(self, *args, **kwargs):
-        # Collect dummy elements.
-        dummy_inputs = []
-        if kwargs.get("background", False) and "progress" in kwargs:
-            dummy_inputs.append(DummyDependency("function", "set_progress"))  # represents set_progress function
         # Collect args "normally".
-        self.inputs, self.outputs = collect_args(args, dummy_inputs, [])
+        self.inputs, self.outputs = collect_args(args, [], [])
         # Flexible signature handling via keyword arguments. If provided, it takes precedence.
         if "output" in kwargs:
             self.outputs = DependencyCollection(kwargs.pop("output"), keyword="output")
         if "inputs" in kwargs:
-            self.inputs = DependencyCollection(dummy_inputs + _as_list(kwargs.pop("inputs")), keyword="inputs")
+            self.inputs = DependencyCollection(kwargs.pop("inputs"), keyword="inputs")
         if "state" in kwargs:
             raise ValueError("Please use the 'inputs' keyword instead of the 'state' keyword.")
+        # Collect dummy elements.
+        if kwargs.get("background", False) and "progress" in kwargs:
+            # This element represents the set_progress function.
+            self.inputs.append(DummyDependency("function", "set_progress"), index=0, flex_key="set_progress")
         # Collect the rest.
         self.kwargs: Dict[str, Any] = kwargs
         self.f = None
