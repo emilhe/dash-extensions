@@ -163,15 +163,28 @@ def collect_args(args: Union[Tuple[Any], List[Any]], inputs, outputs):
     return DependencyCollection(inputs), DependencyCollection(outputs)
 
 
+class DummyDependency(DashDependency):
+    """
+    Object used to represent dummy dependencies.
+    """
+
+    def __init__(self, component_id, component_property):
+        super().__init__(component_id, component_property)
+
+
 class CallbackBlueprint:
     def __init__(self, *args, **kwargs):
+        # Collect dummy elements.
+        dummy_inputs = []
+        if kwargs.get("background", False) and "progress" in kwargs:
+            dummy_inputs.append(DummyDependency("function", "set_progress"))  # represents set_progress function
         # Collect args "normally".
-        self.inputs, self.outputs = collect_args(args, [], [])
+        self.inputs, self.outputs = collect_args(args, dummy_inputs, [])
         # Flexible signature handling via keyword arguments. If provided, it takes precedence.
         if "output" in kwargs:
             self.outputs = DependencyCollection(kwargs.pop("output"), keyword="output")
         if "inputs" in kwargs:
-            self.inputs = DependencyCollection(kwargs.pop("inputs"), keyword="inputs")
+            self.inputs = DependencyCollection(dummy_inputs + _as_list(kwargs.pop("inputs")), keyword="inputs")
         if "state" in kwargs:
             raise ValueError("Please use the 'inputs' keyword instead of the 'state' keyword.")
         # Collect the rest.
@@ -185,6 +198,10 @@ class CallbackBlueprint:
             s = dep_col.structure
             if isinstance(s, list) and len(s) == 1:
                 s = s[0]
+            if isinstance(s, DummyDependency):
+                continue
+            if isinstance(s, list):
+                s = [dep for dep in s if not isinstance(dep, DummyDependency)]
             if dep_col.keyword is None:
                 dep_args.append(s)
             else:
@@ -325,6 +342,10 @@ class DashProxy(dash.Dash):
 
     def clientside_callback(self, clientside_function, *args, **kwargs):
         return self.blueprint.clientside_callback(clientside_function, *args, **kwargs)
+
+    def long_callback(self, *_args, **_kwargs):
+        raise NotImplementedError(
+            "The 'long_callback(..)' syntax is not supported, please use 'callback(background=True, ...)' instead.")
 
     def _setup_server(self):
         # Register the callbacks.
@@ -1137,8 +1158,8 @@ def _pack_outputs(callback):
                 update_needed = False
                 for i, output in enumerate(callback.outputs):
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
-                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
+                    to_skip = [isinstance(item, Trigger) for item in callback.inputs]
+                    filtered_args = [arg for i, arg in enumerate(args) if not to_skip[i]]
                     # Generate unique ID.
                     unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
                     unique_ids.append(unique_id)
@@ -1167,8 +1188,8 @@ def _pack_outputs(callback):
                 serverside_output = isinstance(callback.outputs[i], ServersideOutput)
                 if serverside_output or memoize:
                     # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
-                    filtered_args = [arg for i, arg in enumerate(args) if not is_trigger[i]]
+                    to_skip = [isinstance(item, (Trigger, DummyDependency)) for item in callback.inputs]
+                    filtered_args = [arg for i, arg in enumerate(args) if not to_skip[i]]
                     unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
                     output.backend.set(unique_id, data[i])
                     # Replace only for server side outputs.
