@@ -18,8 +18,6 @@ const BeforeAfter = props => {
         keyboard,
         beforeProps,
         afterProps,
-        beforeClassName,
-        afterClassName,
     } = props;
 
     return (
@@ -36,7 +34,6 @@ const BeforeAfter = props => {
                     height={height}
                     src={before}
                     {...beforeProps}
-                    className={beforeClassName}
                 />
                 <img
                     slot="second"
@@ -44,7 +41,6 @@ const BeforeAfter = props => {
                     height={height}
                     src={after}
                     {...afterProps}
-                    className={afterClassName}
                 />
             </ImgComparisonSlider>
         </div>
@@ -106,16 +102,6 @@ BeforeAfter.propTypes = {
      * Enable/disable slider position control with the keyboard
      */
     keyboard: PropTypes.oneOf(['enabled', 'disabled']),
-
-    /**
-     * className of before image. Often used with CSS to style elements with common properties.
-     */
-    beforeClassName: PropTypes.string,
-
-    /**
-     * className of `after` image. Often used with CSS to style elements with common properties.
-     */
-    afterClassName: PropTypes.string,
 
     /**
      * Other props for the `before` Img component. eg {"alt": "description of the first image"}
