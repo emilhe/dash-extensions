@@ -1,55 +1,123 @@
-import React, {Component} from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
-import BeforeAfterSlider from 'react-before-after-slider';
+import {ImgComparisonSlider} from '@img-comparison-slider/react';
 
 /**
- * A light wrapper of BeforeAfterSlider.
+ * Before After Image Slider based on https://github.com/sneas/img-comparison-slider
  */
-export default class BeforeAfter extends Component {
+const BeforeAfter = props => {
+    const {
+        id,
+        before,
+        after,
+        width,
+        height,
+        hover,
+        value,
+        direction,
+        keyboard,
+        beforeProps,
+        afterProps,
+    } = props;
 
-    render() {
-        return (
-            <BeforeAfterSlider {...this.props}/>
-        );
-    }
+    return (
+        <div id={id}>
+            <ImgComparisonSlider
+                hover={hover}
+                value={value}
+                direction={direction}
+                keyboard={keyboard}
+            >
+                <img
+                    slot="first"
+                    width={width}
+                    height={height}
+                    src={before}
+                    {...beforeProps}
+                />
+                <img
+                    slot="second"
+                    width={width}
+                    height={height}
+                    src={after}
+                    {...afterProps}
+                />
+            </ImgComparisonSlider>
+        </div>
+    );
+};
 
-}
+
+BeforeAfter.defaultProps = {
+    width: '100%',
+    height: 'auto',
+    hover: true,
+    value: 50,
+    direction: 'horizontal',
+    keyboard: 'enabled',
+};
 
 BeforeAfter.propTypes = {
-
-    before: PropTypes.string,
-
-    after: PropTypes.string,
-
-    width: PropTypes.number,
-
-    height: PropTypes.number,
-
-    defaultProgress: PropTypes.number,
-
-    beforeClassName: PropTypes.string,
-
-    afterClassName: PropTypes.string,
-
-    beforeProps: PropTypes.object,
-
-    afterProps: PropTypes.object,
-
-    // Dash props.
-
     /**
-     * The ID used to identify this component in Dash callbacks
+     * The ID used to identify this component in Dash callbacks.
      */
     id: PropTypes.string,
 
     /**
-     * The children of this component
+     * Before image src
      */
-    children: PropTypes.node,
+    before: PropTypes.string.isRequired,
 
     /**
-     * The class of the component
+     * After image src
      */
-    className: PropTypes.string,
+    after: PropTypes.string.isRequired,
 
+    /**
+     *  image height - default "auto" for responsive images.
+     */
+    height: PropTypes.string,
+
+    /**
+     * image width - default "100%" for responsive images.
+     */
+    width: PropTypes.string,
+
+    /**
+     * Automatic slide on mouse over.
+     */
+    hover: PropTypes.bool,
+
+    /**
+     * The divider position can be specified as a percentage. 0 to 100
+     */
+    value: PropTypes.number,
+
+    /**
+     * Set slider direction
+     */
+    direction: PropTypes.oneOf(['horizontal', 'vertical']),
+
+    /**
+     * Enable/disable slider position control with the keyboard
+     */
+    keyboard: PropTypes.oneOf(['enabled', 'disabled']),
+
+    /**
+     * Other props for the `before` Img component. eg {"alt": "description of the first image"}
+     */
+    beforeProps: PropTypes.object,
+
+    /**
+     *  Other props for the after Img component. eg {"alt": "description of the second image"}
+     */
+    afterProps: PropTypes.object,
+
+    /**
+     * Dash-assigned callback that should be called to report property changes
+     * to Dash, to make them available for callbacks.
+     */
+    setProps: PropTypes.func,
 };
+
+export default BeforeAfter;
