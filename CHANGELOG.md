@@ -2,10 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.6] - 08-09-22
+## [0.1.6] - 10-09-22
 
 ### Changed
 
+- Reimplementation of the `BeforeAfter` component by @AnnMarieW adding new features and improved mobile compatibility. NB: This is a **breaking** change, please consult the docs for an example using the new syntax 
 - Improved support for the new `callback(background=True, ...)` syntax adding support for the `set_progress` keyword
 - Added explicit raise of `NotImplementedError` for the (deprecated) `long_callback` syntax
 

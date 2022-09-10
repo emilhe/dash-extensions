@@ -16,8 +16,6 @@ const BeforeAfter = props => {
         value,
         direction,
         keyboard,
-        beforeProps,
-        afterProps,
     } = props;
 
     return (
@@ -32,15 +30,13 @@ const BeforeAfter = props => {
                     slot="first"
                     width={width}
                     height={height}
-                    src={before}
-                    {...beforeProps}
+                    {...before}
                 />
                 <img
                     slot="second"
                     width={width}
                     height={height}
-                    src={after}
-                    {...afterProps}
+                    {...after}
                 />
             </ImgComparisonSlider>
         </div>
@@ -59,37 +55,27 @@ BeforeAfter.defaultProps = {
 
 BeforeAfter.propTypes = {
     /**
-     * The ID used to identify this component in Dash callbacks.
+     * The ID used to identify this component in Dash callbacks
      */
     id: PropTypes.string,
 
     /**
-     * Before image src
-     */
-    before: PropTypes.string.isRequired,
-
-    /**
-     * After image src
-     */
-    after: PropTypes.string.isRequired,
-
-    /**
-     *  image height - default "auto" for responsive images.
+     *  Image height - default "auto" for responsive images
      */
     height: PropTypes.string,
 
     /**
-     * image width - default "100%" for responsive images.
+     * Image width - default "100%" for responsive images
      */
     width: PropTypes.string,
 
     /**
-     * Automatic slide on mouse over.
+     * Automatic slide on mouse over
      */
     hover: PropTypes.bool,
 
     /**
-     * The divider position can be specified as a percentage. 0 to 100
+     * The divider position can be specified as a percentage, i.e. 0 to 100
      */
     value: PropTypes.number,
 
@@ -104,14 +90,14 @@ BeforeAfter.propTypes = {
     keyboard: PropTypes.oneOf(['enabled', 'disabled']),
 
     /**
-     * Other props for the `before` Img component. eg {"alt": "description of the first image"}
+     * Props for the `before` Img component. eg {"src": "/assets/lena_bw.png"}
      */
-    beforeProps: PropTypes.object,
+    before: PropTypes.object,
 
     /**
-     *  Other props for the after Img component. eg {"alt": "description of the second image"}
+     *  Props for the `after` Img component. eg {"src": "/assets/lena_color.png"}
      */
-    afterProps: PropTypes.object,
+    after: PropTypes.object,
 
     /**
      * Dash-assigned callback that should be called to report property changes
