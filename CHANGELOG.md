@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Reimplementation of the `BeforeAfter` component by @AnnMarieW adding new features and improved mobile compatibility. NB: This is a **breaking** change, please consult the docs for an example using the new syntax 
 - Improved support for the new `callback(background=True, ...)` syntax adding support for the `set_progress` keyword
+- Added syntax sugar for Celery task registration for use with the `CeleryManager` object
 - Added explicit raise of `NotImplementedError` for the (deprecated) `long_callback` syntax
 
 ## [0.1.5] - 17-07-22

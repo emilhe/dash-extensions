@@ -6,6 +6,7 @@ import json
 import logging
 import secrets
 import struct
+import sys
 import uuid
 import plotly
 import dash
@@ -352,9 +353,15 @@ class DashProxy(dash.Dash):
         raise NotImplementedError(
             "The 'long_callback(..)' syntax is not supported, please use 'callback(background=True, ...)' instead.")
 
-    def _setup_server(self):
-        # Register the callbacks.
+    def register_celery_tasks(self):
+        if sys.argv[0].endswith("celery"):
+            self.register_callbacks()
+
+    def register_callbacks(self):
         self.blueprint.register_callbacks(super())
+
+    def _setup_server(self):
+        self.register_callbacks()
         # Proceed as normally.
         super()._setup_server()
         # Remap callback bindings to enable callback registration via the 'before_first_request' hook.
