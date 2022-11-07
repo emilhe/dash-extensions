@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] - 07-11-22
+
+### Changed
+
+- Bump dependencies to `dash>=2.7.0` (including a compatibility fix) and `Flask-Caching==2.0.1`
+
 ## [0.1.6] - 10-09-22
 
 ### Changed
