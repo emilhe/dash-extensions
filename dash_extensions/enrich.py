@@ -35,6 +35,7 @@ from dash import (  # lgtm [py/unused-import]
     page_registry,
     register_page
 )
+from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
 from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
 from dash.development.base_component import Component
@@ -501,6 +502,7 @@ class BlockingCallbackTransform(DashTransform):
             callback_id = callback.uid
             # Bind proxy components.
             start_client_id = f"{callback_id}_start_client"
+            start_client_ctx = f"{callback_id}_start_client_ctx"
             end_server_id = f"{callback_id}_end_server"
             end_client_id = f"{callback_id}_end_client"
             start_blocked_id = f"{callback_id}_start_blocked"
@@ -510,35 +512,50 @@ class BlockingCallbackTransform(DashTransform):
                 dcc.Store(id=end_server_id),
                 dcc.Store(id=end_client_id),
                 dcc.Store(id=start_blocked_id),
+                dcc.Store(id=start_client_ctx),
                 CycleBreaker(id=end_blocked_id)
             ])
             # Bind start signal callback.
             start_callback = f"""function()
             {{
-                const start = arguments[arguments.length-2];
-                const end = arguments[arguments.length-1];
+                const start = arguments[arguments.length-3];
+                const end = arguments[arguments.length-2];
+                let ctx = arguments[arguments.length-1];
                 const now = new Date().getTime();
+                const trigger = dash_clientside.callback_context.triggered[0];
+                const no = window.dash_clientside.no_update;
+                // Update context.
+                if(trigger !== undefined){{
+                    if(!trigger.prop_id.startsWith('{end_blocked_id}')){{
+                        ctx = dash_clientside.callback_context;
+                        console.log(trigger.prop_id);
+                        console.log('{end_blocked_id}');
+                    }}
+                }}
+                // First run => INVOKE.
                 if(!end & !start){{
-                    return [now, null];
+                    return [now, null, ctx];
                 }}
+                // Timeout reached  => INVOKE (but don't refresh context).
                 if((now - start)/1000 > {timeout}){{
-                    // timed out
-                    return [now, null];
+                    return [now, null, ctx];
                 }}
+                // Not completed first time => BLOCK.
                 if(!end){{
-                    // blocked
-                    return [window.dash_clientside.no_update, now];
+                    return [no, now, no];
                 }}
+                // Previous invoke ended => INVOKE (but don't update context).
                 if(end > start){{
-                    return [now, null];
+                    return [now, null, ctx];
                 }}
-                return [window.dash_clientside.no_update, now];
+                // Callback running.
+                return [no, now, no];
             }}"""
             self.blueprint.clientside_callback(
                 start_callback,
-                [Output(start_client_id, "data"), Output(start_blocked_id, "data")],
+                [Output(start_client_id, "data"), Output(start_blocked_id, "data"), Output(start_client_ctx, "data")],
                 [Input(end_blocked_id, "dst")] + list(callback.inputs),
-                [State(start_client_id, "data"), State(end_client_id, "data")],
+                [State(start_client_id, "data"), State(end_client_id, "data"), State(start_client_ctx, "data")],
             )
             # Bind end signal callback.
             end_callback = """function(endServerId, startBlockedId)
@@ -563,18 +580,24 @@ class BlockingCallbackTransform(DashTransform):
                 callback.inputs[i] = State(item.component_id, item.component_property)
             # Add new input trigger.
             in_flex_key = callback.inputs.append(Input(start_client_id, "data"))
+            st_flex_key = callback.inputs.append(State(start_client_ctx, "data"))
             # Modify the callback function accordingly.
             f = callback.f
-            callback.f = skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key)(f)
+            callback.f = skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key, st_flex_key)(f)
 
         return callbacks
 
 
-def skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key):
+def skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key, st_flex_key):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
-            args, kwargs = _skip_input(args, kwargs, in_flex_key)
+            args, kwargs, fltr = _skip_inputs(args, kwargs, [in_flex_key, st_flex_key])
+            cached_ctx = fltr[1]
+            if cached_ctx is not None and "triggered" in cached_ctx:
+                ctx = context_value.get()
+                ctx["triggered_inputs"] = cached_ctx["triggered"]
+                context_value.set(ctx)
             outputs = f(*args, **kwargs)
             return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
 
@@ -1429,7 +1452,7 @@ class OperatorTransform(DashTransform):
         layout.children = children
 
     def _apply(self, callback, output):
-        original_id = output.component_id
+        original_id = str(output).replace(".", "_") #.component_id
         relay_id = _relay_id(original_id)
         if str(output) not in self.operator_outputs:
             # Append new relay component.
@@ -1598,16 +1621,20 @@ def _as_list(item):
     return [item]
 
 
-def _skip_input(args, kwargs, key=None):
-    if isinstance(key, str):
-        kwargs.pop(key)
-    else:
+def _skip_inputs(args, kwargs, keys: List[Any]):
+    fltr = []
+    str_keys = [key for key in keys if isinstance(key, str)]
+    int_keys = [key for key in keys if isinstance(key, int)]
+    # Drop str keys.
+    for key in str_keys:
+        fltr.append(kwargs.pop(key))
+    # Filter the other ones.
+    if any(int_keys):
         args = list(args)
-        if key is not None:
-            args.pop(key)
-        else:
-            args.pop()
-    return args, kwargs
+        fltr.extend([arg for i, arg in enumerate(args) if i in keys])
+        args = [arg for i, arg in enumerate(args) if i not in keys]
+    # TODO: Do we need to handle None?
+    return args, kwargs, fltr
 
 
 def _append_output(outputs, value, single_output, out_idx):
