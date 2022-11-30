@@ -33,7 +33,8 @@ from dash import (  # lgtm [py/unused-import]
     clientside_callback,
     page_container,
     page_registry,
-    register_page
+    register_page,
+    ctx
 )
 from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
@@ -259,6 +260,7 @@ class DashBlueprint:
 
         def wrapper(f):
             cbp.f = f
+            return f
 
         return wrapper
 
