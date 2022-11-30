@@ -1047,6 +1047,8 @@ class MultiplexerTransform(DashTransform):
     def _apply_multiplexer(self, output, callbacks):
         inputs = []
         proxies = []
+        max_priority = -1
+        idx_priority = -1
         for i, callback in enumerate(callbacks):
             mp_id = _mp_id(output, i)
             mp_id_escaped = _escape_wildcards(mp_id)
@@ -1056,15 +1058,26 @@ class MultiplexerTransform(DashTransform):
             callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped.copy(), _mp_prop())
             # Create proxy input.
             inputs.append(Input(mp_id, _mp_prop()))
+            # Figure out which is the highest priority.
+            p = callback.kwargs.get("priority", 0)
+            if p > max_priority:
+                max_priority = p
+                idx_priority = i
         # Collect proxy elements to add to layout.
         self.proxy_map[output].extend(proxies)
         # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
         self.blueprint.clientside_callback(
-            """
-            function(){
+            f"""
+            function(){{
                 const ts = dash_clientside.callback_context.triggered;
+                for (let i = 0; i < ts.length; i++) {{
+                    idx = JSON.parse(ts[i].prop_id.split('.')[0]).idx;
+                    if(idx === {idx_priority}){{
+                        return ts[i].value;
+                    }}
+                }}
                 return ts[0].value;
-            }
+            }}
         """,
             output,
             inputs,
