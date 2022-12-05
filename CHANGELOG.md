@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] - 05-12-22
+
+### Changed
+
+- Bump a number of npm packages to address security issues
+- Change callback context of `BlockingCallbackTransform` callbacks to reflect the original trigger
+- Add `priority` keyword argument for callbacks that makes it possible to select which callbacks take precedence, when multiple callbacks target the same output simultaneously using the `MultiplexerTransform`
+- Add support for the unittest syntax [introduced with Dash 2.6](https://dash.plotly.com/testing)
+
 ## [0.1.7] - 08-11-22
 
 ### Changed
