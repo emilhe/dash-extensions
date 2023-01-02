@@ -14,6 +14,10 @@ dash = ">=2.7.0"
 more-itertools = "^8.12.0"
 jsbeautifier = "^1.14.3"
 Flask-Caching = "2.0.1"
+dash-mantine-components = {version = "^0.10,<0.11", optional = true}
+
+[tool.poetry.extras]
+mantine = ["dash-mantine-components"]
 
 [tool.poetry.dev-dependencies]
 dash = {extras = ["dev", "testing"], version = "^2.7.0"}
