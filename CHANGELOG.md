@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.9] - 03-01-23
+
+### Changed
+
+- Bump a number of npm packages to address security issues
+- Bump `dash-mantine-components` to 0.11.0, and update code accordingly (to mitigate introduced breaking changes)
+
 ## [0.1.8] - 05-12-22
 
 ### Changed

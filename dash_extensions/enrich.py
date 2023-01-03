@@ -614,23 +614,35 @@ def skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key
 
 
 class LogConfig:
-    def __init__(self, log_output, log_writer_map: Dict[int, Callable]):
+    def __init__(self, log_output, log_writer_map: Dict[int, Callable],
+                 layout_transform: Callable[[List[Component]], List[Component]]):
         self.log_output = log_output
         self.log_writer_map = log_writer_map
+        self.layout_transform = layout_transform
 
 
-def setup_notifications_log_config(layout: List[Component]):
-    import dash_mantine_components as dmc
+def setup_notifications_log_config():
+    log_id = "notifications_provider"
+    log_output = Output(log_id, "children")
 
-    layout.append(dmc.NotificationsProvider(id="notifications_provider"))
-    log_output = Output("notifications_provider", "children")
-    return LogConfig(log_output, get_notification_log_writers())
+    def notification_layout_transform(layout: List[Component]):
+        import dash_mantine_components as dmc
+
+        layout.append(html.Div(id=log_id))
+        return [dmc.NotificationsProvider(layout)]
+
+    return LogConfig(log_output, get_notification_log_writers(), notification_layout_transform)
 
 
-def setup_div_log_config(layout: List[Component]):
-    layout.append(html.Div(id="log"))
-    log_output = Output("log", "children")
-    return LogConfig(log_output, get_default_log_writers())
+def setup_div_log_config():
+    log_id = "log"
+
+    def div_layout_transform(layout: List[Component]):
+        layout.append(html.Div(id=log_id))
+        return layout
+
+    log_output = Output(log_id, "children")
+    return LogConfig(log_output, get_default_log_writers(), div_layout_transform)
 
 
 def get_default_log_writers():
@@ -686,23 +698,21 @@ class DashLogger:
 class LogTransform(DashTransform):
     def __init__(self, log_config=None, try_use_mantine=True):
         super().__init__()
-        self.components = []
         # Per default, try to use dmc notification system.
         if log_config is None and try_use_mantine:
             try:
-                log_config = setup_notifications_log_config(self.components)
+                log_config = setup_notifications_log_config()
             except ImportError:
                 msg = "Failed to import dash-mantine-components, falling back to simple div for log output."
                 logging.warning(msg)
         # Otherwise, use simple div.
         if log_config is None:
-            log_config = setup_div_log_config(self.components)
+            log_config = setup_div_log_config()
         # Bind the resulting log config.
         self.log_config = log_config
 
     def transform_layout(self, layout):
-        children = _as_list(layout.children) + self.components
-        layout.children = children
+        layout.children = self.log_config.layout_transform(_as_list(layout.children))
 
     def apply(self, callbacks, clientside_callbacks):
         callbacks = self.apply_serverside(callbacks)
@@ -1467,7 +1477,7 @@ class OperatorTransform(DashTransform):
         layout.children = children
 
     def _apply(self, callback, output):
-        original_id = str(output).replace(".", "_") #.component_id
+        original_id = str(output).replace(".", "_")  # .component_id
         relay_id = _relay_id(original_id)
         if str(output) not in self.operator_outputs:
             # Append new relay component.
