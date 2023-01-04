@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.10] - 04-01-23
+
+### Changed
+
+- Performance improvement of `BlockingCallbackTransform`
+
 ## [0.1.9] - 03-01-23
 
 ### Changed

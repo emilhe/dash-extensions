@@ -525,13 +525,16 @@ class BlockingCallbackTransform(DashTransform):
                 let ctx = arguments[arguments.length-1];
                 const now = new Date().getTime();
                 const trigger = dash_clientside.callback_context.triggered[0];
-                const no = window.dash_clientside.no_update;
+                const no = window.dash_clientside.no_update  
                 // Update context.
                 if(trigger !== undefined){{
                     if(!trigger.prop_id.startsWith('{end_blocked_id}')){{
-                        ctx = dash_clientside.callback_context;
-                        console.log(trigger.prop_id);
-                        console.log('{end_blocked_id}');
+                        ctx = {{}}
+                        keys = ["inputs", "inputs_list", "triggered"];
+                        for (let i = 0; i < keys.length; i++) {{
+                            let key = keys[i];
+                            ctx[key] = dash_clientside.callback_context[key];
+                        }}                        
                     }}
                 }}
                 // First run => INVOKE.
