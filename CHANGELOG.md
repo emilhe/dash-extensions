@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.11] - 23-01-23
+
+### Changed
+
+- Fixed bug in html table generator
+
 ## [0.1.10] - 04-01-23
 
 ### Changed
