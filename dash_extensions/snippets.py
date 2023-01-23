@@ -50,7 +50,10 @@ Node = Union[str, float, int, Component]
 
 
 def generate_html_table(
-    columns: List[Node], rows=List[List[Node]], footers=List[Node], caption=Node
+    columns: List[Node],
+    rows: List[List[Node]] = None,
+    footers: List[Node] = None,
+    caption: Node = None,
 ) -> List[Component]:
     rows = [] if rows is None else rows
     # Create table structure.
