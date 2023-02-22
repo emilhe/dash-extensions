@@ -1583,6 +1583,7 @@ class OperatorTransform(StatefulDashTransform):
                             ...obj[idx],
                             ...x.obj
                         }};
+                        break;
                       // Unknown action(s).
                       default:
                         console.log("Received unknown action for component {original_id}.");
