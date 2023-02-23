@@ -342,7 +342,7 @@ class DashBlueprint:
     def reset(self):
         for transform in self.transforms:
             transform.reset()
-        if self._layout_is_function:
+        if not self._layout_is_function:
             self._layout = copy(self._layout_unmodified)
 
 
