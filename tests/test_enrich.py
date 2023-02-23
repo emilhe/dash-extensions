@@ -1,3 +1,4 @@
+from copy import copy
 import decimal
 import json
 import os
@@ -10,7 +11,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection, OperatorTransform, OperatorOutput, Operator
+    CycleBreakerInput, DependencyCollection, OperatorTransform, OperatorOutput, Operator, DashBlueprint
 
 
 # region Test utils/stubs
@@ -125,6 +126,38 @@ def test_callback_blueprint():
         hello="world"
     )
     assert cbp.kwargs == dict(hello="world")
+
+
+def test_blueprint_reset():
+    bp = DashBlueprint(transforms=[MultiplexerTransform()])
+    bp.layout = html.Div([
+        html.Button("Left", id="left"),
+        html.Button("Right", id="right"),
+        html.Div(id="log")
+    ])
+
+    @bp.callback(Output("log", "children"), Input("left", "n_clicks"))
+    def left(n_clicks):
+        if not n_clicks:
+            raise PreventUpdate()
+        return "left"
+
+    @bp.callback(Output("log", "children"), Input("right", "n_clicks"))
+    def right(n_clicks):
+        if not n_clicks:
+            raise PreventUpdate()
+        return "right"
+
+    # Layout without any transforms applied.
+    original_layout = copy(bp.layout)
+    original_layout_value = copy(bp._layout_value())
+    bp.reset()
+    assert len(original_layout) == len(original_layout_value)
+    # Layout without transforms applied.
+    modified_layout = bp.embed(DashProxy())
+    assert len(bp.layout.children) == len(original_layout.children)  # should be unmodified
+    assert len(modified_layout.children) > len(original_layout.children)
+    assert len(bp._layout_value().children) == len(original_layout.children)  # should be unmodified
 
 
 def test_flexible_callback_signature():
@@ -709,4 +742,3 @@ def test_composite_operator(dash_duo):
     data = sorted(data)
     dash_duo.find_element("#action").click()
     dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
-

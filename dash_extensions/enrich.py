@@ -7,7 +7,10 @@ import logging
 import secrets
 import struct
 import sys
+import threading
 import uuid
+from copy import copy
+
 import plotly
 import dash
 
@@ -248,6 +251,7 @@ class DashBlueprint:
         self.clientside_callbacks: List[CallbackBlueprint] = []
         self.transforms = _resolve_transforms(transforms)
         self._layout = None
+        self._layout_unmodified = None
         self._layout_is_function = False
         self.include_global_callbacks = include_global_callbacks
 
@@ -319,6 +323,12 @@ class DashBlueprint:
             layout = transform.layout(layout, self._layout_is_function)
         return layout
 
+    def embed(self, app: Union[dash.Dash, DashProxy]):
+        self.register_callbacks(app)
+        _modified_layout = self._layout_value()
+        self.reset()
+        return _modified_layout
+
     @property
     def layout(self):
         return self._layout
@@ -327,6 +337,13 @@ class DashBlueprint:
     def layout(self, value):
         self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
         self._layout = value
+        self._layout_unmodified = copy(value)
+
+    def reset(self):
+        for transform in self.transforms:
+            transform.reset()
+        if not self._layout_is_function:
+            self._layout = copy(self._layout_unmodified)
 
 
 # endregion
@@ -345,6 +362,7 @@ class DashProxy(dash.Dash):
         super().__init__(*args, **kwargs)
         self.blueprint = DashBlueprint(transforms,
                                        include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
+        self.setup_server_lock = threading.Lock()
 
     def callback(self, *args, **kwargs):
         return self.blueprint.callback(*args, **kwargs)
@@ -364,18 +382,19 @@ class DashProxy(dash.Dash):
         self.blueprint.register_callbacks(super())
 
     def _setup_server(self):
-        first_request = not bool(self._got_first_request["setup_server"])
-        if first_request:
-            self.register_callbacks()
-        # Proceed as normally.
-        super()._setup_server()
-        if first_request:
-            # Remap callback bindings to enable callback registration via the 'before_first_request' hook.
-            self.callback = super().callback
-            self.clientside_callback = super().clientside_callback
-            # Set session secret. Used by some subclasses.
-            if not self.server.secret_key:
-                self.server.secret_key = secrets.token_urlsafe(16)
+        with self.setup_server_lock:
+            first_request = not bool(self._got_first_request["setup_server"])
+            if first_request:
+                self.register_callbacks()
+            # Proceed as normally.
+            super()._setup_server()
+            if first_request:
+                # Remap callback bindings to enable callback registration via the 'before_first_request' hook.
+                self.callback = super().callback
+                self.clientside_callback = super().clientside_callback
+                # Set session secret. Used by some subclasses.
+                if not self.server.secret_key:
+                    self.server.secret_key = secrets.token_urlsafe(16)
 
     def hijack(self, app: dash.Dash):
         """
@@ -460,6 +479,22 @@ class DashTransform:
     def sort_key(self):
         return 1
 
+    def reset(self):
+        self.layout_initialized = False
+
+
+class StatefulDashTransform(DashTransform):
+
+    def __init__(self):
+        super().__init__()
+        self.blueprint = DashBlueprint()
+        self.components = []
+
+    def reset(self):
+        super().reset()
+        self.components = []
+        self.blueprint.clear()
+
 
 def _resolve_transforms(transforms: List[DashTransform]) -> List[DashTransform]:
     # Resolve transforms.
@@ -480,11 +515,9 @@ def _resolve_transforms(transforms: List[DashTransform]) -> List[DashTransform]:
 # region Blocking callback transform
 
 
-class BlockingCallbackTransform(DashTransform):
+class BlockingCallbackTransform(StatefulDashTransform):
     def __init__(self, timeout=60):
         super().__init__()
-        self.components = []
-        self.blueprint = DashBlueprint()
         self.timeout = timeout
 
     def transform_layout(self, layout):
@@ -756,11 +789,10 @@ def bind_logger(logger, single_output, out_flex_key):
 
 # region Cycle breaker transform
 
-class CycleBreakerTransform(DashTransform):
+class CycleBreakerTransform(StatefulDashTransform):
 
     def __init__(self):
         super().__init__()
-        self.components = []
 
     def transform_layout(self, layout):
         children = _as_list(layout.children) + self.components
@@ -1010,7 +1042,7 @@ def inject_proxies_recursively(node, proxy_map):
         node.children = children
 
 
-class MultiplexerTransform(DashTransform):
+class MultiplexerTransform(StatefulDashTransform):
     """
     The MultiplexerTransform makes it possible to target an output by callbacks multiple times. Under the hood, proxy
     components (dcc.Store) are used, and the proxy_location keyword argument determines where these proxies are placed.
@@ -1026,7 +1058,6 @@ class MultiplexerTransform(DashTransform):
         self.proxy_location = proxy_location
         self.proxy_map = defaultdict(lambda: [])
         self.proxy_wrapper_map = proxy_wrapper_map
-        self.blueprint = DashBlueprint()
 
     def transform_layout(self, layout):
         # Apply wrappers if needed.
@@ -1101,6 +1132,10 @@ class MultiplexerTransform(DashTransform):
 
     def sort_key(self):
         return 10
+
+    def reset(self):
+        super().reset()
+        self.proxy_map = defaultdict(lambda: [])
 
 
 # endregion
@@ -1339,10 +1374,9 @@ class RedisStore(RedisCache):
 # region No output transform
 
 
-class NoOutputTransform(DashTransform):
+class NoOutputTransform(StatefulDashTransform):
     def __init__(self):
         super().__init__()
-        self.components = []
 
     def transform_layout(self, layout):
         children = _as_list(layout.children) + self.components
@@ -1468,12 +1502,10 @@ class DictOperator:
         return self._collect("clear")
 
 
-class OperatorTransform(DashTransform):
+class OperatorTransform(StatefulDashTransform):
     def __init__(self):
         super().__init__()
-        self.components = []
         self.operator_outputs = []
-        self.blueprint = DashBlueprint()
 
     def transform_layout(self, layout):
         children = _as_list(layout.children) + self.components
@@ -1555,6 +1587,7 @@ class OperatorTransform(DashTransform):
                             ...obj[idx],
                             ...x.obj
                         }};
+                        break;
                       // Unknown action(s).
                       default:
                         console.log("Received unknown action for component {original_id}.");
@@ -1592,6 +1625,10 @@ class OperatorTransform(DashTransform):
 
     def get_dependent_transforms(self):
         return [MultiplexerTransform()]
+
+    def reset(self):
+        super().reset()
+        self.operator_outputs = []
 
 
 def apply_operator():
