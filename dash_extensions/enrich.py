@@ -251,6 +251,7 @@ class DashBlueprint:
         self.clientside_callbacks: List[CallbackBlueprint] = []
         self.transforms = _resolve_transforms(transforms)
         self._layout = None
+        self._layout_unmodified = None
         self._layout_is_function = False
         self.include_global_callbacks = include_global_callbacks
 
@@ -317,7 +318,7 @@ class DashBlueprint:
         self.transforms = []
 
     def _layout_value(self):
-        layout = copy(self._layout() if self._layout_is_function else self._layout)
+        layout = self._layout() if self._layout_is_function else self._layout
         for transform in self.transforms:
             layout = transform.layout(layout, self._layout_is_function)
         return layout
@@ -336,10 +337,13 @@ class DashBlueprint:
     def layout(self, value):
         self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
         self._layout = value
+        self._layout_unmodified = copy(value)
 
     def reset(self):
         for transform in self.transforms:
             transform.reset()
+        if self._layout_is_function:
+            self._layout = copy(self._layout_unmodified)
 
 
 # endregion

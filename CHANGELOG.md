@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.12] - UNRELEASED
+
+### Changed
+
+- Mitigation of #241 attempted (race condition hard to reproduce)
+- Fixed bug #243 (add break statement)
+- Fixed bug #245 + #242 (add embed function)
+
 ## [0.1.11] - 23-01-23
 
 ### Changed
