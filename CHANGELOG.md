@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Mitigation of #241 attempted. Rrace condition hard to reproduce, validity of fix is uncertain
-- Addressed bug #245 + #242
+- Addressed bugs #245 + #242
 - Fixed bug #243
 
 ## [0.1.11] - 23-01-23
