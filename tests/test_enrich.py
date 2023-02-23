@@ -646,7 +646,7 @@ def test_dict_output(dash_duo):
     update_dict = dict(key="value", some="stuff", foo="bar")
     gui_actions = dict(
         set=lambda x: Operator().dict.set(f"some_key{x}", f"some_value{x}"),
-        clear=lambda x: Operator().dict.reset(),
+        clear=lambda x: Operator().dict.clear(),
         pop=lambda x: Operator().dict.pop(pop_key),
         update=lambda x: Operator().dict.update(update_dict),
     )
