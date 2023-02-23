@@ -2,13 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.12] - UNRELEASED
+## [0.1.12] - 23-02-23
 
 ### Changed
 
-- Mitigation of #241 attempted (race condition hard to reproduce)
-- Fixed bug #243 (add break statement)
-- Fixed bug #245 + #242 (add embed function)
+- Mitigation of #241 attempted. Rrace condition hard to reproduce, validity of fix is uncertain
+- Addressed bug #245 + #242
+- Fixed bug #243
 
 ## [0.1.11] - 23-01-23
 
