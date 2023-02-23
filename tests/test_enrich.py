@@ -578,7 +578,7 @@ def test_list_output(dash_duo):
         extend=lambda x: Operator().list.extend([x, x]),
         sort=lambda x: Operator().list.sort(),
         reverse=lambda x: Operator().list.reverse(),
-        clear=lambda x: Operator().list.reset(),
+        clear=lambda x: Operator().list.clear(),
         insert=lambda x: Operator().list.insert(4, "hest"),
         remove=lambda x: Operator().list.remove(3),
         pop=lambda x: Operator().list.pop(3),
