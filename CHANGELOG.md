@@ -2,11 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.13] - UNRELEASED
+
+### Changed
+
+- Add support for embedding of blueprints in function layouts
+
 ## [0.1.12] - 23-02-23
 
 ### Changed
 
-- Mitigation of #241 attempted. Rrace condition hard to reproduce, validity of fix is uncertain
+- Mitigation of #241 attempted. Race condition hard to reproduce, validity of fix is uncertain
 - Addressed bugs #245 + #242
 - Fixed bug #243
 - Bump dependencies
