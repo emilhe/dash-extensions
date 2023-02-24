@@ -9,8 +9,6 @@ import struct
 import sys
 import threading
 import uuid
-from copy import copy
-
 import plotly
 import dash
 
@@ -251,7 +249,6 @@ class DashBlueprint:
         self.clientside_callbacks: List[CallbackBlueprint] = []
         self.transforms = _resolve_transforms(transforms)
         self._layout = None
-        self._layout_unmodified = None
         self._layout_is_function = False
         self.include_global_callbacks = include_global_callbacks
 
@@ -323,11 +320,11 @@ class DashBlueprint:
             layout = transform.layout(layout, self._layout_is_function)
         return layout
 
-    def embed(self, app: Union[dash.Dash, DashProxy]):
+    def embed(self, app: DashProxy):
+        if app.blueprint._layout_is_function and app._got_first_request["setup_server"]:
+            return self._layout_value()
         self.register_callbacks(app)
-        _modified_layout = self._layout_value()
-        self.reset()
-        return _modified_layout
+        return self._layout_value()
 
     @property
     def layout(self):
@@ -337,13 +334,6 @@ class DashBlueprint:
     def layout(self, value):
         self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
         self._layout = value
-        self._layout_unmodified = copy(value)
-
-    def reset(self):
-        for transform in self.transforms:
-            transform.reset()
-        if not self._layout_is_function:
-            self._layout = copy(self._layout_unmodified)
 
 
 # endregion
@@ -385,6 +375,9 @@ class DashProxy(dash.Dash):
         with self.setup_server_lock:
             first_request = not bool(self._got_first_request["setup_server"])
             if first_request:
+                # Trigger callback generation for embedded layouts.
+                if self.blueprint._layout_is_function:
+                    _ = self.blueprint.layout()
                 self.register_callbacks()
             # Proceed as normally.
             super()._setup_server()
@@ -479,9 +472,6 @@ class DashTransform:
     def sort_key(self):
         return 1
 
-    def reset(self):
-        self.layout_initialized = False
-
 
 class StatefulDashTransform(DashTransform):
 
@@ -489,11 +479,6 @@ class StatefulDashTransform(DashTransform):
         super().__init__()
         self.blueprint = DashBlueprint()
         self.components = []
-
-    def reset(self):
-        super().reset()
-        self.components = []
-        self.blueprint.clear()
 
 
 def _resolve_transforms(transforms: List[DashTransform]) -> List[DashTransform]:
@@ -1133,10 +1118,6 @@ class MultiplexerTransform(StatefulDashTransform):
     def sort_key(self):
         return 10
 
-    def reset(self):
-        super().reset()
-        self.proxy_map = defaultdict(lambda: [])
-
 
 # endregion
 
@@ -1625,10 +1606,6 @@ class OperatorTransform(StatefulDashTransform):
 
     def get_dependent_transforms(self):
         return [MultiplexerTransform()]
-
-    def reset(self):
-        super().reset()
-        self.operator_outputs = []
 
 
 def apply_operator():
