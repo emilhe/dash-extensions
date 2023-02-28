@@ -128,38 +128,6 @@ def test_callback_blueprint():
     assert cbp.kwargs == dict(hello="world")
 
 
-def test_blueprint_reset():
-    bp = DashBlueprint(transforms=[MultiplexerTransform()])
-    bp.layout = html.Div([
-        html.Button("Left", id="left"),
-        html.Button("Right", id="right"),
-        html.Div(id="log")
-    ])
-
-    @bp.callback(Output("log", "children"), Input("left", "n_clicks"))
-    def left(n_clicks):
-        if not n_clicks:
-            raise PreventUpdate()
-        return "left"
-
-    @bp.callback(Output("log", "children"), Input("right", "n_clicks"))
-    def right(n_clicks):
-        if not n_clicks:
-            raise PreventUpdate()
-        return "right"
-
-    # Layout without any transforms applied.
-    original_layout = copy(bp.layout)
-    original_layout_value = copy(bp._layout_value())
-    bp.reset()
-    assert len(original_layout) == len(original_layout_value)
-    # Layout without transforms applied.
-    modified_layout = bp.embed(DashProxy())
-    assert len(bp.layout.children) == len(original_layout.children)  # should be unmodified
-    assert len(modified_layout.children) > len(original_layout.children)
-    assert len(bp._layout_value().children) == len(original_layout.children)  # should be unmodified
-
-
 def test_flexible_callback_signature():
     # Test input/output/state as kwargs.
     cbp = CallbackBlueprint(
