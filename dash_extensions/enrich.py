@@ -314,8 +314,8 @@ class DashBlueprint:
         self.clientside_callbacks = []
         self.transforms = []
 
-    def _layout_value(self):
-        layout = self._layout() if self._layout_is_function else self._layout
+    def _layout_value(self, *args, **kwargs):
+        layout = self._layout(*args, **kwargs) if self._layout_is_function else self._layout
         for transform in self.transforms:
             layout = transform.layout(layout, self._layout_is_function)
         return layout
