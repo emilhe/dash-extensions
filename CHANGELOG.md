@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.14] - UNRELEASED
+
+### Changed
+
+- Add `DashBlueprint` support for args/kwargs. Fixes [#250](https://github.com/thedirtyfew/dash-extensions/issues/250)
+
 ## [0.1.13] - 28-02-23
 
 ### Changed
