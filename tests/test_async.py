@@ -6,7 +6,7 @@ from multiprocessing import Process
 from dash_extensions import EventSource, WebSocket
 from dash import Dash, Input, Output, html, dcc
 
-from enrich import DashBlueprint, DashProxy
+from dash_extensions.enrich import DashBlueprint, DashProxy
 from tests.mock_async import sse_response, async_server, ws_response
 
 # region Async mock server fixture
