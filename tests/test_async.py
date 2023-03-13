@@ -5,6 +5,8 @@ import uvicorn
 from multiprocessing import Process
 from dash_extensions import EventSource, WebSocket
 from dash import Dash, Input, Output, html, dcc
+
+from enrich import DashBlueprint, DashProxy
 from tests.mock_async import sse_response, async_server, ws_response
 
 # region Async mock server fixture
@@ -16,6 +18,24 @@ ws_server_url = f"ws://127.0.0.1:{server_port}/ws"
 
 def run_server():
     uvicorn.run(async_server, port=server_port)
+
+
+def ws_example_bp(extra_children=None) -> DashBlueprint:
+    dbp = DashBlueprint()
+    dbp.layout = html.Div(
+        [
+            dcc.Input(id="input", autoComplete="off"),
+            html.Div(id="msg"),
+            WebSocket(url=ws_server_url, id="ws"),
+        ] + (extra_children if extra_children is not None else [])
+    )
+    # Send input value using websocket.
+    send = "function(value){return value;}"
+    dbp.clientside_callback(send, Output("ws", "send"), [Input("input", "value")])
+    # Update div using websocket.
+    receive = 'function(msg){return msg.data;}'
+    dbp.clientside_callback(receive, Output("msg", "children"), [Input("ws", "message")])
+    return dbp
 
 
 @pytest.fixture(scope="module")
@@ -43,20 +63,7 @@ def test_server_sent_events(dash_duo, server):
 
 def test_websocket(dash_duo, server):
     # Create small example app.
-    app = Dash(prevent_initial_callbacks=True)
-    app.layout = html.Div(
-        [
-            dcc.Input(id="input", autoComplete="off"),
-            html.Div(id="msg"),
-            WebSocket(url=ws_server_url, id="ws"),
-        ]
-    )
-    # Send input value using websocket.
-    send = "function(value){return value;}"
-    app.clientside_callback(send, Output("ws", "send"), [Input("input", "value")])
-    # Update div using websocket.
-    receive = 'function(msg){return msg.data;}'
-    app.clientside_callback(receive, Output("msg", "children"), [Input("ws", "message")])
+    app = DashProxy(blueprint=ws_example_bp(), prevent_initial_callbacks=True)
     # Run the test.
     dash_duo.start_server(app)
     time.sleep(0.01)
@@ -64,3 +71,24 @@ def test_websocket(dash_duo, server):
     name = "x"
     dash_duo.find_element("#input").send_keys(name)
     dash_duo.wait_for_text_to_equal("#msg", ws_response(name), timeout=2)
+
+
+def test_websocket_unmount(dash_duo, server):
+    msg = "No websocket here."
+    msg_id = "no_ws"
+    link_id = "link_id"
+    pth = "other"
+    # Create small example app.
+    app = Dash(prevent_initial_callbacks=True, use_pages=True, pages_folder="")
+    # Create a (default) page with a WS.
+    ws_example_bp(extra_children=[dcc.Link(href=f"/{pth}", id=link_id)]).register(app, "")
+    # Create a page without.
+    bp = DashBlueprint()
+    bp.layout = html.Div(msg, id=msg_id)
+    bp.register(app, pth)
+    # Run the test.
+    dash_duo.start_server(app)
+    time.sleep(0.01)
+    assert dash_duo.find_element("#msg").text == ""
+    dash_duo.find_element(f"#{link_id}").click()
+    assert dash_duo.find_element(f"#{msg_id}").text == msg

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Add `DashBlueprint` support for args/kwargs. Fixes [#250](https://github.com/thedirtyfew/dash-extensions/issues/250)
+- Remove `WebSocket` event handlers prior to close. Fixes [#160](https://github.com/thedirtyfew/dash-extensions/issues/160)
 
 ## [0.1.13] - 28-02-23
 
