@@ -348,8 +348,8 @@ class DashProxy(dash.Dash):
     work (e.g. setting a secret key on the server), and exposes convenience functions such as 'hijack'.
     """
 
-    def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None, prevent_initial_callbacks="initial_duplicate", **kwargs):
+        super().__init__(*args, prevent_initial_callbacks=prevent_initial_callbacks, **kwargs)
         self.blueprint = DashBlueprint(transforms,
                                        include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
         self.setup_server_lock = threading.Lock()
@@ -1027,7 +1027,7 @@ def inject_proxies_recursively(node, proxy_map):
         node.children = children
 
 
-class MultiplexerTransform(StatefulDashTransform):
+class MultiplexerTransform(DashTransform):
     """
     The MultiplexerTransform makes it possible to target an output by callbacks multiple times. Under the hood, proxy
     components (dcc.Store) are used, and the proxy_location keyword argument determines where these proxies are placed.
@@ -1038,26 +1038,8 @@ class MultiplexerTransform(StatefulDashTransform):
     to place the proxies here instead. To use dcc.Loading for this particular case, the proxy_location must be wrapped.
     """
 
-    def __init__(self, proxy_location=None, proxy_wrapper_map=None):
+    def __init__(self):
         super().__init__()
-        self.proxy_location = proxy_location
-        self.proxy_map = defaultdict(lambda: [])
-        self.proxy_wrapper_map = proxy_wrapper_map
-
-    def transform_layout(self, layout):
-        # Apply wrappers if needed.
-        if self.proxy_wrapper_map:
-            for key in self.proxy_wrapper_map:
-                if key in self.proxy_map:
-                    self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
-        # Inject proxies in a user defined component.
-        if self.proxy_location == "inplace":
-            inject_proxies_recursively(layout, self.proxy_map)
-        # Inject proxies in a component, either user defined or top level.
-        else:
-            target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
-            proxies = list(flatten(list(self.proxy_map.values())))
-            target.children = _as_list(target.children) + proxies
 
     def apply(self, callbacks, clientside_callbacks):
         all_callbacks = callbacks + clientside_callbacks
@@ -1065,58 +1047,16 @@ class MultiplexerTransform(StatefulDashTransform):
         output_map = defaultdict(list)
         for callback in all_callbacks:
             for output in callback.outputs:
-                output_map[output].append(callback)
-        # Apply multiplexer where needed.
+                output_map[output].append(output)
+        # Set allow_duplicate where needed.
         for output in output_map:
             # If there is only one output, multiplexing is not needed.
             if len(output_map[output]) == 1:
                 continue
-            self._apply_multiplexer(output, output_map[output])
+            for entry in output_map[output]:
+                entry.allow_duplicate = True
 
-        return callbacks, clientside_callbacks + self.blueprint.clientside_callbacks
-
-    def _apply_multiplexer(self, output, callbacks):
-        inputs = []
-        proxies = []
-        max_priority = -1
-        idx_priority = -1
-        for i, callback in enumerate(callbacks):
-            mp_id = _mp_id(output, i)
-            mp_id_escaped = _escape_wildcards(mp_id)
-            # Create proxy element.
-            proxies.append(_mp_element(mp_id_escaped.copy()))
-            # Assign proxy element as output.
-            callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped.copy(), _mp_prop())
-            # Create proxy input.
-            inputs.append(Input(mp_id, _mp_prop()))
-            # Figure out which is the highest priority.
-            p = callback.kwargs.get("priority", 0)
-            if p > max_priority:
-                max_priority = p
-                idx_priority = i
-        # Collect proxy elements to add to layout.
-        self.proxy_map[output].extend(proxies)
-        # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
-        self.blueprint.clientside_callback(
-            f"""
-            function(){{
-                const ts = dash_clientside.callback_context.triggered;
-                for (let i = 0; i < ts.length; i++) {{
-                    idx = JSON.parse(ts[i].prop_id.split('.')[0]).idx;
-                    if(idx === {idx_priority}){{
-                        return ts[i].value;
-                    }}
-                }}
-                return ts[0].value;
-            }}
-        """,
-            output,
-            inputs,
-            prevent_initial_call=True,
-        )
-
-    def sort_key(self):
-        return 10
+        return callbacks, clientside_callbacks
 
 
 # endregion
@@ -1129,8 +1069,8 @@ class EnrichedOutput(Output):
     Like a normal Output, includes additional properties related to storing the data.
     """
 
-    def __init__(self, component_id, component_property, backend=None, session_check=None, arg_check=True):
-        super().__init__(component_id, component_property)
+    def __init__(self, component_id, component_property, allow_duplicate=False, backend=None, session_check=None, arg_check=True):
+        super().__init__(component_id, component_property, allow_duplicate)
         self.backend = backend
         self.session_check = session_check
         self.arg_check = arg_check
@@ -1384,252 +1324,6 @@ class NoOutputTransform(StatefulDashTransform):
 
 # endregion
 
-# region [Magic] transform
-
-class OperatorOutput(Output):
-    """
-    Like a normal Output, but enables list and dict manipulations.
-    """
-
-
-class Operator:
-    def __init__(self, path: Optional[List] = None, operations: Optional[List] = None):
-        self.path = path if path is not None else []
-        self.operations = operations if operations is not None else []
-
-    def __getitem__(self, key):
-        return Operator(self.path + [key], operations=self.operations)
-
-    def __setitem__(self, key, item):
-        self.path += [key]
-        return self.assign(item)
-
-    def collect(self, opr, **kwargs):
-        self.operations.append(dict(opr=opr, pth=self.path, **kwargs))
-        self.path = []
-        return self
-
-    @property
-    def list(self):
-        return ListOperator(self)
-
-    @property
-    def dict(self):
-        return DictOperator(self)
-
-    def assign(self, item):
-        return self.collect("assign", item=item)
-
-    def apply(self):
-        return self.operations
-
-
-class ListOperator:
-    def __init__(self, operator: Optional[Operator] = None):
-        self.operator = operator
-
-    def _collect(self, opr, **kwargs):
-        return self.operator.collect(f"list_{opr}", **kwargs)
-
-    def apply(self):
-        return self.operator.apply()
-
-    def append(self, item):
-        return self._collect("append", item=item)
-
-    def extend(self, iterable):
-        return self._collect("extend", array=list(iterable))
-
-    def insert(self, index, item):
-        return self._collect("insert", item=item, index=index)
-
-    def remove(self, item):
-        # NB: Remove ALL occurances of item, not just the first one.
-        return self._collect("remove", item=item)
-
-    def pop(self, index):
-        return self._collect("pop", index=index)
-
-    def clear(self):
-        return self._collect("clear")
-
-    def sort(self):
-        return self._collect("sort")
-
-    def reverse(self):
-        return self._collect("reverse")
-
-
-class DictOperator:
-    def __init__(self, operator: Optional[Operator] = None):
-        self.operator = operator
-
-    def _collect(self, opr, **kwargs):
-        return self.operator.collect(f"dict_{opr}", **kwargs)
-
-    def apply(self):
-        return self.operator.apply()
-
-    def set(self, key, item):
-        return self._collect("set", key=key, item=item)
-
-    def pop(self, key):
-        return self._collect("pop", key=key)
-
-    def update(self, obj):
-        return self._collect("update", obj=obj)
-
-    def clear(self):
-        return self._collect("clear")
-
-
-class OperatorTransform(StatefulDashTransform):
-    def __init__(self):
-        super().__init__()
-        self.operator_outputs = []
-
-    def transform_layout(self, layout):
-        children = _as_list(layout.children) + self.components
-        layout.children = children
-
-    def _apply(self, callback, output):
-        original_id = str(output).replace(".", "_")  # .component_id
-        relay_id = _relay_id(original_id)
-        if str(output) not in self.operator_outputs:
-            # Append new relay component.
-            relay_component = dcc.Store(id=relay_id)
-            self.components.append(relay_component)
-            # Add clientside callback to perform modifications.
-            self.blueprint.clientside_callback(f"""function(operations, current){{
-                // Handle empty init call.
-                if (typeof operations === 'undefined'){{
-                    return window.dash_clientside.no_update;
-                }}
-                // Map non-list actions to list to enable iteration.
-                if (!(Array.isArray(operations))){{
-                    operations = [operations];
-                }}
-                // Function for resolving sub elements.
-                const drill = (obj, pth, lvl=0) => {{
-                    if(lvl === pth.length){{return obj;}}
-                    return drill(obj[pth[lvl]], pth, lvl+1);
-                }}
-                // Wrap current in list to enable index access.
-                lst = [current];
-                // Action.
-                for (const x of operations) {{
-                    let pth = [0].concat(x.pth);
-                    let idx = pth[pth.length - 1];
-                    let obj = drill(lst, pth.slice(0,-1));
-                    switch(x.opr) {{
-                      case "assign":
-                        obj[idx] = x.item;             
-                        break;
-                      // List action(s).
-                      case "list_append":
-                        obj[idx].push(x.item)
-                        break;
-                      case "list_extend":
-                        obj[idx] = obj[idx].concat(x.array);
-                        break;
-                      case "list_insert":
-                        obj[idx].splice(x.index, 0, x.item);
-                        break;
-                      case "list_remove":
-                        obj[idx] = obj[idx].filter(function(ele){{
-                            return ele != x.item;
-                        }});
-                        break;
-                      case "list_pop":
-                        obj[idx].splice(x.index, 1);
-                        break;
-                      case "list_reverse":
-                        obj[idx].reverse();
-                        break;
-                      case "list_sort":
-                        // TODO: Make it possible to inject sorting function
-                        obj[idx].sort();
-                        break;
-                      case "list_clear":
-                        obj[idx] = []             
-                        break;
-                      // Dict action(s).
-                      case "dict_set":
-                        obj[idx][x.key] = x.item;
-                        break;
-                      case "dict_pop":
-                        delete obj[idx][x.key];
-                        break;
-                      case "dict_clear":
-                        obj[idx] = {{}};             
-                        break;
-                      case "dict_update":
-                        obj[idx] = {{
-                            ...obj[idx],
-                            ...x.obj
-                        }};
-                        break;
-                      // Unknown action(s).
-                      default:
-                        console.log("Received unknown action for component {original_id}.");
-                        console.log(x);
-                        console.log("Update will be skipped.");
-                    }}
-                }}
-                // Make sure out ref != input ref (otherwise, React can get confused)
-                const result = lst[0];
-                if(Array.isArray(result)){{
-                    return Array.from(result)
-                }}
-                if(typeof result === 'object'){{
-                    return Object.assign({{}}, result);
-                }}
-                return result;
-            }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
-            # Record binding.
-            self.operator_outputs.append(str(output))
-        # Modify callback in-place to route output to the relay.
-        callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
-        # Run apply if needed.
-        f = callback.f
-        callback.f = apply_operator()(f)
-
-    def apply_serverside(self, callbacks):
-        for callback in callbacks:
-            for output in callback.outputs:
-                if isinstance(output, OperatorOutput):
-                    self._apply(callback, output)
-        return callbacks
-
-    def apply_clientside(self, callbacks):
-        return callbacks + self.blueprint.clientside_callbacks
-
-    def get_dependent_transforms(self):
-        return [MultiplexerTransform()]
-
-
-def apply_operator():
-    def wrapper(f):
-        @functools.wraps(f)
-        def decorated_function(*args):
-            output = f(*args)
-            if isinstance(output, Operator):
-                return output.apply()
-            if hasattr(output, "__len__"):
-                output = [o.apply() if isinstance(o, Operator) else o for o in output]
-            return output
-
-        return decorated_function
-
-    return wrapper
-
-
-def _relay_id(uid):
-    return f"{uid}_operator_relay"
-
-
-# endregion
-
 # region Batteries included dash proxy object
 
 
@@ -1644,7 +1338,6 @@ class Dash(DashProxy):
             CycleBreakerTransform(),
             BlockingCallbackTransform(),
             ServersideOutputTransform(**output_defaults),
-            OperatorTransform()
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
 
