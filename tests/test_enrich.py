@@ -1,5 +1,7 @@
 import decimal
+import json
 import os
+import re
 import time
 
 import dash
@@ -11,7 +13,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection, DashBlueprint
+    CycleBreakerInput, DependencyCollection, DashBlueprint, MATCH
 
 
 # region Test utils/stubs
@@ -478,6 +480,64 @@ def test_serverside_output_transform_memoize(dash_duo):
     dash_duo.wait_for_text_to_equal("#log1", "2", timeout=1)
     # Args (i.e. n_clicks) not included in memoize key, i.e. only one call is made.
     assert dash_duo.find_element("#log2").text == "1"
+
+
+def stringify_id(id_):
+    if isinstance(id_, dict):
+        return json.dumps(id_, sort_keys=True, separators=(",", ":"))
+    return id_
+
+
+def css_escape(s):
+    sel = re.sub("[\\{\\}\\\"\\'.:,]", lambda m: "\\" + m.group(0), s)
+    return sel
+
+
+def css_selector(_id):
+    return f'#{css_escape(stringify_id(_id))}'
+
+
+def test_serverside_output_transform_wildcard(dash_duo):
+    def _id(t, i):
+        return {"type": t, "index": i}
+
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
+    app.layout = html.Div([
+        html.Button(id=_id("btn", "1")),
+        html.Button(id=_id("btn", "2")),
+        html.Div(id=_id("sso", "1")),
+        html.Div(id=_id("sso", "2")),
+        html.Div(id=_id("log", "1")),
+        html.Div(id=_id("log", "2")),
+        html.Div(id="log_all"),
+    ])
+
+    @app.callback(ServersideOutput(_id("sso", MATCH), "children"),
+                  Input(_id("btn", MATCH), "n_clicks"))
+    def update_default(n_clicks):
+        return pd.DataFrame(columns=["A"], data=[1])
+
+    @app.callback(Output(_id("log", MATCH), "children"),
+                  Input(_id("sso", MATCH), "children"))
+    def update_log(data):
+        return data.to_json()
+
+    @app.callback(Output("log_all", "children"),
+                  Input(_id("sso", ALL), "children"))
+    def update_log_all(data):
+        return [d.to_json() if d is not None else "None" for d in data]
+
+    # Check that stuff works. It doesn't using a normal Dash object.
+    dash_duo.start_server(app)
+    assert dash_duo.find_element(css_selector(_id("sso", "1"))).text == ""
+    assert dash_duo.find_element(css_selector(_id("log", "1"))).text == ""
+    dash_duo.find_element(css_selector(_id("btn", "1"))).click()
+    time.sleep(0.1)  # wait for callback code to execute.
+    assert dash_duo.find_element(css_selector(_id("sso", "2"))).text == ""
+    assert dash_duo.find_element(css_selector(_id("log", "2"))).text == ""
+    assert dash_duo.find_element(css_selector(_id("sso", "1"))).text != ""
+    assert dash_duo.find_element(css_selector(_id("log", "1"))).text == '{"A":{"0":1}}'
+    assert dash_duo.find_element(css_selector("log_all")).text == '{"A":{"0":1}}None'
 
 
 @pytest.mark.parametrize(

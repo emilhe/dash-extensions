@@ -1055,6 +1055,8 @@ class MultiplexerTransform(DashTransform):
                 continue
             for entry in output_map[output]:
                 entry.allow_duplicate = True
+            for entry in callback_map[output]:
+                entry.kwargs["prevent_initial_call"] = True
 
         return callbacks, clientside_callbacks
 
@@ -1125,6 +1127,7 @@ class ServersideOutputTransform(DashTransform):
             # Figure out which args need loading.
             items = callback.inputs
             item_ids = [_create_callback_id(item) for item in items]
+            # TODO: Add other pattern-matches here
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
             if any(serverside_outputs):
@@ -1155,10 +1158,13 @@ def _unpack_outputs(serverside_outputs):
                     continue
                 # Replace content of element(s).
                 try:
-                    args[i] = serverside_output.backend.get(args[i], ignore_expired=True)
+                    if isinstance(args[i], list):
+                        for j, wildcard in enumerate(args[i]):
+                            args[i][j] = serverside_output.backend.get(wildcard, ignore_expired=True)
+                    else:
+                        args[i] = serverside_output.backend.get(args[i], ignore_expired=True)
                 except TypeError as ex:
-                    # TODO: Should we do anything about this?
-                    args[i] = None
+                    pass
             return f(*args, **kwargs)
 
         return decorated_function
@@ -1387,7 +1393,7 @@ def _append_output(outputs, value, single_output, out_idx):
 def _create_callback_id(item):
     cid = item.component_id
     if isinstance(cid, dict):
-        cid = {key: cid[key] if cid[key] not in _wildcard_mappings else _wildcard_mappings[cid[key]] for key in cid}
+        cid = {key: cid[key] for key in cid if cid[key] not in _wildcard_mappings}
         cid = json.dumps(cid)
     return "{}.{}".format(cid, item.component_property)
 
