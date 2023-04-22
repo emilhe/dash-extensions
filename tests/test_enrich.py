@@ -5,12 +5,13 @@ import time
 import dash
 import pandas as pd
 import pytest
+import dash_extensions.enrich
 from dash.exceptions import PreventUpdate
 
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection
+    CycleBreakerInput, DependencyCollection, DashBlueprint
 
 
 # region Test utils/stubs
@@ -58,6 +59,7 @@ def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
 
 
 # endregion
+
 
 @pytest.mark.parametrize(
     'tst, flt',
@@ -367,6 +369,8 @@ def test_global_blueprint(dash_duo):
 
     # Check that callbacks work.
     _basic_dash_proxy_test(dash_duo, app)
+    # Reset changes.
+    dash_extensions.enrich.GLOBAL_BLUEPRINT = DashBlueprint()
 
 
 @pytest.mark.parametrize(

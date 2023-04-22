@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - UNRELEASED
+
+### Removed
+
+- The `OperatorTransform` has been dropped, as [similar functionality](https://dash.plotly.com/partial-properties) has been implemented in the core Dash library as part of the 2.9 release
+
+### Changed
+
+- The `MultiplexerTransform` has been changed to simply set the 
+
+
+- Add support for embedding of blueprints in function layouts
+
+
 ## [0.1.13] - 28-02-23
 
 ### Changed
