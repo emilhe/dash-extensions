@@ -1127,12 +1127,12 @@ class ServersideOutputTransform(DashTransform):
             # Figure out which args need loading.
             items = callback.inputs
             item_ids = [_create_callback_id(item) for item in items]
-            # TODO: Add other pattern-matches here
+            item_multi = [isinstance(item.component_id, dict) and ALL in item.component_id.values() or ALLSMALLER in item.component_id.values() for item in items]
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
             if any(serverside_outputs):
                 f = callback.f
-                callback.f = _unpack_outputs(serverside_outputs)(f)
+                callback.f = _unpack_outputs(serverside_outputs, item_multi)(f)
         # 3) Apply the caching itself.
         for i, callback in enumerate(serverside_callbacks):
             f = callback.f
@@ -1145,7 +1145,7 @@ class ServersideOutputTransform(DashTransform):
         return callbacks
 
 
-def _unpack_outputs(serverside_outputs):
+def _unpack_outputs(serverside_outputs, item_multi):
     def unpack(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
@@ -1158,7 +1158,7 @@ def _unpack_outputs(serverside_outputs):
                     continue
                 # Replace content of element(s).
                 try:
-                    if isinstance(args[i], list):
+                    if item_multi[i]:
                         for j, wildcard in enumerate(args[i]):
                             args[i][j] = serverside_output.backend.get(wildcard, ignore_expired=True)
                     else:
