@@ -1125,7 +1125,7 @@ class ServersideOutputTransform(DashTransform):
             # Figure out which args need loading.
             items = callback.inputs
             item_ids = [_create_callback_id(item) for item in items]
-            item_multi = [isinstance(item.component_id, dict) and ALL in item.component_id.values() or ALLSMALLER in item.component_id.values() for item in items]
+            item_multi = [_check_multi(item) for item in items]
             serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
             # If any arguments are packed, unpack them.
             if any(serverside_outputs):
@@ -1394,6 +1394,13 @@ def _create_callback_id(item):
         cid = {key: cid[key] for key in cid if cid[key] not in _wildcard_mappings}
         cid = json.dumps(cid)
     return "{}.{}".format(cid, item.component_property)
+
+def _check_multi(item):
+    cid = item.component_id
+    if not isinstance(cid, dict):
+        return False
+    vs = cid.values()
+    return ALL in vs or ALLSMALLER in vs
 
 
 def plotly_jsonify(data):
