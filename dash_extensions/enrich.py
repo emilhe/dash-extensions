@@ -1055,8 +1055,6 @@ class MultiplexerTransform(DashTransform):
                 continue
             for entry in output_map[output]:
                 entry.allow_duplicate = True
-            for entry in callback_map[output]:
-                entry.kwargs["prevent_initial_call"] = True
 
         return callbacks, clientside_callbacks
 
