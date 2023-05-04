@@ -1208,8 +1208,7 @@ class NoOutputTransform(StatefulDashTransform):
 
 
 class Dash(DashProxy):
-    def __init__(self, *args, output_defaults=None, **kwargs):
-        output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
+    def __init__(self, *args, **kwargs):
         transforms = [
             TriggerTransform(),
             LogTransform(),
@@ -1217,7 +1216,7 @@ class Dash(DashProxy):
             NoOutputTransform(),
             CycleBreakerTransform(),
             BlockingCallbackTransform(),
-            ServersideOutputTransform(**output_defaults),
+            ServersideOutputTransform(),
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
 
