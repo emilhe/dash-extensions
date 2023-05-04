@@ -1,20 +1,44 @@
-from copy import copy
 import decimal
 import json
 import os
+import re
 import time
 
 import dash
 import pandas as pd
 import pytest
+import dash_extensions.enrich
 from dash.exceptions import PreventUpdate
+
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
-    BlockingCallbackTransform, dcc, ServersideOutputTransform, ServersideOutput, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection, OperatorTransform, OperatorOutput, Operator, DashBlueprint
+    BlockingCallbackTransform, dcc, ServersideOutputTransform, Serverside, ALL, CycleBreakerTransform, \
+    CycleBreakerInput, DependencyCollection, DashBlueprint, MATCH
 
 
 # region Test utils/stubs
+
+
+def _stringify_id(id_):
+    if isinstance(id_, dict):
+        return json.dumps(id_, sort_keys=True, separators=(",", ":"))
+    return id_
+
+
+def _css_escape(s):
+    sel = re.sub("[\\{\\}\\\"\\'.:,]", lambda m: "\\" + m.group(0), s)
+    return sel
+
+
+def _css_selector(_id):
+    return f'#{_css_escape(_stringify_id(_id))}'
+
+
+def _cssid(**kwargs):
+    # escaped CSS for object IDs
+    kvs = r"\,".join([r"\"" + k + r"\"\:\"" + kwargs[k] + r"\"" for k in kwargs])
+    return r"#\{" + kvs + r"\}"
+
 
 def _get_basic_dash_proxy(**kwargs) -> DashProxy:
     app = DashProxy(**kwargs)
@@ -59,6 +83,7 @@ def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
 
 
 # endregion
+
 
 @pytest.mark.parametrize(
     'tst, flt',
@@ -307,16 +332,11 @@ def test_multiplexer_transform_wildcard(dash_duo):
     app = DashProxy(transforms=[MultiplexerTransform()], prevent_initial_callbacks=True)
     app.layout = html.Div(make_block("0") + make_block("1"))
 
-    def cssid(**kwargs):
-        # escaped CSS for object IDs
-        kvs = r"\,".join([r"\"" + k + r"\"\:\"" + kwargs[k] + r"\"" for k in kwargs])
-        return r"#\{" + kvs + r"\}"
-
     dash_duo.start_server(app)
-    dash_duo.find_element(cssid(id="x", type="button0")).click()
-    assert dash_duo.find_element(cssid(id="0", type="div")).text == "Hello from group 0"
-    dash_duo.find_element(cssid(id="y", type="button1")).click()
-    assert dash_duo.find_element(cssid(id="1", type="div")).text == "Hello from group 1"
+    dash_duo.find_element(_cssid(id="x", type="button0")).click()
+    assert dash_duo.find_element(_cssid(id="0", type="div")).text == "Hello from group 0"
+    dash_duo.find_element(_cssid(id="y", type="button1")).click()
+    assert dash_duo.find_element(_cssid(id="1", type="div")).text == "Hello from group 1"
 
 
 @pytest.mark.parametrize('flex', [False, True])
@@ -368,6 +388,8 @@ def test_global_blueprint(dash_duo):
 
     # Check that callbacks work.
     _basic_dash_proxy_test(dash_duo, app)
+    # Reset changes.
+    dash_extensions.enrich.GLOBAL_BLUEPRINT = DashBlueprint()
 
 
 @pytest.mark.parametrize(
@@ -410,8 +432,8 @@ def test_blocking_callback_transform_final_invocation(dash_duo):
 
 @pytest.mark.parametrize(
     'args, kwargs',
-    [([ServersideOutput("store", "children"), Input("btn", "n_clicks")], dict()),
-     ([], dict(output=ServersideOutput("store", "children"),
+    [([Output("store", "children"), Input("btn", "n_clicks")], dict()),
+     ([], dict(output=Output("store", "children"),
                inputs=dict(n_clicks=Input("btn", "n_clicks"))))])
 def test_serverside_output_transform(dash_duo, args, kwargs):
     app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
@@ -423,7 +445,7 @@ def test_serverside_output_transform(dash_duo, args, kwargs):
 
     @app.callback(*args, **kwargs)
     def update_default(n_clicks):
-        return pd.DataFrame(columns=["A"], data=[1])
+        return Serverside(pd.DataFrame(columns=["A"], data=[1]))
 
     @app.callback(Output("log", "children"), Input("store", "children"))
     def update_log(data):
@@ -439,42 +461,78 @@ def test_serverside_output_transform(dash_duo, args, kwargs):
     assert dash_duo.find_element("#log").text == '{"A":{"0":1}}'
 
 
-def test_serverside_output_transform_memoize(dash_duo):
-    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
-    app.layout = html.Div([
-        html.Button(id="btn"),
-        html.Div(id="store1"),
-        html.Div(id="store2"),
-        html.Div(id="log1", children="0"),
-        html.Div(id="log2", children="0"),
-    ])
+def test_serverside_output_transform_wildcard(dash_duo):
+    def _id(t, i):
+        return {"type": t, "index": i}
 
-    @app.callback(ServersideOutput("store1", "children"), Input("btn", "n_clicks"), memoize=True)
-    def update_store1(n_clicks):
-        return n_clicks
+    def make_block(i):
+        return [
+            html.Button(id=_id("btn", i)),
+            html.Div(id=_id("sso", i)),
+            html.Div(id=_id("log", i)),
+        ]
 
-    @app.callback(Output("log1", "children"), Input("store1", "children"))
-    def update_log1(n_clicks):
-        return n_clicks
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform(), MultiplexerTransform()])
+    app.layout = html.Div(make_block("1") + make_block("2") + [html.Div(id="log_all"), html.Button(id="btn_all")])
 
-    @app.callback(ServersideOutput("store2", "children", arg_check=False, session_check=False),
-                  Input("btn", "n_clicks"), memoize=True)
-    def update_store2(n_clicks):
-        return n_clicks
+    @app.callback(Output(_id("sso", MATCH), "children"),
+                  Input(_id("btn", MATCH), "n_clicks"))
+    def update_default(n_clicks):
+        """
+        Populate serverside output ONE at a time, i.e. WRITE to SSO using MATCH.
+        """
+        return Serverside(pd.DataFrame(columns=["A"], data=[n_clicks]))
 
-    @app.callback(Output("log2", "children"), Input("store2", "children"))
-    def update_log2(n_clicks):
-        return n_clicks
+    @app.callback(Output(_id("sso", ALL), "children"),
+                  Input("btn_all", "n_clicks"))
+    def update_all(n_clicks):
+        """
+        Populate serverside output ALL at once, i.e. WRITE to SSO using ALL.
+        """
+        return [Serverside(pd.DataFrame(columns=["B"], data=[n_clicks]))] * 2
 
-    # Check that stuff works. It doesn't using a normal Dash object.
+    @app.callback(Output(_id("log", MATCH), "children"),
+                  Input(_id("sso", MATCH), "children"))
+    def update_log(data):
+        """
+        Populate log elements ONE at a time, i.e. READ from SSO using MATCH.
+        """
+        return data.to_json()
+
+    @app.callback(Output("log_all", "children"),
+                  Input(_id("sso", ALL), "children"))
+    def update_log_all(data):
+        """
+        Populate ALL log elements, i.e. READ from SSO using ALL.
+        """
+        return [d.to_json() if d is not None else "None" for d in data]
+
     dash_duo.start_server(app)
-    dash_duo.find_element("#btn").click()
-    time.sleep(1)
-    dash_duo.find_element("#btn").click()
-    # Args (i.e. n_clicks) included in memoize key, i.e. a call is made on every click.
-    dash_duo.wait_for_text_to_equal("#log1", "2", timeout=1)
-    # Args (i.e. n_clicks) not included in memoize key, i.e. only one call is made.
-    assert dash_duo.find_element("#log2").text == "1"
+    assert dash_duo.find_element(_css_selector(_id("sso", "1"))).text == ""
+    assert dash_duo.find_element(_css_selector(_id("log", "1"))).text == ""
+    assert dash_duo.find_element(_css_selector(_id("sso", "2"))).text == ""
+    assert dash_duo.find_element(_css_selector(_id("log", "2"))).text == ""
+    # Click the first element.
+    dash_duo.find_element(_css_selector(_id("btn", "1"))).click()
+    time.sleep(0.1)  # wait for callback code to execute.
+    assert dash_duo.find_element(_css_selector(_id("sso", "2"))).text == ""  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("log", "2"))).text == ""  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("sso", "1"))).text != ""
+    assert dash_duo.find_element(_css_selector(_id("log", "1"))).text == '{"A":{"0":1}}'
+    assert dash_duo.find_element(_css_selector("log_all")).text == '{"A":{"0":1}}None'
+    # Click the second element twice.
+    dash_duo.find_element(_css_selector(_id("btn", "2"))).click()
+    time.sleep(0.1)  # wait for callback code to execute.
+    dash_duo.find_element(_css_selector(_id("btn", "2"))).click()
+    time.sleep(0.1)  # wait for callback code to execute.
+    assert dash_duo.find_element(_css_selector(_id("sso", "2"))).text != ""  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("log", "2"))).text == '{"A":{"0":2}}'  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("log", "1"))).text == '{"A":{"0":1}}'
+    assert dash_duo.find_element(_css_selector("log_all")).text == '{"A":{"0":1}}{"A":{"0":2}}'
+    # Click the all element.
+    dash_duo.find_element("#btn_all").click()
+    time.sleep(0.1)  # wait for callback code to execute.
+    assert dash_duo.find_element(_css_selector("log_all")).text == '{"B":{"0":1}}{"B":{"0":1}}'
 
 
 @pytest.mark.parametrize(
@@ -538,175 +596,3 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
     c = dash_duo.find_element("#celsius")
     c.send_keys("100")
     dash_duo.wait_for_text_to_equal("#fahrenheit", "212", timeout=1)
-
-
-def test_list_output(dash_duo):
-    gui_actions = dict(
-        append=lambda x: Operator().list.append(x),
-        extend=lambda x: Operator().list.extend([x, x]),
-        sort=lambda x: Operator().list.sort(),
-        reverse=lambda x: Operator().list.reverse(),
-        clear=lambda x: Operator().list.clear(),
-        insert=lambda x: Operator().list.insert(4, "hest"),
-        remove=lambda x: Operator().list.remove(3),
-        pop=lambda x: Operator().list.pop(3),
-    )
-    action_buttons = [html.Button(k, id=k) for k in gui_actions]
-    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
-    app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
-    for k in gui_actions:
-        app.callback(OperatorOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
-    app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
-    # Start stuff.
-    proxy_list = []
-    dash_duo.start_server(app)
-    # Check empty after clear.
-    dash_duo.find_element("#clear").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check append.
-    proxy_list.append(1)
-    dash_duo.find_element("#append").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    proxy_list.append(2)
-    dash_duo.find_element("#append").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    proxy_list.append(3)
-    dash_duo.find_element("#append").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    proxy_list.append(4)
-    dash_duo.find_element("#append").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check extend.
-    proxy_list.extend([1, 1])
-    dash_duo.find_element("#extend").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    proxy_list.extend([2, 2])
-    dash_duo.find_element("#extend").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check sort.
-    proxy_list.sort()
-    dash_duo.find_element("#sort").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check reverse.
-    proxy_list.reverse()
-    dash_duo.find_element("#reverse").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check remove.
-    proxy_list.remove(3)
-    dash_duo.find_element("#remove").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check pop.
-    proxy_list.pop(3)
-    dash_duo.find_element("#pop").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check insert.
-    proxy_list.insert(4, "hest")
-    dash_duo.find_element("#insert").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-    # Check empty after clear.
-    proxy_list.clear()
-    dash_duo.find_element("#clear").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_list), timeout=1)
-
-
-def test_dict_output(dash_duo):
-    pop_key = "some_key2"
-    update_dict = dict(key="value", some="stuff", foo="bar")
-    gui_actions = dict(
-        set=lambda x: Operator().dict.set(f"some_key{x}", f"some_value{x}"),
-        clear=lambda x: Operator().dict.clear(),
-        pop=lambda x: Operator().dict.pop(pop_key),
-        update=lambda x: Operator().dict.update(update_dict),
-    )
-    action_buttons = [html.Button(k, id=k) for k in gui_actions]
-    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
-    app.layout = html.Div(action_buttons + [dcc.Store(id="store"), html.Div(id="log")])
-    for k in gui_actions:
-        app.callback(OperatorOutput("store", "data"), Input(k, "n_clicks"))(gui_actions[k])
-    app.callback(Output("log", "children"), Input("store", "data"))(lambda data: json.dumps(data))
-    # Start stuff.
-    proxy_dict = {}
-    dash_duo.start_server(app)
-    # Check empty after clear.
-    dash_duo.find_element("#clear").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
-    # Check set.
-    proxy_dict["some_key1"] = "some_value1"
-    dash_duo.find_element("#set").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
-    proxy_dict["some_key2"] = "some_value2"
-    dash_duo.find_element("#set").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
-    proxy_dict["some_key3"] = "some_value3"
-    dash_duo.find_element("#set").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
-    # Check pop.
-    proxy_dict.pop(pop_key)
-    dash_duo.find_element("#pop").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
-    # Check update.
-    proxy_dict.update(update_dict)
-    dash_duo.find_element("#update").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(proxy_dict), timeout=1)
-
-
-def test_index_accessor(dash_duo):
-    some_value = "some_value"
-    gui_actions = [
-        dict(id="list_idx", opr=lambda x: Operator()[1].assign(some_value), data=["bar", "bar", "bar"]),
-        dict(id="dict_key", opr=lambda x: Operator()['foo'].assign(some_value), data={"foo": "bar", "foo2": "bar2"}),
-        dict(id="composite", opr=lambda x: Operator()[1]['foo'][0].assign(some_value),
-             data=[
-                 "bar",
-                 {"foo": ["bar", "bar", "bar"], "foo2": "bar2"},
-                 "bar"
-             ]),
-    ]
-    action_buttons = [html.Button(e['id'], id=e['id']) for e in gui_actions]
-    stores = [dcc.Store(data=e['data'], id=f"store_{e['id']}") for e in gui_actions]
-    app = DashProxy(transforms=[OperatorTransform(), MultiplexerTransform()], prevent_initial_callbacks=True)
-    app.layout = html.Div(action_buttons + stores + [html.Div(id="log")])
-    for e in gui_actions:
-        app.callback(OperatorOutput(f"store_{e['id']}", "data"), Input(e['id'], "n_clicks"))(e['opr'])
-        app.callback(Output("log", "children"), Input(f"store_{e['id']}", "data"))(lambda x: json.dumps(x))
-    # Start stuff.
-    dash_duo.start_server(app)
-    # Check list_index.
-    data = gui_actions[0]['data']
-    data[1] = some_value
-    dash_duo.find_element("#list_idx").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
-    # Check dict_key.
-    data = gui_actions[1]['data']
-    data['foo'] = some_value
-    dash_duo.find_element("#dict_key").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
-    # Check composite.
-    data = gui_actions[2]['data']
-    data[1]['foo'][0] = some_value
-    dash_duo.find_element("#composite").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
-
-
-def test_composite_operator(dash_duo):
-    data = [1, 2, 3, 4, 5]
-    app = DashProxy(transforms=[OperatorTransform()], prevent_initial_callbacks=True)
-    app.layout = html.Div([html.Button(id="action"), dcc.Store(id="store", data=data), html.Div(id="log")])
-    app.callback(Output("log", "children"), Input("store", "data"))(lambda x: json.dumps(x))
-
-    @app.callback(OperatorOutput("store", "data"), Input("action", "n_clicks"))
-    def action(_):
-        o = Operator()
-        o[2] = 7
-        o[4] = -1
-        o.list.sort()
-        return o
-
-    # Start stuff.
-    dash_duo.start_server(app)
-    # Test stuff.
-    data[2] = 7
-    data[4] = -1
-    data = sorted(data)
-    dash_duo.find_element("#action").click()
-    dash_duo.wait_for_text_to_equal("#log", json.dumps(data), timeout=1)
