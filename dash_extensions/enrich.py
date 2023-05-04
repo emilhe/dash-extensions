@@ -982,7 +982,7 @@ def trigger_filter(args):
 class MultiplexerTransform(DashTransform):
     """
     The MultiplexerTransform was previously used to make it possible to target an output by multiple callbacks, but as
-    per Dash 2.9 this function is now included, but default it is disabled. To achieve similar behaviour as before (and
+    per Dash 2.9 this function is now included, but by default disabled. To achieve similar behaviour as before (and
     thus improve backwards compatibility), the MultiplexerTransform enables the functionality automagically.
     """
 

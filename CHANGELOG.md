@@ -6,15 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 
-- The `OperatorTransform` has been dropped, as [similar functionality](https://dash.plotly.com/partial-properties) has been implemented in the core Dash library as part of the 2.9 release
+- The `OperatorTransform` has been dropped, as [similar functionality](https://dash.plotly.com/partial-properties) has been implemented in the core Dash library as part of the Dash 2.9 release
 
 ### Changed
 
-- The `MultiplexerTransform` has been changed to simply set the 
-
-
+- The syntax of the `ServersideOutputTransform` has been changed. Instead of using `ServersideOutput` in place of the `Output`, one must now wrap return values in `Serverside` objects
+- The `MultiplexerTransform` has been changed to simply set a flag to enable multiplexing, which has been included as part of the Dash 2.9 release (with the default being disabled)
 - Add support for embedding of blueprints in function layouts
-
 
 ## [0.1.13] - 28-02-23
 
