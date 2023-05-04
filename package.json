@@ -1,6 +1,6 @@
 {
   "name": "dash-extensions",
-  "version": "0.1.14rc1",
+  "version": "1.0.0rc1",
   "description": "Extensions for Plotly Dash.",
   "main": "build/index.js",
   "scripts": {
@@ -48,7 +48,7 @@
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-react": "^7.29.4",
     "loader-utils": ">=1.4.2",
-    "npm": "^8.8.0",
+    "npm": "^9.6.6",
     "prop-types": "^15.8.1",
     "react": "^16.14.0",
     "react-docgen": "^5.4.0",

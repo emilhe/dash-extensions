@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dash-extensions"
-version = "0.1.14rc1"
+version = "1.0.0rc2"
 description = "Extensions for Plotly Dash."
 authors = ["emher <emil.h.eriksen@gmail.com>"]
 license = "MIT"
@@ -10,11 +10,11 @@ repository = "https://github.com/thedirtyfew/dash-extensions"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4"
-dash = ">=2.8.1"
+dash = ">=2.9.3"
 more-itertools = "^9.0.0"
 jsbeautifier = "^1.14.3"
 Flask-Caching = "2.0.2"
-dash-mantine-components = {version = "^0.11.0", optional = true}
+dash-mantine-components = {version = "^0.11.1", optional = true}
 
 [tool.poetry.extras]
 mantine = ["dash-mantine-components"]

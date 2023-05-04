@@ -348,8 +348,9 @@ class DashProxy(dash.Dash):
     work (e.g. setting a secret key on the server), and exposes convenience functions such as 'hijack'.
     """
 
-    def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None,
+                 prevent_initial_callbacks="initial_duplicate", **kwargs):
+        super().__init__(*args, prevent_initial_callbacks=prevent_initial_callbacks, **kwargs)
         self.blueprint = DashBlueprint(transforms,
                                        include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
         self.setup_server_lock = threading.Lock()
@@ -978,86 +979,15 @@ def trigger_filter(args):
 
 # region Multiplexer transform
 
-
-def _mp_id(output: Output, idx: int) -> Dict[str, str]:
-    if isinstance(output.component_id, dict):
-        return {**output.component_id, **dict(prop=output.component_property, idx=idx)}
-    return dict(id=output.component_id, prop=output.component_property, idx=idx)
-
-
-def _escape_wildcards(mp_id):
-    if not isinstance(mp_id, dict):
-        return mp_id
-    for key in mp_id:
-        # The ALL wildcard is supported.
-        if mp_id[key] == ALL:
-            mp_id[key] = _wildcard_mappings[ALL]
-            continue
-        # Other ALL wildcards are NOT supported.
-        if mp_id[key] in _wildcard_mappings:
-            raise ValueError(f"Multiplexer does not support wildcard [{mp_id[key]}]")
-    return mp_id
-
-
-def _mp_element(mp_id: Dict[str, str]) -> dcc.Store:
-    return dcc.Store(id=mp_id)
-
-
-def _mp_prop() -> str:
-    return "data"
-
-
-def inject_proxies_recursively(node, proxy_map):
-    if not hasattr(node, "children") or node.children is None:
-        return
-    children = _as_list(node.children)
-    modified = False
-    for i, child in enumerate(children):
-        # Do recursion.
-        inject_proxies_recursively(child, proxy_map)
-        # Attach the proxy components as children of the original component to ensure dcc.Loading works.
-        if not hasattr(child, "id"):
-            continue
-        for key in proxy_map:
-            if not child.id == key:
-                continue
-            children[i] = html.Div([child] + proxy_map[key])
-            modified = True
-    if modified:
-        node.children = children
-
-
-class MultiplexerTransform(StatefulDashTransform):
+class MultiplexerTransform(DashTransform):
     """
-    The MultiplexerTransform makes it possible to target an output by callbacks multiple times. Under the hood, proxy
-    components (dcc.Store) are used, and the proxy_location keyword argument determines where these proxies are placed.
-    The default value "inplace" means that the original component is replace by a Div element that wraps the original
-    component and its proxies. The means that dcc.Loading will work, but it also means that if you replace the layout
-    of a component higher in the tree in a callback, you might end up deleting the proxies (!), which will break your
-    app. For this particular case, you can set proxy_location to a custom component (or None to use the layout root),
-    to place the proxies here instead. To use dcc.Loading for this particular case, the proxy_location must be wrapped.
+    The MultiplexerTransform was previously used to make it possible to target an output by multiple callbacks, but as
+    per Dash 2.9 this function is now included, but by default disabled. To achieve similar behaviour as before (and
+    thus improve backwards compatibility), the MultiplexerTransform enables the functionality automagically.
     """
 
-    def __init__(self, proxy_location=None, proxy_wrapper_map=None):
+    def __init__(self):
         super().__init__()
-        self.proxy_location = proxy_location
-        self.proxy_map = defaultdict(lambda: [])
-        self.proxy_wrapper_map = proxy_wrapper_map
-
-    def transform_layout(self, layout):
-        # Apply wrappers if needed.
-        if self.proxy_wrapper_map:
-            for key in self.proxy_wrapper_map:
-                if key in self.proxy_map:
-                    self.proxy_map[key] = _as_list(self.proxy_wrapper_map[key](self.proxy_map[key]))
-        # Inject proxies in a user defined component.
-        if self.proxy_location == "inplace":
-            inject_proxies_recursively(layout, self.proxy_map)
-        # Inject proxies in a component, either user defined or top level.
-        else:
-            target = self.proxy_location if isinstance(self.proxy_location, Component) else layout
-            proxies = list(flatten(list(self.proxy_map.values())))
-            target.children = _as_list(target.children) + proxies
 
     def apply(self, callbacks, clientside_callbacks):
         all_callbacks = callbacks + clientside_callbacks
@@ -1065,58 +995,23 @@ class MultiplexerTransform(StatefulDashTransform):
         output_map = defaultdict(list)
         for callback in all_callbacks:
             for output in callback.outputs:
-                output_map[output].append(callback)
-        # Apply multiplexer where needed.
-        for output in output_map:
+                output_map[_output_id_without_wildcards(output)].append(output)
+        # Set allow_duplicate where needed.
+        for output_id in output_map:
             # If there is only one output, multiplexing is not needed.
-            if len(output_map[output]) == 1:
+            if len(output_map[output_id]) == 1:
                 continue
-            self._apply_multiplexer(output, output_map[output])
+            for entry in output_map[output_id]:
+                entry.allow_duplicate = True
 
-        return callbacks, clientside_callbacks + self.blueprint.clientside_callbacks
+        return callbacks, clientside_callbacks
 
-    def _apply_multiplexer(self, output, callbacks):
-        inputs = []
-        proxies = []
-        max_priority = -1
-        idx_priority = -1
-        for i, callback in enumerate(callbacks):
-            mp_id = _mp_id(output, i)
-            mp_id_escaped = _escape_wildcards(mp_id)
-            # Create proxy element.
-            proxies.append(_mp_element(mp_id_escaped.copy()))
-            # Assign proxy element as output.
-            callback.outputs[callback.outputs.index(output)] = Output(mp_id_escaped.copy(), _mp_prop())
-            # Create proxy input.
-            inputs.append(Input(mp_id, _mp_prop()))
-            # Figure out which is the highest priority.
-            p = callback.kwargs.get("priority", 0)
-            if p > max_priority:
-                max_priority = p
-                idx_priority = i
-        # Collect proxy elements to add to layout.
-        self.proxy_map[output].extend(proxies)
-        # Create multiplexer callback. Clientside for best performance. TODO: Is this robust?
-        self.blueprint.clientside_callback(
-            f"""
-            function(){{
-                const ts = dash_clientside.callback_context.triggered;
-                for (let i = 0; i < ts.length; i++) {{
-                    idx = JSON.parse(ts[i].prop_id.split('.')[0]).idx;
-                    if(idx === {idx_priority}){{
-                        return ts[i].value;
-                    }}
-                }}
-                return ts[0].value;
-            }}
-        """,
-            output,
-            inputs,
-            prevent_initial_call=True,
-        )
 
-    def sort_key(self):
-        return 10
+def _output_id_without_wildcards(output: Output) -> str:
+    i, p = output.component_id, output.component_property
+    if isinstance(i, dict):
+        i = json.dumps({k: i[k] for k in sorted(i) if i[k] not in [ALL, MATCH, ALLSMALLER]})
+    return f"{i}_{p}"
 
 
 # endregion
@@ -1124,179 +1019,7 @@ class MultiplexerTransform(StatefulDashTransform):
 # region Server side output transform
 
 
-class EnrichedOutput(Output):
-    """
-    Like a normal Output, includes additional properties related to storing the data.
-    """
-
-    def __init__(self, component_id, component_property, backend=None, session_check=None, arg_check=True):
-        super().__init__(component_id, component_property)
-        self.backend = backend
-        self.session_check = session_check
-        self.arg_check = arg_check
-
-
-class ServersideOutput(EnrichedOutput):
-    """
-    Like a normal Output, but with the content stored only server side.
-    """
-
-
-class ServersideOutputTransform(DashTransform):
-    def __init__(self, backend=None, session_check=True, arg_check=True):
-        super().__init__()
-        self.backend = backend if backend is not None else FileSystemStore()
-        self.session_check = session_check
-        self.arg_check = arg_check
-
-    # NOTE: Doesn't make sense for clientside callbacks.
-
-    def _get_attr_with_default(self, output, attr):
-        if hasattr(output, attr):
-            value = getattr(output, attr)
-            if value is not None:
-                return value
-        return getattr(self, attr)
-
-    def apply_serverside(self, callbacks):
-        # 1) Create index.
-        serverside_callbacks = []
-        serverside_output_map = {}
-        for callback in callbacks:
-            # If memoize keyword is used, serverside caching is needed.
-            memoize = callback.kwargs.get("memoize", None)
-            serverside = False
-            # Keep tract of which outputs are server side outputs.
-            for output in callback.outputs:
-                if isinstance(output, ServersideOutput):
-                    serverside_output_map[_create_callback_id(output)] = output
-                    serverside = True
-                # Set default values.
-                if not isinstance(output, ServersideOutput) and not memoize:
-                    continue
-                output.backend = self._get_attr_with_default(output, "backend")
-                output.arg_check = self._get_attr_with_default(output, "arg_check")
-                output.session_check = self._get_attr_with_default(output, "session_check")
-            # Keep track of server side callbacks.
-            if serverside or memoize:
-                serverside_callbacks.append(callback)
-        # 2) Inject cached data into callbacks.
-        for callback in callbacks:
-            # Figure out which args need loading.
-            items = callback.inputs
-            item_ids = [_create_callback_id(item) for item in items]
-            serverside_outputs = [serverside_output_map.get(item_id, None) for item_id in item_ids]
-            # If any arguments are packed, unpack them.
-            if any(serverside_outputs):
-                f = callback.f
-                callback.f = _unpack_outputs(serverside_outputs)(f)
-        # 3) Apply the caching itself.
-        for i, callback in enumerate(serverside_callbacks):
-            f = callback.f
-            callback.f = _pack_outputs(callback)(f)
-        # 4) Strip special args.
-        for callback in callbacks:
-            for key in ["memoize"]:
-                callback.kwargs.pop(key, None)
-
-        return callbacks
-
-
-def _unpack_outputs(serverside_outputs):
-    def unpack(f):
-        @functools.wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not any(serverside_outputs):
-                return f(*args, **kwargs)
-            args = list(args)
-            for i, serverside_output in enumerate(serverside_outputs):
-                # Just skip elements that are not stored server side.
-                if not serverside_output:
-                    continue
-                # Replace content of element(s).
-                try:
-                    args[i] = serverside_output.backend.get(args[i], ignore_expired=True)
-                except TypeError as ex:
-                    # TODO: Should we do anything about this?
-                    args[i] = None
-            return f(*args, **kwargs)
-
-        return decorated_function
-
-    return unpack
-
-
-def _pack_outputs(callback):
-    memoize = callback.kwargs.get("memoize", None)
-
-    def packed_callback(f):
-        @functools.wraps(f)
-        def decorated_function(*args, **kwargs):
-            multi_output = callback.multi_output
-            # If memoize is enabled, we check if the cache already has a valid value.
-            if memoize:
-                # Figure out if an update is necessary.
-                unique_ids = []
-                update_needed = False
-                for i, output in enumerate(callback.outputs):
-                    # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    to_skip = [isinstance(item, Trigger) for item in callback.inputs]
-                    filtered_args = [arg for i, arg in enumerate(args) if not to_skip[i]]
-                    # Generate unique ID.
-                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
-                    unique_ids.append(unique_id)
-                    if not output.backend.has(unique_id):
-                        update_needed = True
-                        break
-                # If not update is needed, just return the ids (or values, if not serverside output).
-                if not update_needed:
-                    results = [
-                        uid
-                        if isinstance(callback.outputs[i], ServersideOutput)
-                        else callback.outputs[i].backend.get(uid)
-                        for i, uid in enumerate(unique_ids)
-                    ]
-                    return results if multi_output else results[0]
-            # Do the update.
-            data = f(*args, **kwargs)
-            data = list(data) if multi_output else [data]
-            if callable(memoize):
-                data = memoize(data)
-            for i, output in enumerate(callback.outputs):
-                # Skip no_update updates.
-                if isinstance(data[i], type(no_update)):
-                    continue
-                # Replace only for server side outputs.
-                serverside_output = isinstance(callback.outputs[i], ServersideOutput)
-                if serverside_output or memoize:
-                    # Filter out Triggers (a little ugly to do here, should ideally be handled elsewhere).
-                    to_skip = [isinstance(item, (Trigger, DummyDependency)) for item in callback.inputs]
-                    filtered_args = [arg for i, arg in enumerate(args) if not to_skip[i]]
-                    unique_id = _get_cache_id(f, output, list(filtered_args), output.session_check, output.arg_check)
-                    output.backend.set(unique_id, data[i])
-                    # Replace only for server side outputs.
-                    if serverside_output:
-                        data[i] = unique_id
-            return data if multi_output else data[0]
-
-        return decorated_function
-
-    return packed_callback
-
-
-def _get_cache_id(func, output, args, session_check=None, arg_check=True):
-    all_args = [func.__name__, _create_callback_id(output)]
-    if arg_check:
-        all_args += list(args)
-    if session_check:
-        all_args += [_get_session_id()]
-    return hashlib.md5(json.dumps(all_args).encode()).hexdigest()
-
-
-# Interface definition for server stores.
-
-
-class ServerStore:
+class ServersideBackend:
     def get(self, key, ignore_expired=False):
         raise NotImplementedError()
 
@@ -1306,11 +1029,15 @@ class ServerStore:
     def has(self, key):
         raise NotImplementedError()
 
+    @property
+    def uid(self) -> str:
+        """
+        Backend identifier. Must be unique across the backend registry. Defaults to class name.
+        """
+        return self.__class__.__name__
 
-# Place store implementations here.
 
-
-class FileSystemStore(FileSystemCache):
+class FileSystemBackend(FileSystemCache, ServersideBackend):
     def __init__(self, cache_dir="file_system_store", **kwargs):
         super().__init__(cache_dir, **kwargs)
 
@@ -1336,7 +1063,7 @@ class FileSystemStore(FileSystemCache):
         return None
 
 
-class RedisStore(RedisCache):
+class RedisBackend(RedisCache, ServersideBackend):
     """
     Store that uses Redis as backend. Note, that the timeout must be large enough that a (k,v) pair NEVER expires
     during a user session. If it does, the user experience for those sessions will be degraded.
@@ -1348,6 +1075,99 @@ class RedisStore(RedisCache):
     def get(self, key, ignore_expired=False):
         # TODO: Is there any way to honor ignore_expired for redis? I don't think so
         return super().get(key)
+
+
+class EnrichedOutput(Output):
+    """
+    Like a normal Output, includes additional properties related to storing the data.
+    """
+
+    def __init__(self, component_id, component_property, allow_duplicate=False, backend=None, session_check=None,
+                 arg_check=True):
+        super().__init__(component_id, component_property, allow_duplicate)
+        self.backend = backend
+        self.session_check = session_check
+        self.arg_check = arg_check
+
+
+class ServersideOutputTransform(DashTransform):
+    prefix: str = "SERVERSIDE_"
+
+    def __init__(self,
+                 backends: Optional[List[ServersideBackend]] = None,
+                 default_backend: Optional[ServersideBackend] = None):
+        super().__init__()
+        # Per default, use file system backend.
+        if backends is None:
+            backends = [FileSystemBackend()]
+        self._default_backend: ServersideBackend = backends[0] if default_backend is None else default_backend
+        # Setup registry for easy/fast access.
+        self._backend_registry: Dict[str, ServersideBackend] = {backend.uid: backend for backend in backends}
+
+    def apply_serverside(self, callbacks):
+        for callback in callbacks:
+            f = callback.f
+            callback.f = self._unpack_pack_callback(callback)(f)
+        return callbacks
+
+    def _try_load(self, obj: Any) -> Any:
+        if not isinstance(obj, str):
+            return obj
+        if not obj.startswith(self.prefix):
+            return obj
+        data = json.loads(obj[len(self.prefix):])
+        backend = self._backend_registry[data["backend_uid"]]
+        value = backend.get(data["key"], ignore_expired=True)
+        return value
+
+    def _try_dump(self, obj: Any) -> Any:
+        if not isinstance(obj, Serverside):
+            return obj
+        backend_uid = obj.backend_uid
+        # If not backend it set, use the default.
+        if backend_uid is None:
+            backend_uid = self._default_backend.uid
+        # Dump the data.
+        backend = self._backend_registry[backend_uid]
+        backend.set(obj.key, obj.value)
+        # Return lookup structure.
+        data = dict(backend_uid=backend_uid, key=obj.key)
+        return f"{self.prefix}{json.dumps(data)}"
+
+    def _unpack_pack_callback(self, callback):
+        def unpack_pack_args(f):
+            @functools.wraps(f)
+            def decorated_function(*args, **kwargs):
+                args = list(args)
+                # Replace args and kwargs. # TODO: Is recursion needed?
+                for i, arg in enumerate(args):
+                    value = [self._try_load(a) for a in arg] if isinstance(arg, list) else self._try_load(arg)
+                    args[i] = value
+                for key in kwargs:
+                    arg = kwargs[key]
+                    value = [self._try_load(a) for a in arg] if isinstance(arg, list) else self._try_load(arg)
+                    kwargs[key] = value
+                # Evaluate function.
+                data = f(*args, **kwargs)
+                # Capture serverside outputs.
+                data = self._try_dump(data)
+                if isinstance(data, list):
+                    data = [self._try_dump(element) for element in data]
+                if isinstance(data, dict):
+                    data = {key: self._try_dump(data[key]) for key in data}
+                return data
+
+            return decorated_function
+
+        return unpack_pack_args
+
+
+class Serverside:
+
+    def __init__(self, value: Any, key: str = None, backend: Union[ServersideBackend, str, None] = None):
+        self.value = value
+        self.key: str = str(uuid.uuid4()) if key is None else key
+        self.backend_uid: str = backend.uid if isinstance(backend, ServersideBackend) else backend
 
 
 # endregion
@@ -1384,258 +1204,11 @@ class NoOutputTransform(StatefulDashTransform):
 
 # endregion
 
-# region [Magic] transform
-
-class OperatorOutput(Output):
-    """
-    Like a normal Output, but enables list and dict manipulations.
-    """
-
-
-class Operator:
-    def __init__(self, path: Optional[List] = None, operations: Optional[List] = None):
-        self.path = path if path is not None else []
-        self.operations = operations if operations is not None else []
-
-    def __getitem__(self, key):
-        return Operator(self.path + [key], operations=self.operations)
-
-    def __setitem__(self, key, item):
-        self.path += [key]
-        return self.assign(item)
-
-    def collect(self, opr, **kwargs):
-        self.operations.append(dict(opr=opr, pth=self.path, **kwargs))
-        self.path = []
-        return self
-
-    @property
-    def list(self):
-        return ListOperator(self)
-
-    @property
-    def dict(self):
-        return DictOperator(self)
-
-    def assign(self, item):
-        return self.collect("assign", item=item)
-
-    def apply(self):
-        return self.operations
-
-
-class ListOperator:
-    def __init__(self, operator: Optional[Operator] = None):
-        self.operator = operator
-
-    def _collect(self, opr, **kwargs):
-        return self.operator.collect(f"list_{opr}", **kwargs)
-
-    def apply(self):
-        return self.operator.apply()
-
-    def append(self, item):
-        return self._collect("append", item=item)
-
-    def extend(self, iterable):
-        return self._collect("extend", array=list(iterable))
-
-    def insert(self, index, item):
-        return self._collect("insert", item=item, index=index)
-
-    def remove(self, item):
-        # NB: Remove ALL occurances of item, not just the first one.
-        return self._collect("remove", item=item)
-
-    def pop(self, index):
-        return self._collect("pop", index=index)
-
-    def clear(self):
-        return self._collect("clear")
-
-    def sort(self):
-        return self._collect("sort")
-
-    def reverse(self):
-        return self._collect("reverse")
-
-
-class DictOperator:
-    def __init__(self, operator: Optional[Operator] = None):
-        self.operator = operator
-
-    def _collect(self, opr, **kwargs):
-        return self.operator.collect(f"dict_{opr}", **kwargs)
-
-    def apply(self):
-        return self.operator.apply()
-
-    def set(self, key, item):
-        return self._collect("set", key=key, item=item)
-
-    def pop(self, key):
-        return self._collect("pop", key=key)
-
-    def update(self, obj):
-        return self._collect("update", obj=obj)
-
-    def clear(self):
-        return self._collect("clear")
-
-
-class OperatorTransform(StatefulDashTransform):
-    def __init__(self):
-        super().__init__()
-        self.operator_outputs = []
-
-    def transform_layout(self, layout):
-        children = _as_list(layout.children) + self.components
-        layout.children = children
-
-    def _apply(self, callback, output):
-        original_id = str(output).replace(".", "_")  # .component_id
-        relay_id = _relay_id(original_id)
-        if str(output) not in self.operator_outputs:
-            # Append new relay component.
-            relay_component = dcc.Store(id=relay_id)
-            self.components.append(relay_component)
-            # Add clientside callback to perform modifications.
-            self.blueprint.clientside_callback(f"""function(operations, current){{
-                // Handle empty init call.
-                if (typeof operations === 'undefined'){{
-                    return window.dash_clientside.no_update;
-                }}
-                // Map non-list actions to list to enable iteration.
-                if (!(Array.isArray(operations))){{
-                    operations = [operations];
-                }}
-                // Function for resolving sub elements.
-                const drill = (obj, pth, lvl=0) => {{
-                    if(lvl === pth.length){{return obj;}}
-                    return drill(obj[pth[lvl]], pth, lvl+1);
-                }}
-                // Wrap current in list to enable index access.
-                lst = [current];
-                // Action.
-                for (const x of operations) {{
-                    let pth = [0].concat(x.pth);
-                    let idx = pth[pth.length - 1];
-                    let obj = drill(lst, pth.slice(0,-1));
-                    switch(x.opr) {{
-                      case "assign":
-                        obj[idx] = x.item;             
-                        break;
-                      // List action(s).
-                      case "list_append":
-                        obj[idx].push(x.item)
-                        break;
-                      case "list_extend":
-                        obj[idx] = obj[idx].concat(x.array);
-                        break;
-                      case "list_insert":
-                        obj[idx].splice(x.index, 0, x.item);
-                        break;
-                      case "list_remove":
-                        obj[idx] = obj[idx].filter(function(ele){{
-                            return ele != x.item;
-                        }});
-                        break;
-                      case "list_pop":
-                        obj[idx].splice(x.index, 1);
-                        break;
-                      case "list_reverse":
-                        obj[idx].reverse();
-                        break;
-                      case "list_sort":
-                        // TODO: Make it possible to inject sorting function
-                        obj[idx].sort();
-                        break;
-                      case "list_clear":
-                        obj[idx] = []             
-                        break;
-                      // Dict action(s).
-                      case "dict_set":
-                        obj[idx][x.key] = x.item;
-                        break;
-                      case "dict_pop":
-                        delete obj[idx][x.key];
-                        break;
-                      case "dict_clear":
-                        obj[idx] = {{}};             
-                        break;
-                      case "dict_update":
-                        obj[idx] = {{
-                            ...obj[idx],
-                            ...x.obj
-                        }};
-                        break;
-                      // Unknown action(s).
-                      default:
-                        console.log("Received unknown action for component {original_id}.");
-                        console.log(x);
-                        console.log("Update will be skipped.");
-                    }}
-                }}
-                // Make sure out ref != input ref (otherwise, React can get confused)
-                const result = lst[0];
-                if(Array.isArray(result)){{
-                    return Array.from(result)
-                }}
-                if(typeof result === 'object'){{
-                    return Object.assign({{}}, result);
-                }}
-                return result;
-            }}""", output, Input(relay_id, "data"), State(output.component_id, output.component_property))
-            # Record binding.
-            self.operator_outputs.append(str(output))
-        # Modify callback in-place to route output to the relay.
-        callback.outputs[callback.outputs.index(output)] = Output(relay_id, "data")
-        # Run apply if needed.
-        f = callback.f
-        callback.f = apply_operator()(f)
-
-    def apply_serverside(self, callbacks):
-        for callback in callbacks:
-            for output in callback.outputs:
-                if isinstance(output, OperatorOutput):
-                    self._apply(callback, output)
-        return callbacks
-
-    def apply_clientside(self, callbacks):
-        return callbacks + self.blueprint.clientside_callbacks
-
-    def get_dependent_transforms(self):
-        return [MultiplexerTransform()]
-
-
-def apply_operator():
-    def wrapper(f):
-        @functools.wraps(f)
-        def decorated_function(*args):
-            output = f(*args)
-            if isinstance(output, Operator):
-                return output.apply()
-            if hasattr(output, "__len__"):
-                output = [o.apply() if isinstance(o, Operator) else o for o in output]
-            return output
-
-        return decorated_function
-
-    return wrapper
-
-
-def _relay_id(uid):
-    return f"{uid}_operator_relay"
-
-
-# endregion
-
 # region Batteries included dash proxy object
 
 
 class Dash(DashProxy):
-    def __init__(self, *args, output_defaults=None, **kwargs):
-        output_defaults = dict(backend=None, session_check=True) if output_defaults is None else output_defaults
+    def __init__(self, *args, **kwargs):
         transforms = [
             TriggerTransform(),
             LogTransform(),
@@ -1643,8 +1216,7 @@ class Dash(DashProxy):
             NoOutputTransform(),
             CycleBreakerTransform(),
             BlockingCallbackTransform(),
-            ServersideOutputTransform(**output_defaults),
-            OperatorTransform()
+            ServersideOutputTransform(),
         ]
         super().__init__(*args, transforms=transforms, **kwargs)
 
@@ -1694,9 +1266,17 @@ def _append_output(outputs, value, single_output, out_idx):
 def _create_callback_id(item):
     cid = item.component_id
     if isinstance(cid, dict):
-        cid = {key: cid[key] if cid[key] not in _wildcard_mappings else _wildcard_mappings[cid[key]] for key in cid}
+        cid = {key: cid[key] for key in cid if cid[key] not in _wildcard_mappings}
         cid = json.dumps(cid)
     return "{}.{}".format(cid, item.component_property)
+
+
+def _check_multi(item):
+    cid = item.component_id
+    if not isinstance(cid, dict):
+        return False
+    vs = cid.values()
+    return ALL in vs or ALLSMALLER in vs
 
 
 def plotly_jsonify(data):
