@@ -479,7 +479,7 @@ def test_serverside_output_transform_wildcard(dash_duo):
                   Input(_id("btn", MATCH), "n_clicks"))
     def update_default(n_clicks):
         """
-        Populate serverside output ONE at a time, i.e. WRITE to SSO using match.
+        Populate serverside output ONE at a time, i.e. WRITE to SSO using MATCH.
         """
         return Serverside(pd.DataFrame(columns=["A"], data=[n_clicks]))
 
@@ -487,7 +487,7 @@ def test_serverside_output_transform_wildcard(dash_duo):
                   Input("btn_all", "n_clicks"))
     def update_all(n_clicks):
         """
-        Populate serverside output ONE at a time, i.e. WRITE to SSO using match.
+        Populate serverside output ALL at once, i.e. WRITE to SSO using ALL.
         """
         return [Serverside(pd.DataFrame(columns=["B"], data=[n_clicks]))] * 2
 
@@ -495,7 +495,7 @@ def test_serverside_output_transform_wildcard(dash_duo):
                   Input(_id("sso", MATCH), "children"))
     def update_log(data):
         """
-        Populate log elements ONE at a time, i.e. READ from SSO using match.
+        Populate log elements ONE at a time, i.e. READ from SSO using MATCH.
         """
         return data.to_json()
 
@@ -506,8 +506,6 @@ def test_serverside_output_transform_wildcard(dash_duo):
         Populate ALL log elements, i.e. READ from SSO using ALL.
         """
         return [d.to_json() if d is not None else "None" for d in data]
-
-    # TODO: Should support be added to WRITE using ALL too?
 
     dash_duo.start_server(app)
     assert dash_duo.find_element(_css_selector(_id("sso", "1"))).text == ""
