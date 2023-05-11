@@ -12,10 +12,10 @@ The `dash-extensions` package is a collection of utility functions, syntax exten
 
 The `enrich` module enables a number of _transforms_ that add functionality and/or syntactic sugar to Dash. Examples include
 
-* Making it possible to target an `Output` by multiple callbacks via the `MultiplexerTransform`
+* Making it possible to avoid invoking a callback _if it is already running_ via the `BlockingCallbackTransform`
 * Enabling logging from within Dash callbacks via the `LogTransform`
 * Improving app performance via the `ServersideOutputTransform`
 
 to name a few. To enable interactivity, the documentation has been moved to a [separate page](http://dash-extensions.com).
 
-NB: The 0.1.0 version introduces a number of breaking changes, see the changelog for details.
+NB: The 1.0.0 version introduces a number of breaking changes, see documentation for details.
