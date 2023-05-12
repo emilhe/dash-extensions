@@ -1038,7 +1038,7 @@ class ServersideBackend:
 
 
 class FileSystemBackend(FileSystemCache, ServersideBackend):
-    def __init__(self, cache_dir="file_system_store", **kwargs):
+    def __init__(self, cache_dir="file_system_backend", **kwargs):
         super().__init__(cache_dir, **kwargs)
 
     def get(self, key: str, ignore_expired=False):
@@ -1061,6 +1061,13 @@ class FileSystemBackend(FileSystemCache, ServersideBackend):
                 exc_info=True,
             )
         return None
+
+    @property
+    def uid(self) -> str:
+        """
+        Backend identifier. Must be unique across the backend registry.
+        """
+        return f"{self.__class__.__name__}:{self._path}"
 
 
 class RedisBackend(RedisCache, ServersideBackend):
