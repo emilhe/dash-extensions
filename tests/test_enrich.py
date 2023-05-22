@@ -489,7 +489,7 @@ def test_serverside_output_transform_wildcard(dash_duo):
         """
         Populate serverside output ALL at once, i.e. WRITE to SSO using ALL.
         """
-        return [Serverside(pd.DataFrame(columns=["B"], data=[n_clicks]))] * 2
+        return tuple([Serverside(pd.DataFrame(columns=["B"], data=[n_clicks]))] * 2)
 
     @app.callback(Output(_id("log", MATCH), "children"),
                   Input(_id("sso", MATCH), "children"))
