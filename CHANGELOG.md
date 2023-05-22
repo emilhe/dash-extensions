@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 22-05-23
+
+### Changed
+
+- Fix of bug that caused `ServersideOutputTransform` not to be applied when return type was `tuple`
+
 ## [1.0.0] - 12-05-23
 
 ### Removed

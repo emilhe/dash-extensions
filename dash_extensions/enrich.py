@@ -1160,6 +1160,8 @@ class ServersideOutputTransform(DashTransform):
                 data = self._try_dump(data)
                 if isinstance(data, list):
                     data = [self._try_dump(element) for element in data]
+                if isinstance(data, tuple):
+                    data = tuple([self._try_dump(element) for element in data])
                 if isinstance(data, dict):
                     data = {key: self._try_dump(data[key]) for key in data}
                 return data
