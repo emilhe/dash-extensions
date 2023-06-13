@@ -1264,7 +1264,6 @@ class DataclassTransform(DashTransform):
 
     def __init__(self):
         super().__init__()
-        import dash
 
     def apply_serverside(self, callbacks):
         for cb in callbacks:
