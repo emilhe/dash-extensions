@@ -271,6 +271,21 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "dataclass-wizard"
+version = "0.22.2"
+description = "Marshal dataclasses to/from JSON. Use field properties with initial values. Construct a dataclass schema with JSON input."
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+typing-extensions = {version = ">=3.7.4.2", markers = "python_version <= \"3.9\""}
+
+[package.extras]
+timedelta = ["pytimeparse (>=1.1.7)"]
+yaml = ["PyYAML (>=5.3)"]
+
+[[package]]
 name = "dill"
 version = "0.3.6"
 description = "serialize all of python"
@@ -953,7 +968,7 @@ wsproto = ">=0.14"
 name = "typing-extensions"
 version = "4.5.0"
 description = "Backported and Experimental Type Hints for Python 3.7+"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=3.7"
 
@@ -1064,7 +1079,7 @@ mantine = ["dash-mantine-components"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<4"
-content-hash = "0ff378eb6b771207b211bdc15233768d42c9630818da49816533898c5a98d509"
+content-hash = "10a6159228e82caa0b1019b7a9b5c7dbc5929fa65e56f793606073cd5b43e00a"
 
 [metadata.files]
 aiofiles = [
@@ -1364,6 +1379,10 @@ dash-table = [
 dash-testing-stub = [
     {file = "dash-testing-stub-0.0.2.tar.gz", hash = "sha256:0a98f7da9fe41dd3a37d781bc1d5672319448fdf98e47fd867aff2123171a357"},
     {file = "dash_testing_stub-0.0.2-py3-none-any.whl", hash = "sha256:a44d530a77e1ede9c6528be4b5951f34c6109b419a09f2691422375ffa7d09de"},
+]
+dataclass-wizard = [
+    {file = "dataclass-wizard-0.22.2.tar.gz", hash = "sha256:211f842e5e9a8ace50ba891ef428cd78c82579fb98024f80f3e630ca8d1946f6"},
+    {file = "dataclass_wizard-0.22.2-py2.py3-none-any.whl", hash = "sha256:49be36ecc64bc5a1e9a35a6bad1d71d33b6b9b06877404931a17c6a3a6dfbb10"},
 ]
 dill = [
     {file = "dill-0.3.6-py3-none-any.whl", hash = "sha256:a07ffd2351b8c678dfc4a856a3005f8067aea51d6ba6c700796a4d9e280f39f0"},
