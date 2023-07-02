@@ -3,6 +3,8 @@ import json
 import os
 import re
 import time
+from dataclasses import dataclass
+from datetime import datetime
 
 import dash
 import pandas as pd
@@ -13,7 +15,7 @@ from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import Output, Input, State, CallbackBlueprint, html, DashProxy, NoOutputTransform, Trigger, \
     TriggerTransform, MultiplexerTransform, PrefixIdTransform, callback, clientside_callback, DashLogger, LogTransform, \
     BlockingCallbackTransform, dcc, ServersideOutputTransform, Serverside, ALL, CycleBreakerTransform, \
-    CycleBreakerInput, DependencyCollection, DashBlueprint, MATCH
+    CycleBreakerInput, DependencyCollection, DashBlueprint, MATCH, DataclassTransform
 
 
 # region Test utils/stubs
@@ -428,6 +430,39 @@ def test_blocking_callback_transform_final_invocation(dash_duo):
     f.send_keys("b")
     f.send_keys("c")
     dash_duo.wait_for_text_to_equal("#log", "abc", timeout=5)  # final invocation
+
+@pytest.mark.parametrize(
+    'args, kwargs',
+    [([Output("store", "children"), Input("btn", "n_clicks")], dict()),
+     ([], dict(output=Output("store", "children"),
+               inputs=dict(n_clicks=Input("btn", "n_clicks"))))])
+def test_dataclass_transform(dash_duo, args, kwargs):
+    @dataclass
+    class StateModel:
+        value: datetime
+        list_of_values: list[int]
+
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[DataclassTransform()])
+    app.layout = html.Div([
+        html.Button(id="btn"),
+        dcc.Store(id="store"),
+        html.Div(id="log"),
+    ])
+
+    @app.callback(Output("store", "data"), Input("btn", "n_clicks"))
+    def update_default(n_clicks: str):
+        return StateModel(value=datetime(2000, 1, 1), list_of_values=[1, 2, 3, 4, 5])
+
+    @app.callback(Output("log", "children"), Input("store", "data"))
+    def update_log(state: StateModel):
+        return f"{state.value.isoformat()}: {str(state.list_of_values)}"
+
+    # Check that stuff works. It doesn't using a normal Dash object.
+    dash_duo.start_server(app)
+    assert dash_duo.find_element("#log").text == ""
+    dash_duo.find_element("#btn").click()
+    time.sleep(0.1)  # wait for callback code to execute.
+    assert dash_duo.find_element("#log").text == "2000-01-01T00:00:00: [1, 2, 3, 4, 5]"
 
 
 @pytest.mark.parametrize(

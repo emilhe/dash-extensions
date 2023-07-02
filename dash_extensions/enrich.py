@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import dataclasses
 import functools
 import hashlib
+import inspect
 import json
 import logging
 import secrets
@@ -48,6 +50,7 @@ from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple, Optional
 from datetime import datetime
 from dash_extensions import CycleBreaker
+from dataclass_wizard import fromdict, asdict
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -1016,6 +1019,77 @@ def _output_id_without_wildcards(output: Output) -> str:
 
 # endregion
 
+# region SerializationTransform
+
+class SerializationTransform(DashTransform):
+
+    def apply_serverside(self, callbacks):
+        for callback in callbacks:
+            f = callback.f
+            callback.f = self._unpack_pack_callback(callback)(f)
+        return callbacks
+
+    def _try_load(self, data: Any, ann=None):
+        raise NotImplementedError
+
+    def _try_dump(self, obj: Any):
+        raise NotImplementedError
+
+    def _unpack_pack_callback(self, callback):
+        full_arg_spec = inspect.getfullargspec(callback.f)
+
+        def unpack_pack_args(f):
+            @functools.wraps(f)
+            def decorated_function(*args, **kwargs):
+                args = list(args)
+                # Replace args and kwargs. # TODO: Is recursion needed?
+                for i, arg in enumerate(args):
+                    an = full_arg_spec.annotations.get(full_arg_spec.args[i])
+                    # TODO: Pass annotation here also?
+                    value = [self._try_load(a, an) for a in arg] if isinstance(arg, list) else self._try_load(arg, an)
+                    args[i] = value
+                for key in kwargs:
+                    arg = kwargs[key]
+                    an = full_arg_spec.annotations.get(key)
+                    # TODO: Pass annotation here also?
+                    value = [self._try_load(a, an) for a in arg] if isinstance(arg, list) else self._try_load(arg, an)
+                    kwargs[key] = value
+                # Evaluate function.
+                data = f(*args, **kwargs)
+                # Capture outputs.
+                data = self._try_dump(data)
+                if isinstance(data, list):
+                    data = [self._try_dump(element) for element in data]
+                if isinstance(data, tuple):
+                    data = tuple([self._try_dump(element) for element in data])
+                if isinstance(data, dict):
+                    data = {key: self._try_dump(data[key]) for key in data}
+                return data
+
+            return decorated_function
+
+        return unpack_pack_args
+
+
+# endregion
+
+# region DataclassTransform
+
+class DataclassTransform(SerializationTransform):
+
+    def _try_load(self, data: Any, ann=None) -> Any:
+        if not dataclasses.is_dataclass(ann):
+            return data
+        return fromdict(ann, data)
+
+    def _try_dump(self, obj: Any) -> Any:
+        if not dataclasses.is_dataclass(obj):
+            return obj
+        return asdict(obj)
+
+
+# endregion
+
 # region Server side output transform
 
 
@@ -1097,7 +1171,7 @@ class EnrichedOutput(Output):
         self.arg_check = arg_check
 
 
-class ServersideOutputTransform(DashTransform):
+class ServersideOutputTransform(SerializationTransform):
     prefix: str = "SERVERSIDE_"
 
     def __init__(self,
@@ -1111,20 +1185,14 @@ class ServersideOutputTransform(DashTransform):
         # Setup registry for easy/fast access.
         self._backend_registry: Dict[str, ServersideBackend] = {backend.uid: backend for backend in backends}
 
-    def apply_serverside(self, callbacks):
-        for callback in callbacks:
-            f = callback.f
-            callback.f = self._unpack_pack_callback(callback)(f)
-        return callbacks
-
-    def _try_load(self, obj: Any) -> Any:
-        if not isinstance(obj, str):
-            return obj
-        if not obj.startswith(self.prefix):
-            return obj
-        data = json.loads(obj[len(self.prefix):])
-        backend = self._backend_registry[data["backend_uid"]]
-        value = backend.get(data["key"], ignore_expired=True)
+    def _try_load(self, data: Any, ann=None) -> Any:
+        if not isinstance(data, str):
+            return data
+        if not data.startswith(self.prefix):
+            return data
+        obj = json.loads(data[len(self.prefix):])
+        backend = self._backend_registry[obj["backend_uid"]]
+        value = backend.get(obj["key"], ignore_expired=True)
         return value
 
     def _try_dump(self, obj: Any) -> Any:
@@ -1140,35 +1208,6 @@ class ServersideOutputTransform(DashTransform):
         # Return lookup structure.
         data = dict(backend_uid=backend_uid, key=obj.key)
         return f"{self.prefix}{json.dumps(data)}"
-
-    def _unpack_pack_callback(self, callback):
-        def unpack_pack_args(f):
-            @functools.wraps(f)
-            def decorated_function(*args, **kwargs):
-                args = list(args)
-                # Replace args and kwargs. # TODO: Is recursion needed?
-                for i, arg in enumerate(args):
-                    value = [self._try_load(a) for a in arg] if isinstance(arg, list) else self._try_load(arg)
-                    args[i] = value
-                for key in kwargs:
-                    arg = kwargs[key]
-                    value = [self._try_load(a) for a in arg] if isinstance(arg, list) else self._try_load(arg)
-                    kwargs[key] = value
-                # Evaluate function.
-                data = f(*args, **kwargs)
-                # Capture serverside outputs.
-                data = self._try_dump(data)
-                if isinstance(data, list):
-                    data = [self._try_dump(element) for element in data]
-                if isinstance(data, tuple):
-                    data = tuple([self._try_dump(element) for element in data])
-                if isinstance(data, dict):
-                    data = {key: self._try_dump(data[key]) for key in data}
-                return data
-
-            return decorated_function
-
-        return unpack_pack_args
 
 
 class Serverside:
