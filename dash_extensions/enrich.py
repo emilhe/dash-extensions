@@ -1045,13 +1045,11 @@ class SerializationTransform(DashTransform):
                 # Replace args and kwargs. # TODO: Is recursion needed?
                 for i, arg in enumerate(args):
                     an = full_arg_spec.annotations.get(full_arg_spec.args[i])
-                    # TODO: Pass annotation here also?
                     value = [self._try_load(a, an) for a in arg] if isinstance(arg, list) else self._try_load(arg, an)
                     args[i] = value
                 for key in kwargs:
                     arg = kwargs[key]
                     an = full_arg_spec.annotations.get(key)
-                    # TODO: Pass annotation here also?
                     value = [self._try_load(a, an) for a in arg] if isinstance(arg, list) else self._try_load(arg, an)
                     kwargs[key] = value
                 # Evaluate function.
