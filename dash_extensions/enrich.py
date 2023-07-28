@@ -1068,6 +1068,8 @@ class SerializationTransform(DashTransform):
 
         return unpack_pack_args
 
+    def sort_key(self):
+        return 0
 
 # endregion
 
