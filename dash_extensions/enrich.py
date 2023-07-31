@@ -47,10 +47,12 @@ from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
 from more_itertools import flatten
 from collections import defaultdict
-from typing import Dict, Callable, List, Union, Any, Tuple, Optional
+from typing import Dict, Callable, List, Union, Any, Tuple, Optional, Generic, TypeVar
 from datetime import datetime
 from dash_extensions import CycleBreaker
 from dataclass_wizard import fromdict, asdict
+
+T = TypeVar("T")
 
 _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"}
 _wildcard_values = list(_wildcard_mappings.values())
@@ -1210,9 +1212,9 @@ class ServersideOutputTransform(SerializationTransform):
         return f"{self.prefix}{json.dumps(data)}"
 
 
-class Serverside:
+class Serverside(Generic[T]):
 
-    def __init__(self, value: Any, key: str = None, backend: Union[ServersideBackend, str, None] = None):
+    def __init__(self, value: T, key: str = None, backend: Union[ServersideBackend, str, None] = None):
         self.value = value
         self.key: str = str(uuid.uuid4()) if key is None else key
         self.backend_uid: str = backend.uid if isinstance(backend, ServersideBackend) else backend
