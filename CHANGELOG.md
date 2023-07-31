@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 31-07-23
+
+### Added
+
+- Added `SerializationTransform` and `DataclassTransform`
+
+### Changed
+
+- Dependencies updated
+
+### Removed
+
+- The `Ticker` component has been removed. With the underlying component no longer being maintained, its dependency version requirement had fallen behind
+
 ## [1.0.1] - 22-05-23
 
 ### Changed
