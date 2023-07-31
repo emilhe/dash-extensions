@@ -1,6 +1,5 @@
 /* eslint-disable import/prefer-default-export */
 import Lottie from "./components/Lottie.react";
-import Ticker from "./components/Ticker.react";
 import WebSocket from "./components/WebSocket.react";
 import BeforeAfter from "./components/BeforeAfter.react";
 import Mermaid from "./components/Mermaid.react";
@@ -13,7 +12,6 @@ import CycleBreaker from "./components/CycleBreaker.react";
 export {
     Lottie,
     WebSocket,
-    Ticker,
     BeforeAfter,
     Mermaid,
     DeferScript,
