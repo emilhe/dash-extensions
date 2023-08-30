@@ -19,3 +19,7 @@ The `enrich` module enables a number of _transforms_ that add functionality and/
 to name a few. To enable interactivity, the documentation has been moved to a [separate page](http://dash-extensions.com).
 
 NB: The 1.0.0 version introduces a number of breaking changes, see documentation for details.
+
+## Donation
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=Z9RXT5HVPK3B8&currency_code=DKK&source=url)
