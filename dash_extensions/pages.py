@@ -71,6 +71,7 @@ def setup_dynamic_components() -> html.Div:
 # endregion
 
 # region Utils
+
 def _prepare_container(container: Optional[Component] = None):
     container = _COMPONENT_CONTAINER if container is None else container
     # Make sure children is a list.
