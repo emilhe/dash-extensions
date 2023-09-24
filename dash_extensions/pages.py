@@ -44,7 +44,7 @@ def assign_container(component: Component, container: Component):
     :return: None
     """
     if component in _CONTAINER_REGISTRY:
-        raise ValueError("You can only register a component once.")
+        raise ValueError("You can assign a component to one container.")
     _CONTAINER_REGISTRY[component] = container
 
 
@@ -62,7 +62,7 @@ def setup_dynamic_components() -> html.Div:
     """
     Initializes the dynamic components and returns the (default) container into which the components are rendered.
     :return: the default container, into which dynamic components are rendered. Should be included in the layout,
-    unless all (dynamic) components are registered to custom containers (via 'register_component')
+    unless all (dynamic) components are assigned to custom containers (via 'assign_container')
     """
     _setup_callbacks()
     return _COMPONENT_CONTAINER
