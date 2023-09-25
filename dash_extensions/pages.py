@@ -18,13 +18,13 @@ _COMPONENT_CONTAINER = html.Div(id=_ID_CONTENT, disable_n_clicks=True)
 _original_register_page = dash.register_page
 
 
-def _register_page(*args, components=None, **kwargs):
+def _register_page(*args, dynamic_components=None, **kwargs):
     _original_register_page(*args, **kwargs)
-    if components is None:
+    if dynamic_components is None:
         return
     module = kwargs['module'] if 'module' in kwargs else args[0]
     page = dash.page_registry[module]
-    for component in components:
+    for component in dynamic_components:
         set_visible(component, page['path'])
 
 
@@ -83,6 +83,7 @@ def _prepare_container(container: Optional[Component] = None):
 
 
 def _setup_callbacks():
+    store = dash.dash._ID_STORE
     location = dash.dash._ID_LOCATION
     components = list(_PATH_REGISTRY.keys())
     for component in components:
@@ -92,7 +93,9 @@ def _setup_callbacks():
         container = _prepare_container(_CONTAINER_REGISTRY.get(component, _COMPONENT_CONTAINER))
         container.children.append(wrapper)
         # Setup callback.
-        f = f"function(x){{const paths = {_PATH_REGISTRY[component]}; return !paths.includes(x);}}"
-        clientside_callback(f, Output(wrapper, "hidden"), Input(location, "pathname"))
+        f = f"function(y, x){{const paths = {_PATH_REGISTRY[component]}; return !paths.includes(x);}}"
+        clientside_callback(f, Output(wrapper, "hidden"),
+                            Input(store, "data"),
+                            State(location, "pathname"))
 
 # endregion
