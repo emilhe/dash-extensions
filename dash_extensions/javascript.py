@@ -25,6 +25,11 @@ class Namespace:
         return variable(*all_args)
 
     def add(self, src, name=None):
+        # Check if the function already exists.
+        for key in self.f_map:
+            if name is None and self.f_map[key] == src:
+                return key
+        # Otherwise add it.
         name = f"function{len(self.f_map)}" if name is None else name
         self.f_map[name] = src
         return name

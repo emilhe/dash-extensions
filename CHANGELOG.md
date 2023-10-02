@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 31-07-23
+
+### Changed
+
+- Added `SerializationTransform` and `DataclassTransform`
+
 ## [1.0.3] - 31-07-23
 
 ### Added
