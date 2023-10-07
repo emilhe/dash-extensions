@@ -45,7 +45,7 @@ requests = "^2.31.0"
 certifi = "^2023.07.22"
 uvicorn = "^0.20.0"
 sse-starlette = "^1.2.1"
-urllib3 = "^1.26.9"
+urllib3 = "^1.26.17"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -927,7 +927,7 @@ def dynamic_prefix(app: Union[DashBlueprint, DashProxy], component: Component):
     if len(prefix_transforms) == 0:
         return
     prefix_transform: PrefixIdTransform = prefix_transforms[0]
-    prefix_component(prefix_transform.prefix, component, prefix_transform.escape)
+    prefix_recursively(component, prefix_transform.prefix, prefix_transform.prefix_func, prefix_transform.escape)
 
 
 # endregion
