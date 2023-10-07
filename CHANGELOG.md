@@ -11,11 +11,8 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Dependencies updated
-- A few bugfixes
-
-### Added
-
-- Added `SerializationTransform` and `DataclassTransform`
+- Dynamic prefixing is now applied recursively
+- Inline JS functions created using `assign` are now re-used if the code is identical
 
 ## [1.0.3] - 31-07-23
 
