@@ -17,6 +17,7 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: 16
+        registry-url: https://registry.npmjs.org/
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -34,9 +35,14 @@ jobs:
     - run: poetry --version
     - name: Install dependencies
       run: poetry install
-    - name: Build and publish
+    - name: Build and publish to npm
       run: |
         poetry run npm install | echo "Ignore npm install error"
         poetry run npm run build
+        poetry run npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    - name: Build and publish to pypi
+      run: |
         poetry build
         poetry publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}
