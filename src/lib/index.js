@@ -8,6 +8,7 @@ import Purify from "./components/Purify.react";
 import EventListener from "./components/EventListener.react";
 import EventSource from "./components/EventSource.react";
 import CycleBreaker from "./components/CycleBreaker.react";
+import Keyboard from "./components/Keyboard.react";
 
 export {
     Lottie,
@@ -18,5 +19,6 @@ export {
     Purify,
     EventListener,
     EventSource,
-    CycleBreaker
+    CycleBreaker,
+    Keyboard
 };

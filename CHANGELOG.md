@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 27-12-23
+
+### Added
+
+- Re-introduce `Keyboard` component (due to many user requests)
+
 ## [1.0.4] - 07-10-23
 
 ### Added

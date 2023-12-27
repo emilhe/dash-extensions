@@ -3,6 +3,7 @@ from .CycleBreaker import CycleBreaker
 from .DeferScript import DeferScript
 from .EventListener import EventListener
 from .EventSource import EventSource
+from .Keyboard import Keyboard
 from .Lottie import Lottie
 from .Mermaid import Mermaid
 from .Purify import Purify
@@ -14,6 +15,7 @@ __all__ = [
     "DeferScript",
     "EventListener",
     "EventSource",
+    "Keyboard",
     "Lottie",
     "Mermaid",
     "Purify",
