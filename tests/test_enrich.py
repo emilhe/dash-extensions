@@ -623,7 +623,11 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs):
 
     dash_duo.start_server(app)
     time.sleep(0.1)
-    logs = dash_duo.get_logs()
+    logs = [
+        entry
+        for entry in dash_duo.driver.get_log("browser")
+        if entry["timestamp"] > dash_duo._last_ts
+    ]
     assert len(logs) <= int(os.environ.get("TEST_CYCLE_BREAKER_ALLOWED_ERRORS", "0"))
     f = dash_duo.find_element("#fahrenheit")
     f.send_keys("32")
