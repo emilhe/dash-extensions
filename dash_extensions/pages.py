@@ -141,13 +141,9 @@ def _setup_callbacks():
             # Setup callback.
             f = f"""function(y, x){{
                 const path_map = JSON.parse(\'{json.dumps(path_map)}\'); 
-                console.log(path_map);
-                console.log(x);
                 if (x in path_map){{
-                    console.log("RETURN X");
                     return path_map[x];
                 }}
-                console.log("RETURN DEFAULT");
                 return JSON.parse(\'{json.dumps(default)}\'); 
             }}"""
             clientside_callback(f, Output(component, prop, allow_duplicate=True),
