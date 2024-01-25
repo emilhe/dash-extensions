@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 25-01-23
+
+### Changed
+
+- Fixed bug in `BlockingCallbackTransform` component where the callback would never get invoked again, if an (uncaught) exception was raised during execution. Contributed by [lcornelatti](https://github.com/lcornelatti).
+
 ## [1.0.7] - 27-12-23
 
 ### Added
