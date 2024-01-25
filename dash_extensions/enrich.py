@@ -602,7 +602,7 @@ class BlockingCallbackTransform(StatefulDashTransform):
                 State(start_blocked_id, "data")
             )
             # Modify the original callback to send finished signal.
-            single_output = len(callback.outputs) <= 1
+            num_outputs = len(callback.outputs)
             out_flex_key = callback.outputs.append(Output(end_server_id, "data"))
             # Change original inputs to state.
             for i, item in enumerate(callback.inputs):
@@ -612,22 +612,28 @@ class BlockingCallbackTransform(StatefulDashTransform):
             st_flex_key = callback.inputs.append(State(start_client_ctx, "data"))
             # Modify the callback function accordingly.
             f = callback.f
-            callback.f = skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key, st_flex_key)(f)
+            callback.f = skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, st_flex_key)(f)
 
         return callbacks
 
 
-def skip_input_signal_add_output_signal(single_output, out_flex_key, in_flex_key, st_flex_key):
+def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, st_flex_key):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
             args, kwargs, fltr = _skip_inputs(args, kwargs, [in_flex_key, st_flex_key])
             cached_ctx = fltr[1]
+            single_output = num_outputs <= 1
             if cached_ctx is not None and "triggered" in cached_ctx:
                 ctx = context_value.get()
                 ctx["triggered_inputs"] = cached_ctx["triggered"]
                 context_value.set(ctx)
-            outputs = f(*args, **kwargs)
+            try:
+                outputs = f(*args, **kwargs)
+            except Exception:
+                logging.exception(f"Exception raised in blocking callback [{f.__name__}]")
+                outputs = no_update if single_output else [no_update] * num_outputs       
+            
             return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
 
         return decorated_function
