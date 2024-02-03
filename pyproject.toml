@@ -35,7 +35,7 @@ dataclass-wizard = "^0.22.2"
 mantine = ["dash-mantine-components"]
 
 [tool.poetry.dev-dependencies]
-dash = {extras = ["dev", "testing"], version = "^2.8.1"}
+dash = {extras = ["dev", "testing"], version = "^2.15.0"}
 pytest-cov = "^4.0.0"
 black = "^22.12.0"
 pandas = ">=1.5.3"
