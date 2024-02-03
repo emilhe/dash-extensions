@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.11] - 03-02-23
+
+### Changed
+
+- Add `useCapture` property to `EventListener` and `Keyboard` components, thereby fixing [#255](https://github.com/emilhe/dash-extensions/issues/255).
+
 ## [1.0.10] - 03-02-23
 
 ### Changed
