@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.10] - 03-02-23
+
+### Changed
+
+- Update dependencies, including `Flask-caching`, thereby fixing [#296](https://github.com/emilhe/dash-extensions/issues/296).
+
 ## [1.0.9] - 03-02-23
 
 ### Changed
