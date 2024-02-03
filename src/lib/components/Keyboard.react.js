@@ -51,12 +51,12 @@ export default class Keyboard extends Component {
 
     componentDidMount() {
         this.getSources().forEach(s => s.addEventListener("keydown", this.keydownHandler, false));
-        this.getSources().forEach(s =>  s.addEventListener("keyup", this.keydownHandler, false));
+        this.getSources().forEach(s =>  s.addEventListener("keyup", this.keyupHandler, false));
     }
 
     componentWillUnmount() {
         this.getSources().forEach(s => s.removeEventListener("keydown", this.keydownHandler, false));
-        this.getSources().forEach(s => s.removeEventListener("keyup", this.keydownHandler, false));
+        this.getSources().forEach(s => s.removeEventListener("keyup", this.keyupHandler, false));
     }
 
     render() {

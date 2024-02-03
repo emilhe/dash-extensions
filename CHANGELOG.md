@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9] - 03-02-23
+
+### Changed
+
+- Fixed bug in `Keyboard` component where the keydown event would fire twice.
+
 ## [1.0.8] - 25-01-23
 
 ### Changed
