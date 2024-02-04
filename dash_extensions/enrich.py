@@ -656,7 +656,7 @@ class LogConfig:
 
 def setup_notifications_log_config():
     log_id = "notifications_provider"
-    log_output = Output(log_id, "children")
+    log_output = Output(log_id, "children", allow_duplicate=True)
 
     def notification_layout_transform(layout: List[Component]):
         import dash_mantine_components as dmc
@@ -674,7 +674,7 @@ def setup_div_log_config():
         layout.append(html.Div(id=log_id))
         return layout
 
-    log_output = Output(log_id, "children")
+    log_output = Output(log_id, "children", allow_duplicate=True)
     return LogConfig(log_output, get_default_log_writers(), div_layout_transform)
 
 

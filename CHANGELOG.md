@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## [1.0.12] - 04-02-23
+
+### Changed
+
+- Set `allow_duplicate=True` for the default logging configurations for the `LogTransform`, thereby fixing [#280](https://github.com/emilhe/dash-extensions/issues/280).
+
 ## [1.0.11] - 03-02-23
 
 ### Changed
