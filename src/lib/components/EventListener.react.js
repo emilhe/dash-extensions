@@ -35,12 +35,12 @@ export default class EventListener extends Component {
 
     componentDidMount() {
         const events = this.props.events.map(o => o["event"]);
-        this.getSources().forEach(s => events.forEach(e => s.addEventListener(e, this.eventHandler, false)));
+        this.getSources().forEach(s => events.forEach(e => s.addEventListener(e, this.eventHandler, this.props.useCapture)));
     }
 
     componentWillUnmount() {
         const events = this.props.events.map(o => o["event"]);
-        this.getSources().forEach(s => events.forEach(e => s.removeEventListener(e, this.eventHandler, false)));
+        this.getSources().forEach(s => events.forEach(e => s.removeEventListener(e, this.eventHandler, this.props.useCapture)));
     }
 
     render() {
@@ -55,6 +55,7 @@ EventListener.defaultProps = {
     event: {},
     n_events: 0,
     logging: false,
+    useCapture: false
 };
 
 EventListener.propTypes = {
@@ -107,6 +108,11 @@ EventListener.propTypes = {
     /**
      * The number of events fired.
      */
-    n_events: PropTypes.number
+    n_events: PropTypes.number,
+
+    /**
+     * Value of useCapture used when registering event listeners.
+     */
+    useCapture: PropTypes.bool
 
 };

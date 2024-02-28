@@ -2,11 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.8] - UNRELEASED
+## [1.0.13] - UNRELEASED
 
 ### Added
 
 - Add new dynamic props concept (for pages)
+
+## [1.0.12] - 04-02-23
+
+### Changed
+
+- Set `allow_duplicate=True` for the default logging configurations for the `LogTransform`, thereby fixing [#280](https://github.com/emilhe/dash-extensions/issues/280).
+
+## [1.0.11] - 03-02-23
+
+### Changed
+
+- Add `useCapture` property to `EventListener` and `Keyboard` components, thereby fixing [#255](https://github.com/emilhe/dash-extensions/issues/255).
+
+## [1.0.10] - 03-02-23
+
+### Changed
+
+- Update dependencies, including `Flask-caching`, thereby fixing [#296](https://github.com/emilhe/dash-extensions/issues/296).
+
+## [1.0.9] - 03-02-23
+
+### Changed
+
+- Fixed bug in `Keyboard` component where the keydown event would fire twice.
+
+## [1.0.8] - 25-01-23
+
+### Changed
+
+- Fixed bug in `BlockingCallbackTransform` component where the callback would never get invoked again, if an (uncaught) exception was raised during execution. Contributed by [lcornelatti](https://github.com/lcornelatti).
 
 ## [1.0.7] - 27-12-23
 

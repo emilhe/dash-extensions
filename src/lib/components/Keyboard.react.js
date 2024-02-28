@@ -50,13 +50,13 @@ export default class Keyboard extends Component {
     }
 
     componentDidMount() {
-        this.getSources().forEach(s => s.addEventListener("keydown", this.keydownHandler, false));
-        this.getSources().forEach(s =>  s.addEventListener("keyup", this.keydownHandler, false));
+        this.getSources().forEach(s => s.addEventListener("keydown", this.keydownHandler, this.props.useCapture));
+        this.getSources().forEach(s =>  s.addEventListener("keyup", this.keyupHandler, this.props.useCapture));
     }
 
     componentWillUnmount() {
-        this.getSources().forEach(s => s.removeEventListener("keydown", this.keydownHandler, false));
-        this.getSources().forEach(s => s.removeEventListener("keyup", this.keydownHandler, false));
+        this.getSources().forEach(s => s.removeEventListener("keydown", this.keydownHandler, this.props.useCapture));
+        this.getSources().forEach(s => s.removeEventListener("keyup", this.keyupHandler, this.props.useCapture));
     }
 
     render() {
@@ -70,7 +70,8 @@ Keyboard.defaultProps = {
     eventProps: ["key", "altKey", "ctrlKey", "shiftKey","metaKey", "repeat"],
     n_keydowns: 0,
     n_keyups: 0,
-    keys_pressed: {}
+    keys_pressed: {},
+    useCapture: false
 };
 
 
@@ -143,7 +144,11 @@ Keyboard.propTypes = {
      /**
      * A counter, which is incremented on each key up event, similar to n_clicks for buttons.
      */
-    n_keyups: PropTypes.number
+    n_keyups: PropTypes.number,
 
+    /**
+     * Value of useCapture used when registering event listeners.
+     */
+    useCapture: PropTypes.bool
 
 };
