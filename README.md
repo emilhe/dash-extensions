@@ -3,12 +3,13 @@
 [![Testing](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml/badge.svg)](https://github.com/thedirtyfew/dash-extensions/actions/workflows/python-test.yml)
 [![CodeQL](https://github.com/thedirtyfew/dash-extensions/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/thedirtyfew/dash-extensions/actions/workflows/codeql-analysis.yml)
 
-The `dash-extensions` package is a collection of utility functions, syntax extensions, and Dash components that aim to improve the Dash development experience. It can be divided in four main pillars,
+The `dash-extensions` package is a collection of utility functions, syntax extensions, and Dash components that aim to improve the Dash development experience. It can be divided in five main pillars,
 
 * The `enrich` module, which contains various enriched versions of Dash components
 * A number of custom components, e.g. the `Websocket` component, which enables real-time communication and push notifications
 * The `javascript` module, which contains functionality to ease the interplay between Dash and JavaScript
-* The `snippets` module, which contains a collection of utility functions (documentation limited to source code comments)
+* The `pages` module, which extends the functionality of [Dash Pages](https://dash.plotly.com/urls)
+* The `snippets/validation` modules, which contains a collection of utility functions (documentation limited to source code comments)
 
 The `enrich` module enables a number of _transforms_ that add functionality and/or syntactic sugar to Dash. Examples include
 
