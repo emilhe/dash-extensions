@@ -2,11 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.13] - UNRELEASED
+## [1.0.13] - 05-03-24
 
 ### Added
 
-- Add new dynamic props concept (for pages)
+- Add new `pages` module, which introduces the `page components` and `page properties` concepts
+- Add new `validate` module, which adds an `assert_no_random_ids` that assets that Dash didn't generate any random component ids
 
 ## [1.0.12] - 04-02-23
 
