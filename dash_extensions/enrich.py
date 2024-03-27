@@ -11,8 +11,6 @@ import struct
 import sys
 import threading
 import uuid
-from itertools import compress
-
 import plotly
 import dash
 
@@ -47,6 +45,7 @@ from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-impor
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
+from itertools import compress
 from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple, Optional, Generic, TypeVar
