@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.15] - UNRELEASED
+
+- Add new `Loading` component
+
 ## [1.0.14] - 05-03-24
 
 - Add new `validate` module, which adds an `assert_no_random_ids` that assets that Dash didn't generate any random component ids

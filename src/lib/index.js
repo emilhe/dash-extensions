@@ -9,6 +9,7 @@ import EventListener from "./components/EventListener.react";
 import EventSource from "./components/EventSource.react";
 import CycleBreaker from "./components/CycleBreaker.react";
 import Keyboard from "./components/Keyboard.react";
+import Loading from "./components/Loading.react";
 
 export {
     Lottie,
@@ -20,5 +21,6 @@ export {
     EventListener,
     EventSource,
     CycleBreaker,
-    Keyboard
+    Keyboard,
+    Loading
 };
