@@ -307,13 +307,19 @@ class DashBlueprint:
         return callbacks, clientside_callbacks
 
     # TODO: Include or not? The plugin still seems a bit immature.
-    def register(self, app: Union[dash.Dash, DashProxy], module, prefix=None, **kwargs):
-        if prefix is not None:
+    def register(self, app: Union[dash.Dash, DashProxy], module, prefix: Union[str, PrefixIdTransform, None]=None, **kwargs):      
+        # Deal with the prefix -> # prefix can be a string but now also custom PrefixIdTransform instance
+        if isinstance(prefix, str) and prefix:                                                  
+            # Create a PrefixIdTransform if prefix is a non-empty string and append it to transforms.
             prefix_transform = PrefixIdTransform(prefix)
             self.transforms.append(prefix_transform)
+        elif prefix is not None:                                                        
+            # Register the prefix as an instance of PrefixIdTransform or similar.      
+            self.transforms.append(prefix)                                            
+        # Register the callbacks and page.
         self.register_callbacks(app)
         dash.register_page(module, layout=self._layout_value, **kwargs)
-
+    
     def clear(self):
         self.callbacks = []
         self.clientside_callbacks = []
