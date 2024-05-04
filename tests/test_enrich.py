@@ -286,6 +286,42 @@ def test_trigger_transform(dash_duo):
     assert log.text == "1-1"
 
 
+def test_trigger_transform_clientside(dash_duo):
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[TriggerTransform()])
+    app.layout = html.Div([
+        html.Button(id="btn1"),
+        html.Button(id="btn2"),
+        html.Button(id="btn3"),
+        html.Button(id="btn4"),
+        html.Div(id="log"),
+    ])
+
+    app.clientside_callback(
+        """(nClicks2, nClicks4) => `${nClicks2}-${nClicks4}`""",
+        Output("log", "children"),
+        Trigger("btn1", "n_clicks"),
+        Input("btn2", "n_clicks"),
+        Trigger("btn3", "n_clicks"),
+        State("btn4", "n_clicks"))
+
+    # Check that the app works.
+    dash_duo.start_server(app)
+    log = dash_duo.find_element("#log")
+    assert log.text == ""
+    dash_duo.find_element("#btn1").click()
+    time.sleep(0.1)
+    assert log.text == "undefined-undefined"
+    dash_duo.find_element("#btn2").click()
+    time.sleep(0.1)
+    assert log.text == "1-undefined"
+    dash_duo.find_element("#btn4").click()
+    time.sleep(0.1)
+    assert log.text == "1-undefined"
+    dash_duo.find_element("#btn3").click()
+    time.sleep(0.1)
+    assert log.text == "1-1"
+
+
 @pytest.mark.parametrize(
     'args, kwargs',
     [([Output("log", "children"), Input("right", "n_clicks")], dict()),

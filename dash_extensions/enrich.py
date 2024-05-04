@@ -45,6 +45,7 @@ from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-impor
 from dash.development.base_component import Component
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
+from itertools import compress
 from more_itertools import flatten
 from collections import defaultdict
 from typing import Dict, Callable, List, Union, Any, Tuple, Optional, Generic, TypeVar
@@ -973,8 +974,6 @@ class Trigger(Input):
 
 class TriggerTransform(DashTransform):
 
-    # NOTE: This transform cannot be implemented for clientside callbacks since the JS can't be modified from here.
-
     def apply_serverside(self, callbacks):
         for callback in callbacks:
             is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
@@ -984,6 +983,24 @@ class TriggerTransform(DashTransform):
             # If so, filter the callback args.
             f = callback.f
             callback.f = filter_args(is_trigger)(f)
+        return callbacks
+
+    def apply_clientside(self, callbacks):
+        for callback in callbacks:
+            is_not_trigger = [not isinstance(item, Trigger) for item in callback.inputs]
+            # Check if any triggers are there.
+            if all(is_not_trigger):
+                continue
+            # If so, filter the callback args.
+            args = [f"arg{i}" for i in range(len(callback.inputs))]
+            filtered_args = compress(args, is_not_trigger)
+            if isinstance(callback.f, ClientsideFunction):
+                callback.f = f"window.dash_clientside['{callback.f.namespace}']['{callback.f.function_name}']"
+            callback.f = f"""
+function({", ".join(args)}) {{
+const func = {callback.f};
+return func({", ".join(filtered_args)});
+}}"""
         return callbacks
 
 
