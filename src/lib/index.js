@@ -10,6 +10,7 @@ import EventSource from "./components/EventSource.react";
 import CycleBreaker from "./components/CycleBreaker.react";
 import Keyboard from "./components/Keyboard.react";
 import Loading from "./components/Loading.react";
+import StreamingBuffer from "./components/StreamingBuffer.react";
 
 export {
     Lottie,
@@ -22,5 +23,6 @@ export {
     EventSource,
     CycleBreaker,
     Keyboard,
-    Loading
+    Loading,
+    StreamingBuffer
 };
