@@ -857,6 +857,27 @@ def register(blueprint: DashBlueprint, name: str, prefix=None, **kwargs):
 
 class PrefixIdTransform(DashTransform):
     def __init__(self, prefix, prefix_func=None, escape=None):
+        """
+        The PrefixIdTransform adds a prefix to all component ids of the DashBlueprint, including 
+        their references in callbacks. It is typically used to avoid ID collisions between 
+        blueprints when they are registered on or embedded in the main Dash application.
+
+        Args:
+            prefix (str): The prefix that will be added to the component_ids.
+            prefix_func (callable(str, Component, callable(str)): A function used to modify
+                the ID of the components. This function must accept three arguments: the 
+                prefix string, a Dash component, and the escape function. If not provided,
+                the `prefix_component()` function is used, which relies on `apply_prefix()` 
+                to calculate the new ID.
+            escape (callable(str)): A function that will be called by `apply_prefix()` to 
+                determine whether the component's ID should remain unaltered (escaped). The
+                function should accept a string (the component_id) and return a boolean. 
+                By default, `default_prefix_escape()` is used, which avoids modifying 
+                certain IDs that start with "a-" or "anchor-".
+
+        Note: `PrefixIdTransform` is automatically registered as `transforms` by 
+               the `DashBlueprint.register()` method when the `prefix` parameter is specified.
+        """
         super().__init__()
         self.prefix = prefix
         self.prefix_func = prefix_func if prefix_func is not None else prefix_component
