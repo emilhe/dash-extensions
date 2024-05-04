@@ -2,19 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.15] - UNRELEASED
+## [1.0.15] - 05-04-24
 
-- Add new `Loading` component
+- Add new `Loading` component, which makes it possible to block events (e.g. keyboard input) while a component is loading.
+- Add support for client side callbacks in the `TriggerTransform`. Contributed by [lcornelatti](https://github.com/andressommerhoff).
 
 ## [1.0.14] - 05-03-24
 
-- Add new `validate` module, which adds an `assert_no_random_ids` that assets that Dash didn't generate any random component ids
+- Add new `validate` module, which adds an `assert_no_random_ids` that assets that Dash didn't generate any random component ids.
 
 ## [1.0.13] - 05-03-24
 
 ### Added
 
-- Add new `pages` module, which introduces the `page components` and `page properties` concepts
+- Add new `pages` module, which introduces the `page components` and `page properties` concepts.
 
 ## [1.0.12] - 04-02-23
 

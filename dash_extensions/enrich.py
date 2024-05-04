@@ -309,14 +309,10 @@ class DashBlueprint:
 
     # TODO: Include or not? The plugin still seems a bit immature.
     def register(self, app: Union[dash.Dash, DashProxy], module, prefix: Union[str, PrefixIdTransform, None]=None, **kwargs):      
-        # Deal with the prefix -> # prefix can be a string but now also custom PrefixIdTransform instance
-        if isinstance(prefix, str) and prefix:                                                  
-            # Create a PrefixIdTransform if prefix is a non-empty string and append it to transforms.
-            prefix_transform = PrefixIdTransform(prefix)
-            self.transforms.append(prefix_transform)
-        elif prefix is not None:                                                        
-            # Register the prefix as an instance of PrefixIdTransform or similar.      
-            self.transforms.append(prefix)                                            
+        # Add prefix transform if supplied.
+        if prefix is not None:
+            prefix_transform = prefix if isinstance(prefix, PrefixIdTransform) else PrefixIdTransform(prefix)
+            self.transforms.append(prefix_transform)                                          
         # Register the callbacks and page.
         self.register_callbacks(app)
         dash.register_page(module, layout=self._layout_value, **kwargs)
@@ -669,7 +665,7 @@ def setup_notifications_log_config():
         import dash_mantine_components as dmc
 
         layout.append(html.Div(id=log_id))
-        return [dmc.NotificationsProvider(layout)]
+        return [dmc.NotificationProvider(layout)]
 
     return LogConfig(log_output, get_notification_log_writers(), notification_layout_transform)
 
