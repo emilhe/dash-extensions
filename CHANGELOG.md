@@ -4,10 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.15] - 05-04-24
 
+### Added
+
 - Add new `Loading` component, which makes it possible to block events (e.g. keyboard input) while a component is loading.
 - Add support for client side callbacks in the `TriggerTransform`. Contributed by [lcornelatti](https://github.com/andressommerhoff).
 
+ ### Changed
+
+ - Updated dependencies, including `dash` to `2.17.0`, and `dash-mantine-components` (optional) to `0.14.3`. The latter includes breaking changes, e.g. the renaming of `NotificationsProvider` to `NotificationProvider`
+
 ## [1.0.14] - 05-03-24
+
+### Added
 
 - Add new `validate` module, which adds an `assert_no_random_ids` that assets that Dash didn't generate any random component ids.
 
