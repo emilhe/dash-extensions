@@ -328,7 +328,10 @@ class DashBlueprint:
             layout = transform.layout(layout, self._layout_is_function)
         return layout
 
-    def embed(self, app: DashProxy):
+    def embed(self, app: Union[DashBlueprint, DashProxy]):
+        if isinstance(app, DashBlueprint):
+            self.register_callbacks(app)
+            return self._layout_value()
         if app.blueprint._layout_is_function and app._got_first_request["setup_server"]:
             return self._layout_value()
         self.register_callbacks(app)
@@ -662,11 +665,14 @@ def setup_notifications_log_config():
     log_output = Output(log_id, "children", allow_duplicate=True)
 
     def notification_layout_transform(layout: List[Component]):
-        layout.append(html.Div(id=log_id))
         import dash_mantine_components as dmc
+
+        layout.append(html.Div(id=log_id))
         if dmc.__version__ < "0.14.0":
-            return [dmc.NotificationsProvider(layout)]
-        return [dmc.NotificationProvider(layout)]
+            layout.append(dmc.NotificationsProvider())
+        layout.append(dmc.NotificationProvider())
+
+        return layout
 
     return LogConfig(log_output, get_notification_log_writers(), notification_layout_transform)
 
