@@ -8,6 +8,8 @@ const StreamingBuffer = ({url, withCredentials, setProps}) => {
     const [data, setData] = useState("");
 
     useEffect(() => {
+        if(!url){return () => {};}
+
         const sse = new EventSource(url, { withCredentials: withCredentials });
         
         function parseMessage(e) {
@@ -24,6 +26,7 @@ const StreamingBuffer = ({url, withCredentials, setProps}) => {
         sse.onmessage = e => parseMessage(e);
         // Close on error.
         sse.onerror = (e) => {
+          console.log("ERROR");
           console.log(e);
           sse.close();
         }

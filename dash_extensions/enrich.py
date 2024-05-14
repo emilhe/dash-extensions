@@ -662,9 +662,10 @@ def setup_notifications_log_config():
     log_output = Output(log_id, "children", allow_duplicate=True)
 
     def notification_layout_transform(layout: List[Component]):
-        import dash_mantine_components as dmc
-
         layout.append(html.Div(id=log_id))
+        import dash_mantine_components as dmc
+        if dmc.__version__ < "0.14.0":
+            return [dmc.NotificationsProvider(layout)]
         return [dmc.NotificationProvider(layout)]
 
     return LogConfig(log_output, get_notification_log_writers(), notification_layout_transform)
