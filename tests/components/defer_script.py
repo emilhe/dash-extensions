@@ -8,7 +8,11 @@ mxgraph = r"{&quot;highlight&quot;:&quot;#0000ff&quot;,&quot;nav&quot;:true,&quo
 app = Dash(__name__)
 app.layout = html.Div(
     [
-        html.Div(className="mxgraph", style={"maxWidth": "100%"}, **{"data-mxgraph": unescape(mxgraph)}),
+        html.Div(
+            className="mxgraph",
+            style={"maxWidth": "100%"},
+            **{"data-mxgraph": unescape(mxgraph)},
+        ),
         DeferScript(src="https://viewer.diagrams.net/js/viewer-static.min.js"),
     ]
 )

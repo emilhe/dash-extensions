@@ -149,7 +149,9 @@ class DependencyCollection:
                 self._re_index()
                 return i
         if isinstance(self.structure, dict):
-            flex_key = f"{DEPENDENCY_APPEND_PREFIX}{i}" if flex_key is None else flex_key
+            flex_key = (
+                f"{DEPENDENCY_APPEND_PREFIX}{i}" if flex_key is None else flex_key
+            )
             self.structure[flex_key] = value
             self._re_index()
             return flex_key
@@ -198,11 +200,17 @@ class CallbackBlueprint:
         if "inputs" in kwargs:
             self.inputs = DependencyCollection(kwargs.pop("inputs"), keyword="inputs")
         if "state" in kwargs:
-            raise ValueError("Please use the 'inputs' keyword instead of the 'state' keyword.")
+            raise ValueError(
+                "Please use the 'inputs' keyword instead of the 'state' keyword."
+            )
         # Collect dummy elements.
         if kwargs.get("background", False) and "progress" in kwargs:
             # This element represents the set_progress function.
-            self.inputs.append(DummyDependency("function", "set_progress"), index=0, flex_key="set_progress")
+            self.inputs.append(
+                DummyDependency("function", "set_progress"),
+                index=0,
+                flex_key="set_progress",
+            )
         # Collect the rest.
         self.kwargs: Dict[str, Any] = kwargs
         self.f = None
@@ -233,7 +241,9 @@ class CallbackBlueprint:
         if isinstance(self.f, (ClientsideFunction, str)):
             f_repr = repr(self.f)  # handles clientside functions
         else:
-            f_repr = f"{self.f.__module__}.{self.f.__name__}"  # handles Python functions
+            f_repr = (
+                f"{self.f.__module__}.{self.f.__name__}"  # handles Python functions
+            )
         f_hash = hashlib.md5(f_repr.encode()).digest()
         return str(uuid.UUID(bytes=f_hash, version=4))
 
@@ -251,7 +261,11 @@ class CallbackBlueprint:
 
 
 class DashBlueprint:
-    def __init__(self, transforms: List[DashTransform] = None, include_global_callbacks: bool = False):
+    def __init__(
+        self,
+        transforms: List[DashTransform] = None,
+        include_global_callbacks: bool = False,
+    ):
         self.callbacks: List[CallbackBlueprint] = []
         self.clientside_callbacks: List[CallbackBlueprint] = []
         self.transforms = _resolve_transforms(transforms)
@@ -294,7 +308,9 @@ class DashBlueprint:
         for cbp in callbacks + clientside_callbacks:
             cbp.register(app)
 
-    def _resolve_callbacks(self) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
+    def _resolve_callbacks(
+        self,
+    ) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
         """
         This method resolves the callbacks, i.e. it applies the callback injections.
         """
@@ -305,16 +321,26 @@ class DashBlueprint:
             clientside_callbacks += GLOBAL_BLUEPRINT.clientside_callbacks
         # Proceed as before.
         for transform in self.transforms:
-            callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
+            callbacks, clientside_callbacks = transform.apply(
+                callbacks, clientside_callbacks
+            )
         return callbacks, clientside_callbacks
 
     # TODO: Include or not? The plugin still seems a bit immature.
     def register(
-        self, app: Union[dash.Dash, DashProxy], module, prefix: Union[str, PrefixIdTransform, None] = None, **kwargs
+        self,
+        app: Union[dash.Dash, DashProxy],
+        module,
+        prefix: Union[str, PrefixIdTransform, None] = None,
+        **kwargs,
     ):
         # Add prefix transform if supplied.
         if prefix is not None:
-            prefix_transform = prefix if isinstance(prefix, PrefixIdTransform) else PrefixIdTransform(prefix)
+            prefix_transform = (
+                prefix
+                if isinstance(prefix, PrefixIdTransform)
+                else PrefixIdTransform(prefix)
+            )
             self.transforms.append(prefix_transform)
         # Register the callbacks and page.
         self.register_callbacks(app)
@@ -326,7 +352,9 @@ class DashBlueprint:
         self.transforms = []
 
     def _layout_value(self, *args, **kwargs):
-        layout = self._layout(*args, **kwargs) if self._layout_is_function else self._layout
+        layout = (
+            self._layout(*args, **kwargs) if self._layout_is_function else self._layout
+        )
         for transform in self.transforms:
             layout = transform.layout(layout, self._layout_is_function)
         return layout
@@ -371,7 +399,9 @@ class DashProxy(dash.Dash):
         prevent_initial_callbacks="initial_duplicate",
         **kwargs,
     ):
-        super().__init__(*args, prevent_initial_callbacks=prevent_initial_callbacks, **kwargs)
+        super().__init__(
+            *args, prevent_initial_callbacks=prevent_initial_callbacks, **kwargs
+        )
         self.blueprint = (
             DashBlueprint(transforms, include_global_callbacks=include_global_callbacks)
             if blueprint is None
@@ -421,7 +451,9 @@ class DashProxy(dash.Dash):
         """
         # Change properties.
         readonly_props = app.config.__dict__.get("_read_only", {})
-        app.config.update({k: v for k, v in self.config.items() if k not in readonly_props})
+        app.config.update(
+            {k: v for k, v in self.config.items() if k not in readonly_props}
+        )
         app.title = self.title
         app.index_string = self.index_string
         # Inject layout.
@@ -476,7 +508,9 @@ class DashTransform:
         self.layout_initialized = False
 
     def apply(self, callbacks, clientside_callbacks):
-        return self.apply_serverside(callbacks), self.apply_clientside(clientside_callbacks)
+        return self.apply_serverside(callbacks), self.apply_clientside(
+            clientside_callbacks
+        )
 
     def apply_serverside(self, callbacks):
         return callbacks  # per default do nothing
@@ -604,9 +638,17 @@ class BlockingCallbackTransform(StatefulDashTransform):
             }}"""
             self.blueprint.clientside_callback(
                 start_callback,
-                [Output(start_client_id, "data"), Output(start_blocked_id, "data"), Output(start_client_ctx, "data")],
+                [
+                    Output(start_client_id, "data"),
+                    Output(start_blocked_id, "data"),
+                    Output(start_client_ctx, "data"),
+                ],
                 [Input(end_blocked_id, "dst")] + list(callback.inputs),
-                [State(start_client_id, "data"), State(end_client_id, "data"), State(start_client_ctx, "data")],
+                [
+                    State(start_client_id, "data"),
+                    State(end_client_id, "data"),
+                    State(start_client_ctx, "data"),
+                ],
             )
             # Bind end signal callback.
             end_callback = """function(endServerId, startBlockedId)
@@ -634,12 +676,16 @@ class BlockingCallbackTransform(StatefulDashTransform):
             st_flex_key = callback.inputs.append(State(start_client_ctx, "data"))
             # Modify the callback function accordingly.
             f = callback.f
-            callback.f = skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, st_flex_key)(f)
+            callback.f = skip_input_signal_add_output_signal(
+                num_outputs, out_flex_key, in_flex_key, st_flex_key
+            )(f)
 
         return callbacks
 
 
-def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, st_flex_key):
+def skip_input_signal_add_output_signal(
+    num_outputs, out_flex_key, in_flex_key, st_flex_key
+):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
@@ -653,10 +699,14 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
             try:
                 outputs = f(*args, **kwargs)
             except Exception:
-                logging.exception(f"Exception raised in blocking callback [{f.__name__}]")
+                logging.exception(
+                    f"Exception raised in blocking callback [{f.__name__}]"
+                )
                 outputs = no_update if single_output else [no_update] * num_outputs
 
-            return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
+            return _append_output(
+                outputs, datetime.utcnow().timestamp(), single_output, out_flex_key
+            )
 
         return decorated_function
 
@@ -694,7 +744,9 @@ def setup_notifications_log_config():
 
         return layout
 
-    return LogConfig(log_output, get_notification_log_writers(), notification_layout_transform)
+    return LogConfig(
+        log_output, get_notification_log_writers(), notification_layout_transform
+    )
 
 
 def setup_div_log_config():
@@ -720,18 +772,35 @@ def get_notification_log_writers():
     import dash_mantine_components as dmc
 
     def _default_kwargs(color, title, message):
-        return dict(color=color, title=title, message=message, id=str(uuid.uuid4()), action="show", autoClose=False)
+        return dict(
+            color=color,
+            title=title,
+            message=message,
+            id=str(uuid.uuid4()),
+            action="show",
+            autoClose=False,
+        )
 
     def log_info(message, **kwargs):
-        return dmc.Notification(**{**_default_kwargs("blue", "Info", message), **kwargs})
+        return dmc.Notification(
+            **{**_default_kwargs("blue", "Info", message), **kwargs}
+        )
 
     def log_warning(message, **kwargs):
-        return dmc.Notification(**{**_default_kwargs("yellow", "Warning", message), **kwargs})
+        return dmc.Notification(
+            **{**_default_kwargs("yellow", "Warning", message), **kwargs}
+        )
 
     def log_error(message, **kwargs):
-        return dmc.Notification(**{**_default_kwargs("red", "Error", message), **kwargs})
+        return dmc.Notification(
+            **{**_default_kwargs("red", "Error", message), **kwargs}
+        )
 
-    return {logging.INFO: log_info, logging.WARNING: log_warning, logging.ERROR: log_error}
+    return {
+        logging.INFO: log_info,
+        logging.WARNING: log_warning,
+        logging.ERROR: log_error,
+    }
 
 
 class DashLogger:
@@ -790,7 +859,9 @@ class LogTransform(DashTransform):
             out_flex_key = callback.outputs.append(self.log_config.log_output)
             # Modify the callback function accordingly.
             f = callback.f
-            logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
+            logger = DashLogger(
+                self.log_config.log_writer_map
+            )  # TODO: What about scope?
             callback.f = bind_logger(logger, single_output, out_flex_key)(f)
 
         return callbacks
@@ -805,7 +876,9 @@ def bind_logger(logger, single_output, out_flex_key):
         def decorated_function(*args, **kwargs):
             logger.clear()
             outputs = f(*args, **kwargs, dash_logger=logger)
-            return _append_output(outputs, logger.get_output(), single_output, out_flex_key)
+            return _append_output(
+                outputs, logger.get_output(), single_output, out_flex_key
+            )
 
         return decorated_function
 
@@ -857,7 +930,9 @@ class LoadingTransform(DashTransform):
                 continue
             # Add the log component as output.
             single_output = len(callback.outputs) <= 1
-            out_flex_key = callback.outputs.append(Output(self.kwargs["id"], "children", allow_duplicate=True))
+            out_flex_key = callback.outputs.append(
+                Output(self.kwargs["id"], "children", allow_duplicate=True)
+            )
             # Modify the callback function accordingly.
             f = callback.f
             callback.f = bind_loading(single_output, out_flex_key)(f)
@@ -1011,7 +1086,7 @@ def apply_prefix(prefix, component_id, escape):
     if isinstance(component_id, dict):
         for key in component_id:
             # This branch handles the IDs. TODO: Can we always assume use of ints?
-            if type(component_id[key]) is int:
+            if isinstance(component_id[key], int):
                 continue
             # This branch handles the wildcard callbacks.
             if isinstance(component_id[key], _Wildcard):
@@ -1044,12 +1119,19 @@ def prefix_component(key: str, component: Component, escape: Callable):
 # TODO: Test this one.
 def dynamic_prefix(app: Union[DashBlueprint, DashProxy], component: Component):
     bp: DashBlueprint = app if isinstance(app, DashBlueprint) else app.blueprint
-    prefix_transforms = list(filter(lambda t: isinstance(t, PrefixIdTransform), bp.transforms))
+    prefix_transforms = list(
+        filter(lambda t: isinstance(t, PrefixIdTransform), bp.transforms)
+    )
     # No transform, just return.
     if len(prefix_transforms) == 0:
         return
     prefix_transform: PrefixIdTransform = prefix_transforms[0]
-    prefix_recursively(component, prefix_transform.prefix, prefix_transform.prefix_func, prefix_transform.escape)
+    prefix_recursively(
+        component,
+        prefix_transform.prefix,
+        prefix_transform.prefix_func,
+        prefix_transform.escape,
+    )
 
 
 # endregion
@@ -1103,7 +1185,9 @@ def filter_args(args_filter):
         def decorated_function(*args):
             post_args = list(args[len(args_filter) :])
             args = list(args[: len(args_filter)])
-            filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]] + post_args
+            filtered_args = [
+                arg for j, arg in enumerate(args) if not args_filter[j]
+            ] + post_args
             return f(*filtered_args)
 
         return decorated_function
@@ -1112,7 +1196,9 @@ def filter_args(args_filter):
 
 
 def trigger_filter(args):
-    inputs_args = [item for item in args if isinstance(item, Input) or isinstance(item, State)]
+    inputs_args = [
+        item for item in args if isinstance(item, Input) or isinstance(item, State)
+    ]
     is_trigger = [isinstance(item, Trigger) for item in inputs_args]
     return is_trigger
 
@@ -1153,7 +1239,9 @@ class MultiplexerTransform(DashTransform):
 def _output_id_without_wildcards(output: Output) -> str:
     i, p = output.component_id, output.component_property
     if isinstance(i, dict):
-        i = json.dumps({k: i[k] for k in sorted(i) if i[k] not in [ALL, MATCH, ALLSMALLER]})
+        i = json.dumps(
+            {k: i[k] for k in sorted(i) if i[k] not in [ALL, MATCH, ALLSMALLER]}
+        )
     return f"{i}_{p}"
 
 
@@ -1185,12 +1273,20 @@ class SerializationTransform(DashTransform):
                 # Replace args and kwargs. # TODO: Is recursion needed?
                 for i, arg in enumerate(args):
                     an = full_arg_spec.annotations.get(full_arg_spec.args[i])
-                    value = [self._try_load(a, an) for a in arg] if isinstance(arg, list) else self._try_load(arg, an)
+                    value = (
+                        [self._try_load(a, an) for a in arg]
+                        if isinstance(arg, list)
+                        else self._try_load(arg, an)
+                    )
                     args[i] = value
                 for key in kwargs:
                     arg = kwargs[key]
                     an = full_arg_spec.annotations.get(key)
-                    value = [self._try_load(a, an) for a in arg] if isinstance(arg, list) else self._try_load(arg, an)
+                    value = (
+                        [self._try_load(a, an) for a in arg]
+                        if isinstance(arg, list)
+                        else self._try_load(arg, an)
+                    )
                     kwargs[key] = value
                 # Evaluate function.
                 data = f(*args, **kwargs)
@@ -1305,7 +1401,13 @@ class EnrichedOutput(Output):
     """
 
     def __init__(
-        self, component_id, component_property, allow_duplicate=False, backend=None, session_check=None, arg_check=True
+        self,
+        component_id,
+        component_property,
+        allow_duplicate=False,
+        backend=None,
+        session_check=None,
+        arg_check=True,
     ):
         super().__init__(component_id, component_property, allow_duplicate)
         self.backend = backend
@@ -1317,15 +1419,21 @@ class ServersideOutputTransform(SerializationTransform):
     prefix: str = "SERVERSIDE_"
 
     def __init__(
-        self, backends: Optional[List[ServersideBackend]] = None, default_backend: Optional[ServersideBackend] = None
+        self,
+        backends: Optional[List[ServersideBackend]] = None,
+        default_backend: Optional[ServersideBackend] = None,
     ):
         super().__init__()
         # Per default, use file system backend.
         if backends is None:
             backends = [FileSystemBackend()]
-        self._default_backend: ServersideBackend = backends[0] if default_backend is None else default_backend
+        self._default_backend: ServersideBackend = (
+            backends[0] if default_backend is None else default_backend
+        )
         # Setup registry for easy/fast access.
-        self._backend_registry: Dict[str, ServersideBackend] = {backend.uid: backend for backend in backends}
+        self._backend_registry: Dict[str, ServersideBackend] = {
+            backend.uid: backend for backend in backends
+        }
 
     def _try_load(self, data: Any, ann=None) -> Any:
         if not isinstance(data, str):
@@ -1353,10 +1461,17 @@ class ServersideOutputTransform(SerializationTransform):
 
 
 class Serverside(Generic[T]):
-    def __init__(self, value: T, key: str = None, backend: Union[ServersideBackend, str, None] = None):
+    def __init__(
+        self,
+        value: T,
+        key: str = None,
+        backend: Union[ServersideBackend, str, None] = None,
+    ):
         self.value = value
         self.key: str = str(uuid.uuid4()) if key is None else key
-        self.backend_uid: str = backend.uid if isinstance(backend, ServersideBackend) else backend
+        self.backend_uid: str = (
+            backend.uid if isinstance(backend, ServersideBackend) else backend
+        )
 
 
 # endregion

@@ -2,6 +2,7 @@
 DO NOT MODIFY
 This file is used to validate your publish settings.
 """
+
 from __future__ import print_function
 
 import importlib
@@ -44,14 +45,16 @@ def check_manifest(filename):
 
 def check_file(dist, filename):
     if not check_dist(dist, filename):
-        print(missing_dist_msg.format(filename, components_package, "_js_dist"), file=sys.stderr)
+        print(
+            missing_dist_msg.format(filename, components_package, "_js_dist"),
+            file=sys.stderr,
+        )
     if not check_manifest(filename):
         print(missing_manifest_msg.format(filename), file=sys.stderr)
 
 
 for cur, _, files in os.walk(components_package):
     for f in files:
-
         if f.endswith("js"):
             # noinspection PyProtectedMember
             check_file(components_lib._js_dist, f)

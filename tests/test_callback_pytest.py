@@ -13,7 +13,11 @@ def test_update_callback():
 
 def test_display_callback():
     def run_callback():
-        context_value.set(AttributeDict(**{"triggered_inputs": [{"prop_id": "btn-1-ctx-example.n_clicks"}]}))
+        context_value.set(
+            AttributeDict(
+                **{"triggered_inputs": [{"prop_id": "btn-1-ctx-example.n_clicks"}]}
+            )
+        )
         return display(1, 0, 0)
 
     ctx = copy_context()

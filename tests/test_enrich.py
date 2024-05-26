@@ -67,7 +67,9 @@ def _cssid(**kwargs):
 
 def _get_basic_dash_proxy(**kwargs) -> DashProxy:
     app = DashProxy(**kwargs)
-    app.layout = html.Div([html.Button(id="btn"), html.Div(id="log_server"), html.Div(id="log_client")])
+    app.layout = html.Div(
+        [html.Button(id="btn"), html.Div(id="log_server"), html.Div(id="log_client")]
+    )
     return app
 
 
@@ -81,13 +83,20 @@ def _bind_basic_callback(app, flex=False):
 
 
 def _bind_basic_callback_flex(app):
-    @app.callback(output=dict(n=Output("log_server", "children")), inputs=dict(n_clicks=Input("btn", "n_clicks")))
+    @app.callback(
+        output=dict(n=Output("log_server", "children")),
+        inputs=dict(n_clicks=Input("btn", "n_clicks")),
+    )
     def update_log(n_clicks):
         return dict(n=n_clicks)
 
 
 def _bind_basic_clientside_callback(app):
-    app.clientside_callback("function(x){return x;}", Output("log_client", "children"), Input("btn", "n_clicks"))
+    app.clientside_callback(
+        "function(x){return x;}",
+        Output("log_client", "children"),
+        Input("btn", "n_clicks"),
+    )
 
 
 def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
@@ -109,8 +118,17 @@ def _basic_dash_proxy_test(dash_duo, app, element_ids=None, btn_id="btn"):
     "tst, flt",
     [
         (
-            dict(a=Input("a", "prop"), b=[Input("b", "prop")], c=dict(ca=[Input("ca1", "prop"), Input("ca2", "prop")])),
-            [Input("a", "prop"), Input("b", "prop"), Input("ca1", "prop"), Input("ca2", "prop")],
+            dict(
+                a=Input("a", "prop"),
+                b=[Input("b", "prop")],
+                c=dict(ca=[Input("ca1", "prop"), Input("ca2", "prop")]),
+            ),
+            [
+                Input("a", "prop"),
+                Input("b", "prop"),
+                Input("ca1", "prop"),
+                Input("ca2", "prop"),
+            ],
         ),
         (
             [Input("a", "prop"), Input("b", "prop"), Input("c", "prop")],
@@ -144,9 +162,17 @@ def test_callback_blueprint():
     assert list(cbp.outputs) == [Output("o", "prop")]
     assert list(cbp.inputs) == [State("s", "prop"), Input("i", "prop")]
     # Test list element.
-    cbp = CallbackBlueprint([State("s", "prop"), State("s2", "prop")], [Output("o", "prop")], [Input("i", "prop")])
+    cbp = CallbackBlueprint(
+        [State("s", "prop"), State("s2", "prop")],
+        [Output("o", "prop")],
+        [Input("i", "prop")],
+    )
     assert list(cbp.outputs) == [Output("o", "prop")]
-    assert list(cbp.inputs) == [State("s", "prop"), State("s2", "prop"), Input("i", "prop")]
+    assert list(cbp.inputs) == [
+        State("s", "prop"),
+        State("s2", "prop"),
+        Input("i", "prop"),
+    ]
     # Test mix.
     cbp = CallbackBlueprint(
         [State("s", "prop"), State("s2", "prop")],
@@ -171,13 +197,17 @@ def test_callback_blueprint():
     assert list(cbp.outputs) == [Output(my_output, "children")]
     assert list(cbp.inputs) == [Input(my_input, "n_clicks")]
     # Test kwargs.
-    cbp = CallbackBlueprint(Input(my_input, "n_clicks"), Output(my_output, "children"), hello="world")
+    cbp = CallbackBlueprint(
+        Input(my_input, "n_clicks"), Output(my_output, "children"), hello="world"
+    )
     assert cbp.kwargs == dict(hello="world")
 
 
 def test_flexible_callback_signature():
     # Test input/output/state as kwargs.
-    cbp = CallbackBlueprint(output=[Output("o", "prop")], inputs=[Input("i", "prop")], hello="world")
+    cbp = CallbackBlueprint(
+        output=[Output("o", "prop")], inputs=[Input("i", "prop")], hello="world"
+    )
     assert list(cbp.inputs) == [Input("i", "prop")]
     assert list(cbp.outputs) == [Output("o", "prop")]
     assert cbp.kwargs == dict(hello="world")
@@ -193,10 +223,17 @@ def test_flexible_callback_signature():
     # Test complex dict grouping.
     cbp = CallbackBlueprint(
         output=[Output("o", "prop"), Output("u", "prop")],
-        inputs=dict(w=dict(i=Input("i", "prop"), s=State("s", "prop")), z=dict(i=Input("i2", "prop"))),
+        inputs=dict(
+            w=dict(i=Input("i", "prop"), s=State("s", "prop")),
+            z=dict(i=Input("i2", "prop")),
+        ),
         hello="world",
     )
-    assert list(cbp.inputs) == [Input("i", "prop"), State("s", "prop"), Input("i2", "prop")]
+    assert list(cbp.inputs) == [
+        Input("i", "prop"),
+        State("s", "prop"),
+        Input("i2", "prop"),
+    ]
     assert list(cbp.outputs) == [Output("o", "prop"), Output("u", "prop")]
     assert cbp.kwargs == dict(hello="world")
 
@@ -235,7 +272,11 @@ def test_dash_proxy(dash_duo):
 def test_dash_output_input_state_compatibility(dash_duo):
     app = _get_basic_dash_proxy()
 
-    @app.callback(dash.Output("log_server", "children"), dash.Input("btn", "n_clicks"), dash.State("btn", "n_clicks"))
+    @app.callback(
+        dash.Output("log_server", "children"),
+        dash.Input("btn", "n_clicks"),
+        dash.State("btn", "n_clicks"),
+    )
     def update_log(n_clicks, state):
         return n_clicks
 
@@ -243,7 +284,11 @@ def test_dash_output_input_state_compatibility(dash_duo):
 
 
 @pytest.mark.parametrize(
-    "args, kwargs", [([Input("btn", "n_clicks")], dict()), ([], dict(inputs=dict(n_clicks=Input("btn", "n_clicks"))))]
+    "args, kwargs",
+    [
+        ([Input("btn", "n_clicks")], dict()),
+        ([], dict(inputs=dict(n_clicks=Input("btn", "n_clicks")))),
+    ],
 )
 def test_no_output_transform(dash_duo, args, kwargs):
     app = DashProxy()
@@ -352,7 +397,13 @@ def test_trigger_transform_clientside(dash_duo):
     "args, kwargs",
     [
         ([Output("log", "children"), Input("right", "n_clicks")], dict()),
-        ([], dict(output=[Output("log", "children")], inputs=dict(n_clicks=Input("right", "n_clicks")))),
+        (
+            [],
+            dict(
+                output=[Output("log", "children")],
+                inputs=dict(n_clicks=Input("right", "n_clicks")),
+            ),
+        ),
     ],
 )
 def test_multiplexer_transform(dash_duo, args, kwargs):
@@ -364,7 +415,11 @@ def test_multiplexer_transform(dash_duo, args, kwargs):
             html.Div(id="log"),
         ]
     )
-    app.clientside_callback("function(x){return 'left'}", Output("log", "children"), Input("left", "n_clicks"))
+    app.clientside_callback(
+        "function(x){return 'left'}",
+        Output("log", "children"),
+        Input("left", "n_clicks"),
+    )
 
     @app.callback(*args, **kwargs)
     def update_right(n_clicks):
@@ -385,7 +440,8 @@ def test_multiplexer_transform(dash_duo, args, kwargs):
 def test_multiplexer_transform_wildcard(dash_duo):
     def make_callback(i):
         @app.callback(
-            Output({"type": "div", "id": ALL}, "children"), Input({"type": f"button{i}", "id": ALL}, "n_clicks")
+            Output({"type": "div", "id": ALL}, "children"),
+            Input({"type": f"button{i}", "id": ALL}, "n_clicks"),
         )
         def func(n):
             return [f"Hello from group {i}"] * len(n)
@@ -404,9 +460,13 @@ def test_multiplexer_transform_wildcard(dash_duo):
 
     dash_duo.start_server(app)
     dash_duo.find_element(_cssid(id="x", type="button0")).click()
-    assert dash_duo.find_element(_cssid(id="0", type="div")).text == "Hello from group 0"
+    assert (
+        dash_duo.find_element(_cssid(id="0", type="div")).text == "Hello from group 0"
+    )
     dash_duo.find_element(_cssid(id="y", type="button1")).click()
-    assert dash_duo.find_element(_cssid(id="1", type="div")).text == "Hello from group 1"
+    assert (
+        dash_duo.find_element(_cssid(id="1", type="div")).text == "Hello from group 1"
+    )
 
 
 @pytest.mark.parametrize("flex", [False, True])
@@ -422,11 +482,20 @@ def test_prefix_id_transform(dash_duo, flex):
     "args, kwargs",
     [
         ([Output("log", "children"), Input("right", "n_clicks")], dict()),
-        ([], dict(output=[Output("log", "children")], inputs=dict(n_clicks=Input("right", "n_clicks")))),
+        (
+            [],
+            dict(
+                output=[Output("log", "children")],
+                inputs=dict(n_clicks=Input("right", "n_clicks")),
+            ),
+        ),
     ],
 )
 def test_multiplexer_and_prefix_transform(dash_duo, args, kwargs):
-    app = DashProxy(prevent_initial_callbacks=True, transforms=[PrefixIdTransform("prefix"), MultiplexerTransform()])
+    app = DashProxy(
+        prevent_initial_callbacks=True,
+        transforms=[PrefixIdTransform("prefix"), MultiplexerTransform()],
+    )
     app.layout = html.Div(
         [
             html.Button(id="left"),
@@ -434,7 +503,11 @@ def test_multiplexer_and_prefix_transform(dash_duo, args, kwargs):
             html.Div(id="log"),
         ]
     )
-    app.clientside_callback("function(x){return 'left'}", Output("log", "children"), Input("left", "n_clicks"))
+    app.clientside_callback(
+        "function(x){return 'left'}",
+        Output("log", "children"),
+        Input("left", "n_clicks"),
+    )
 
     @app.callback(*args, **kwargs)
     def update_right(n_clicks):
@@ -454,7 +527,11 @@ def test_multiplexer_and_prefix_transform(dash_duo, args, kwargs):
 
 def test_global_blueprint(dash_duo):
     app = _get_basic_dash_proxy()
-    clientside_callback("function(x){return x;}", Output("log_client", "children"), Input("btn", "n_clicks"))
+    clientside_callback(
+        "function(x){return x;}",
+        Output("log_client", "children"),
+        Input("btn", "n_clicks"),
+    )
 
     @callback(Output("log_server", "children"), Input("btn", "n_clicks"))
     def update_log(n_clicks):
@@ -470,12 +547,21 @@ def test_global_blueprint(dash_duo):
     "args, kwargs, port",
     [
         ([Output("log", "children"), Input("trigger", "n_intervals")], dict(), 4757),
-        ([], dict(output=[Output("log", "children")], inputs=dict(tick=Input("trigger", "n_intervals"))), 4758),
+        (
+            [],
+            dict(
+                output=[Output("log", "children")],
+                inputs=dict(tick=Input("trigger", "n_intervals")),
+            ),
+            4758,
+        ),
     ],
 )
 def test_blocking_callback_transform(dash_duo, args, kwargs, port):
     app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
-    app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=500)])
+    app.layout = html.Div(
+        [html.Div(id="log"), dcc.Interval(id="trigger", interval=500)]
+    )
     msg = "Hello world!"
 
     @app.callback(*args, **kwargs, blocking=True)
@@ -510,7 +596,13 @@ def test_blocking_callback_transform_final_invocation(dash_duo):
     "args, kwargs",
     [
         ([Output("store", "children"), Input("btn", "n_clicks")], dict()),
-        ([], dict(output=Output("store", "children"), inputs=dict(n_clicks=Input("btn", "n_clicks")))),
+        (
+            [],
+            dict(
+                output=Output("store", "children"),
+                inputs=dict(n_clicks=Input("btn", "n_clicks")),
+            ),
+        ),
     ],
 )
 def test_dataclass_transform(dash_duo, args, kwargs):
@@ -548,11 +640,19 @@ def test_dataclass_transform(dash_duo, args, kwargs):
     "args, kwargs",
     [
         ([Output("store", "children"), Input("btn", "n_clicks")], dict()),
-        ([], dict(output=Output("store", "children"), inputs=dict(n_clicks=Input("btn", "n_clicks")))),
+        (
+            [],
+            dict(
+                output=Output("store", "children"),
+                inputs=dict(n_clicks=Input("btn", "n_clicks")),
+            ),
+        ),
     ],
 )
 def test_serverside_output_transform(dash_duo, args, kwargs):
-    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
+    app = DashProxy(
+        prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()]
+    )
     app.layout = html.Div(
         [
             html.Button(id="btn"),
@@ -590,10 +690,19 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
             html.Div(id=_id("log", i)),
         ]
 
-    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform(), MultiplexerTransform()])
-    app.layout = html.Div(make_block("1") + make_block("2") + [html.Div(id="log_all"), html.Button(id="btn_all")])
+    app = DashProxy(
+        prevent_initial_callbacks=True,
+        transforms=[ServersideOutputTransform(), MultiplexerTransform()],
+    )
+    app.layout = html.Div(
+        make_block("1")
+        + make_block("2")
+        + [html.Div(id="log_all"), html.Button(id="btn_all")]
+    )
 
-    @app.callback(Output(_id("sso", MATCH), "children"), Input(_id("btn", MATCH), "n_clicks"))
+    @app.callback(
+        Output(_id("sso", MATCH), "children"), Input(_id("btn", MATCH), "n_clicks")
+    )
     def update_default(n_clicks):
         """
         Populate serverside output ONE at a time, i.e. WRITE to SSO using MATCH.
@@ -607,7 +716,9 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
         """
         return tuple([Serverside(pd.DataFrame(columns=["B"], data=[n_clicks]))] * 2)
 
-    @app.callback(Output(_id("log", MATCH), "children"), Input(_id("sso", MATCH), "children"))
+    @app.callback(
+        Output(_id("log", MATCH), "children"), Input(_id("sso", MATCH), "children")
+    )
     def update_log(data):
         """
         Populate log elements ONE at a time, i.e. READ from SSO using MATCH.
@@ -629,8 +740,12 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
     # Click the first element.
     dash_duo.find_element(_css_selector(_id("btn", "1"))).click()
     time.sleep(0.1)  # wait for callback code to execute.
-    assert dash_duo.find_element(_css_selector(_id("sso", "2"))).text == ""  # not clicked, should be blank
-    assert dash_duo.find_element(_css_selector(_id("log", "2"))).text == ""  # not clicked, should be blank
+    assert (
+        dash_duo.find_element(_css_selector(_id("sso", "2"))).text == ""
+    )  # not clicked, should be blank
+    assert (
+        dash_duo.find_element(_css_selector(_id("log", "2"))).text == ""
+    )  # not clicked, should be blank
     assert dash_duo.find_element(_css_selector(_id("sso", "1"))).text != ""
     assert dash_duo.find_element(_css_selector(_id("log", "1"))).text == '{"A":{"0":1}}'
     assert dash_duo.find_element(_css_selector("log_all")).text == '{"A":{"0":1}}None'
@@ -639,21 +754,37 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
     time.sleep(0.1)  # wait for callback code to execute.
     dash_duo.find_element(_css_selector(_id("btn", "2"))).click()
     time.sleep(0.1)  # wait for callback code to execute.
-    assert dash_duo.find_element(_css_selector(_id("sso", "2"))).text != ""  # not clicked, should be blank
-    assert dash_duo.find_element(_css_selector(_id("log", "2"))).text == '{"A":{"0":2}}'  # not clicked, should be blank
+    assert (
+        dash_duo.find_element(_css_selector(_id("sso", "2"))).text != ""
+    )  # not clicked, should be blank
+    assert (
+        dash_duo.find_element(_css_selector(_id("log", "2"))).text == '{"A":{"0":2}}'
+    )  # not clicked, should be blank
     assert dash_duo.find_element(_css_selector(_id("log", "1"))).text == '{"A":{"0":1}}'
-    assert dash_duo.find_element(_css_selector("log_all")).text == '{"A":{"0":1}}{"A":{"0":2}}'
+    assert (
+        dash_duo.find_element(_css_selector("log_all")).text
+        == '{"A":{"0":1}}{"A":{"0":2}}'
+    )
     # Click the all element.
     dash_duo.find_element("#btn_all").click()
     time.sleep(0.1)  # wait for callback code to execute.
-    assert dash_duo.find_element(_css_selector("log_all")).text == '{"B":{"0":1}}{"B":{"0":1}}'
+    assert (
+        dash_duo.find_element(_css_selector("log_all")).text
+        == '{"B":{"0":1}}{"B":{"0":1}}'
+    )
 
 
 @pytest.mark.parametrize(
     "args, kwargs",
     [
         ([Output("log_server", "children"), Input("btn", "n_clicks")], dict()),
-        ([], dict(output=[Output("log_server", "children")], inputs=dict(n_clicks=Input("btn", "n_clicks")))),
+        (
+            [],
+            dict(
+                output=[Output("log_server", "children")],
+                inputs=dict(n_clicks=Input("btn", "n_clicks")),
+            ),
+        ),
     ],
 )
 def test_log_transform(dash_duo, args, kwargs):
@@ -669,7 +800,10 @@ def test_log_transform(dash_duo, args, kwargs):
     # Check that stuff works.
     _basic_dash_proxy_test(dash_duo, app, ["log_server"])
     # Check that log is written to div element.
-    assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
+    assert (
+        dash_duo.find_element("#log").text
+        == "INFO: info\nWARNING: warning\nERROR: error"
+    )
 
 
 @pytest.mark.parametrize(
@@ -683,9 +817,15 @@ def test_log_transform(dash_duo, args, kwargs):
         ),
         (
             [],
-            dict(output=Output("celsius", "value"), inputs=dict(value=CycleBreakerInput("fahrenheit", "value"))),
+            dict(
+                output=Output("celsius", "value"),
+                inputs=dict(value=CycleBreakerInput("fahrenheit", "value")),
+            ),
             [],
-            dict(output=Output("fahrenheit", "value"), inputs=dict(value=Input("celsius", "value"))),
+            dict(
+                output=Output("fahrenheit", "value"),
+                inputs=dict(value=Input("celsius", "value")),
+            ),
         ),
     ],
 )
@@ -716,7 +856,11 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs): 
 
     dash_duo.start_server(app)
     time.sleep(0.1)
-    logs = [entry for entry in dash_duo.driver.get_log("browser") if entry["timestamp"] > dash_duo._last_ts]
+    logs = [
+        entry
+        for entry in dash_duo.driver.get_log("browser")
+        if entry["timestamp"] > dash_duo._last_ts
+    ]
     assert len(logs) <= int(os.environ.get("TEST_CYCLE_BREAKER_ALLOWED_ERRORS", "0"))
     f = dash_duo.find_element("#fahrenheit")
     f.send_keys("32")

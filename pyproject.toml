@@ -37,7 +37,6 @@ mantine = ["dash-mantine-components"]
 [tool.poetry.group.dev.dependencies]
 dash = {extras = ["dev", "testing"], version = "^2.17.0"}
 pytest-cov = "^4.0.0"
-black = "^24.3.0"
 pandas = ">=1.5.3"
 quart = "^0.18.3"
 starlette = "^0.36.2"
@@ -47,28 +46,9 @@ uvicorn = "^0.20.0"
 sse-starlette = "^1.2.1"
 urllib3 = "^1.26.18"
 pre-commit = "^3.7.1"
-flake8 = "^7.0.0"
 mypy = "^1.10.0"
-isort = "^5.13.2"
+
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.black]
-line-length = 120
-target-version = ["py39"]
-
-[tool.isort]
-line_length = 120
-known_first_party = []
-known_third_party = [
-  "ds_training_template",
-  "dynaconf",
-  "mlflow",
-  "numpy",
-  "pandas",
-  "pyspark",
-  "vtreat",
-]
-profile = "black"

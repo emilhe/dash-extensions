@@ -135,3 +135,11 @@ inst/*
 **/file_system_backend/*
 man/*
 R/*
+
+.idea/*
+pc_ex1/*
+page_components/*
+NAMESPACE
+DESCRIPTION
+jsconfig.json
+tmp**.py

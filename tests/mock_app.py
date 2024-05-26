@@ -12,13 +12,20 @@ app.layout = html.Div(
 )
 
 
-@callback(Output("container-no-ctx", "children"), Input("btn-1", "n_clicks"), Input("btn-2", "n_clicks"))
+@callback(
+    Output("container-no-ctx", "children"),
+    Input("btn-1", "n_clicks"),
+    Input("btn-2", "n_clicks"),
+)
 def update(btn1, btn2):
     return f"button 1: {btn1} & button 2: {btn2}"
 
 
 @callback(
-    Output("container", "children"), Input("btn-1", "n_clicks"), Input("btn-2", "n_clicks"), Input("btn-3", "n_clicks")
+    Output("container", "children"),
+    Input("btn-1", "n_clicks"),
+    Input("btn-2", "n_clicks"),
+    Input("btn-3", "n_clicks"),
 )
 def display(btn1, btn2, btn3):
     button_clicked = ctx.triggered_id

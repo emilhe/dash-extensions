@@ -83,7 +83,9 @@ def fix_page_load_anchor_issue(app, delay, input_id=None, output_id=None):
     """
     # Create dummy components.
     input_id = input_id if input_id is not None else "fix_page_load_anchor_issue_input"
-    output_id = output_id if output_id is not None else "fix_page_load_anchor_issue_output"
+    output_id = (
+        output_id if output_id is not None else "fix_page_load_anchor_issue_output"
+    )
     dummy_input = html.Div(id=input_id, style={"display": "hidden"})
     dummy_output = html.Div(id=output_id, style={"display": "hidden"})
     # Setup the callback that does the magic.
@@ -95,9 +97,7 @@ def fix_page_load_anchor_issue(app, delay, input_id=None, output_id=None):
                 match.scrollIntoView();
             }}, {});
         }}
-        """.format(
-            delay
-        ),
+        """.format(delay),
         Output(output_id, "children"),
         [Input(input_id, "children")],
         prevent_initial_call=False,
