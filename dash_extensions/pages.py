@@ -1,8 +1,9 @@
 import json
-import dash
 from collections import OrderedDict
-from typing import Optional, Any
-from dash import html, Input, Output, State, clientside_callback, page_container
+from typing import Any, Optional
+
+import dash
+from dash import Input, Output, State, clientside_callback, html, page_container
 from dash.development.base_component import Component
 
 """
@@ -23,17 +24,17 @@ _original_register_page = dash.register_page
 def _register_page(*args, page_components=None, page_properties=None, **kwargs):
     _original_register_page(*args, **kwargs)
     # Resolve page.
-    module = kwargs['module'] if 'module' in kwargs else args[0]
+    module = kwargs["module"] if "module" in kwargs else args[0]
     page = dash.page_registry[module]
     # Register callbacks for page props.
     if page_properties is not None:
         for component in page_properties:
-            _set_props(component, page['path'], page_properties[component])
+            _set_props(component, page["path"], page_properties[component])
     # Resolve any page components.
     if page_components is None:
         return
     for component in page_components:
-        _set_visible(component, page['path'])
+        _set_visible(component, page["path"])
 
 
 dash.register_page = _register_page
@@ -42,6 +43,7 @@ dash.register_page = _register_page
 # endregion
 
 # region Public interface
+
 
 def set_page_container_style_display_contents():
     """
@@ -62,6 +64,7 @@ def set_default_container(container: Component):
     :param container: the container into which page components will be rendered by default
     :return: None
     """
+    global _COMPONENT_CONTAINER
     _COMPONENT_CONTAINER = container
 
 
@@ -114,6 +117,7 @@ def setup_page_components() -> html.Div:
 
 # region Utils
 
+
 def _prepare_container(container: Optional[Component] = None):
     container = _COMPONENT_CONTAINER if container is None else container
     # Make sure children is a list.
@@ -144,10 +148,13 @@ def _setup_callbacks():
             }}
             return {{display: "none"}};
         }}"""
-        clientside_callback(f, Output(wrapper, "style", allow_duplicate=True),
-                            Input(store, "data"),
-                            State(location, "pathname"),
-                            prevent_initial_call='initial_duplicate')
+        clientside_callback(
+            f,
+            Output(wrapper, "style", allow_duplicate=True),
+            Input(store, "data"),
+            State(location, "pathname"),
+            prevent_initial_call="initial_duplicate",
+        )
     # Setup callbacks for page props.
     components = list(_PROP_PATH_REGISTRY.keys())
     for component in components:
@@ -156,15 +163,19 @@ def _setup_callbacks():
             default = getattr(component, prop, None)
             # Setup callback.
             f = f"""function(y, x){{
-                const path_map = JSON.parse(\'{json.dumps(path_map)}\'); 
+                const path_map = JSON.parse(\'{json.dumps(path_map)}\');
                 if (x in path_map){{
                     return path_map[x];
                 }}
-                return JSON.parse(\'{json.dumps(default)}\'); 
+                return JSON.parse(\'{json.dumps(default)}\');
             }}"""
-            clientside_callback(f, Output(component, prop, allow_duplicate=True),
-                                Input(store, "data"),
-                                State(location, "pathname"),
-                                prevent_initial_call='initial_duplicate')
+            clientside_callback(
+                f,
+                Output(component, prop, allow_duplicate=True),
+                Input(store, "data"),
+                State(location, "pathname"),
+                prevent_initial_call="initial_duplicate",
+            )
+
 
 # endregion

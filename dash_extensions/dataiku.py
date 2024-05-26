@@ -1,15 +1,15 @@
 import os
 import re
-
-from dash import Dash
 from distutils.dir_util import copy_tree
 
+from dash import Dash
+
 """
-The purpose of this module is to ease the integration of Dash with Dataiku. 
+The purpose of this module is to ease the integration of Dash with Dataiku.
 """
 
 
-def bind_assets_folder(app: Dash, app_id: str, assets_folder: str):
+def bind_assets_folder(app: Dash, app_id: str, assets_folder: str):  # noqa: C901
     """
     Dataiku 10 doesn't support separate asset folders for each Dash app. This function targets fixing this issue by
     (1) creating a new asset sub folder for each app, and (2) limiting asset loading to this folder.

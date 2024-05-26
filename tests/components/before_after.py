@@ -1,4 +1,5 @@
 from dash import Dash, html
+
 from dash_extensions import BeforeAfter
 
 app = Dash()

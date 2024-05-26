@@ -37,5 +37,5 @@ async def websocket_endpoint(websocket):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format='{levelname:7} {message}', style='{', level=logging.INFO)
+    logging.basicConfig(format="{levelname:7} {message}", style="{", level=logging.INFO)
     uvicorn.run(async_server, port=5002, log_config=None)

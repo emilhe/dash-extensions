@@ -1,9 +1,8 @@
 import json
-
-from dash import html, Output, Input, callback_context
-from dash.development.base_component import Component
 from typing import List, Union
 
+from dash import Input, Output, callback_context, html
+from dash.development.base_component import Component
 
 # region Get triggered
 
@@ -15,7 +14,7 @@ class Triggered(object):
             setattr(self, key, kwargs[key])
 
 
-def get_triggered() -> Triggered:
+def get_triggered() -> Triggered:  # noqa: C901
     triggered = callback_context.triggered
     if not triggered:
         return Triggered(None)

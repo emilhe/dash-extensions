@@ -24,6 +24,8 @@ def assert_no_random_ids():
     if _components_with_random_ids:
         return
     raise AssertionError(
-        f"The following components have random ids: {', '.join([str(c) for c in _components_with_random_ids])}")
+        f"The following components have random ids: {', '.join([str(c) for c in _components_with_random_ids])}"
+    )
+
 
 # endregion

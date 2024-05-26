@@ -23,7 +23,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<4"
+python = ">=3.9,<4"
 dash = ">=2.17.0"
 more-itertools = ">=10.2.0, <11.0.0"
 jsbeautifier = "^1.14.3"
@@ -34,7 +34,7 @@ dataclass-wizard = "^0.22.2"
 [tool.poetry.extras]
 mantine = ["dash-mantine-components"]
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 dash = {extras = ["dev", "testing"], version = "^2.17.0"}
 pytest-cov = "^4.0.0"
 black = "^24.3.0"
@@ -46,6 +46,10 @@ certifi = "^2023.07.22"
 uvicorn = "^0.20.0"
 sse-starlette = "^1.2.1"
 urllib3 = "^1.26.18"
+pre-commit = "^3.7.1"
+flake8 = "^7.0.0"
+mypy = "^1.10.0"
+isort = "^5.13.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -54,3 +58,17 @@ build-backend = "poetry.core.masonry.api"
 [tool.black]
 line-length = 120
 target-version = ["py39"]
+
+[tool.isort]
+line_length = 120
+known_first_party = []
+known_third_party = [
+  "ds_training_template",
+  "dynaconf",
+  "mlflow",
+  "numpy",
+  "pandas",
+  "pyspark",
+  "vtreat",
+]
+profile = "black"

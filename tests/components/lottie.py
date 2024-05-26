@@ -1,4 +1,5 @@
-from dash import Dash, html, dcc, Input, Output, no_update
+from dash import Dash, Input, Output, dcc, html, no_update
+
 from dash_extensions import Lottie
 
 # Setup options.

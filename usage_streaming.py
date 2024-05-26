@@ -1,6 +1,7 @@
-from dash_extensions import EventSource, StreamingBuffer
-from dash_extensions.enrich import html, dcc, Output, Input, DashProxy, State
 from flask_cors import CORS
+
+from dash_extensions import StreamingBuffer
+from dash_extensions.enrich import DashProxy, Input, Output, html
 
 # Client-side function (for performance) that updates the graph.
 update_graph = """function(msg) {
@@ -11,14 +12,16 @@ update_graph = """function(msg) {
 # Create small example app.
 app = DashProxy(__name__)
 CORS(app.server)
-app.layout = html.Div([
-    StreamingBuffer(id="sse", url="http://127.0.0.1:8000/stream"),
-    html.Div(id="sse-container"),
-    html.Br(),
-    html.Div("----------"),
-    html.Br(),
-    html.Div(id="sse-status")
-])
+app.layout = html.Div(
+    [
+        StreamingBuffer(id="sse", url="http://127.0.0.1:8000/stream"),
+        html.Div(id="sse-container"),
+        html.Br(),
+        html.Div("----------"),
+        html.Br(),
+        html.Div(id="sse-status"),
+    ]
+)
 app.clientside_callback(update_graph, Output("sse-container", "children"), Input("sse", "value"))
 app.clientside_callback(update_graph, Output("sse-status", "children"), Input("sse", "done"))
 

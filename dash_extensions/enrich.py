@@ -11,47 +11,46 @@ import struct
 import sys
 import threading
 import uuid
-import plotly
+from collections import defaultdict
+from datetime import datetime
+from itertools import compress
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+
 import dash
+import plotly
 
 # Enable enrich as drop-in replacement for dash
 # noinspection PyUnresolvedReferences
-from dash import (  # lgtm [py/unused-import]
-    no_update,
-    Output,
-    State,
-    Input,
-    ClientsideFunction,
-    MATCH,
+from dash import callback_context  # noqa: F401
+from dash import ctx  # noqa: F401
+from dash import dash_table  # noqa: F401
+from dash import development  # noqa: F401
+from dash import exceptions  # noqa: F401
+from dash import page_container  # noqa: F401
+from dash import page_registry  # noqa: F401
+from dash import register_page  # noqa: F401
+from dash import resources  # noqa: F401
+from dash import (  # lgtm [py/unused-import]; noqa: F401
     ALL,
     ALLSMALLER,
-    development,
-    exceptions,
-    resources,
+    MATCH,
+    ClientsideFunction,
+    Input,
+    Output,
+    State,
     dcc,
     html,
-    dash_table,
-    callback_context,
-    callback,
-    clientside_callback,
-    page_container,
-    page_registry,
-    register_page,
-    ctx,
+    no_update,
 )
 from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
-from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
+from dash.dependencies import DashDependency, _Wildcard  # lgtm [py/unused-import]
 from dash.development.base_component import Component
+from dataclass_wizard import asdict, fromdict
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
-from itertools import compress
-from more_itertools import flatten
-from collections import defaultdict
-from typing import Dict, Callable, List, Union, Any, Tuple, Optional, Generic, TypeVar
-from datetime import datetime
+
 from dash_extensions import CycleBreaker
-from dataclass_wizard import fromdict, asdict
 
 T = TypeVar("T")
 
@@ -79,7 +78,7 @@ def build_index(structure, entry, index):
     raise ValueError(f"Unsupported structure {str(structure)}")
 
 
-def validate_structure(structure, level=0):
+def validate_structure(structure, level=0):  # noqa: C901
     if isinstance(structure, DashDependency):
         if level == 0:
             return [structure]
@@ -208,7 +207,7 @@ class CallbackBlueprint:
         self.kwargs: Dict[str, Any] = kwargs
         self.f = None
 
-    def register(self, app: dash.Dash):
+    def register(self, app: dash.Dash):  # noqa: C901
         # Collect dependencies.
         dep_args, dep_kwargs = [], {}
         for dep_col in [self.outputs, self.inputs]:
@@ -502,7 +501,6 @@ class DashTransform:
 
 
 class StatefulDashTransform(DashTransform):
-
     def __init__(self):
         super().__init__()
         self.blueprint = DashBlueprint()
@@ -573,7 +571,7 @@ class BlockingCallbackTransform(StatefulDashTransform):
                 let ctx = arguments[arguments.length-1];
                 const now = new Date().getTime();
                 const trigger = dash_clientside.callback_context.triggered[0];
-                const no = window.dash_clientside.no_update  
+                const no = window.dash_clientside.no_update
                 // Update context.
                 if(trigger !== undefined){{
                     if(!trigger.prop_id.startsWith('{end_blocked_id}')){{
@@ -582,7 +580,7 @@ class BlockingCallbackTransform(StatefulDashTransform):
                         for (let i = 0; i < keys.length; i++) {{
                             let key = keys[i];
                             ctx[key] = dash_clientside.callback_context[key];
-                        }}                        
+                        }}
                     }}
                 }}
                 // First run => INVOKE.
@@ -649,9 +647,9 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
             cached_ctx = fltr[1]
             single_output = num_outputs <= 1
             if cached_ctx is not None and "triggered" in cached_ctx:
-                ctx = context_value.get()
-                ctx["triggered_inputs"] = cached_ctx["triggered"]
-                context_value.set(ctx)
+                local_ctx = context_value.get()
+                local_ctx["triggered_inputs"] = cached_ctx["triggered"]
+                context_value.set(local_ctx)
             try:
                 outputs = f(*args, **kwargs)
             except Exception:
@@ -885,7 +883,6 @@ def bind_loading(single_output, out_flex_key):
 
 
 class CycleBreakerTransform(StatefulDashTransform):
-
     def __init__(self):
         super().__init__()
 
@@ -1014,7 +1011,7 @@ def apply_prefix(prefix, component_id, escape):
     if isinstance(component_id, dict):
         for key in component_id:
             # This branch handles the IDs. TODO: Can we always assume use of ints?
-            if type(component_id[key]) == int:
+            if type(component_id[key]) is int:
                 continue
             # This branch handles the wildcard callbacks.
             if isinstance(component_id[key], _Wildcard):
@@ -1070,7 +1067,6 @@ class Trigger(Input):
 
 
 class TriggerTransform(DashTransform):
-
     def apply_serverside(self, callbacks):
         for callback in callbacks:
             is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
@@ -1167,7 +1163,6 @@ def _output_id_without_wildcards(output: Output) -> str:
 
 
 class SerializationTransform(DashTransform):
-
     def apply_serverside(self, callbacks):
         for callback in callbacks:
             f = callback.f
@@ -1180,7 +1175,7 @@ class SerializationTransform(DashTransform):
     def _try_dump(self, obj: Any):
         raise NotImplementedError
 
-    def _unpack_pack_callback(self, callback):
+    def _unpack_pack_callback(self, callback):  # noqa: C901
         full_arg_spec = inspect.getfullargspec(callback.f)
 
         def unpack_pack_args(f):
@@ -1223,7 +1218,6 @@ class SerializationTransform(DashTransform):
 
 
 class DataclassTransform(SerializationTransform):
-
     def _try_load(self, data: Any, ann=None) -> Any:
         if not dataclasses.is_dataclass(ann):
             return data
@@ -1359,7 +1353,6 @@ class ServersideOutputTransform(SerializationTransform):
 
 
 class Serverside(Generic[T]):
-
     def __init__(self, value: T, key: str = None, backend: Union[ServersideBackend, str, None] = None):
         self.value = value
         self.key: str = str(uuid.uuid4()) if key is None else key
