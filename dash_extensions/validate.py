@@ -12,9 +12,7 @@ def _collect_components_with_random_ids(self):
     return _set_random_id(self)
 
 
-dash.development.base_component.Component._set_random_id = (
-    _collect_components_with_random_ids
-)
+dash.development.base_component.Component._set_random_id = _collect_components_with_random_ids
 
 
 def assert_no_random_ids():

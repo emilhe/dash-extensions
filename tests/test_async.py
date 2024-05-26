@@ -35,9 +35,7 @@ def ws_example_bp(extra_children=None) -> DashBlueprint:
     dbp.clientside_callback(send, Output("ws", "send"), [Input("input", "value")])
     # Update div using websocket.
     receive = "function(msg){return msg.data;}"
-    dbp.clientside_callback(
-        receive, Output("msg", "children"), [Input("ws", "message")]
-    )
+    dbp.clientside_callback(receive, Output("msg", "children"), [Input("ws", "message")])
     return dbp
 
 
@@ -55,13 +53,9 @@ def server():
 def test_server_sent_events(dash_duo, server):
     # Create small example app.
     app = Dash(__name__)
-    app.layout = html.Div(
-        [html.Div(id="log"), EventSource(id="sse", url=sse_server_url)]
-    )
+    app.layout = html.Div([html.Div(id="log"), EventSource(id="sse", url=sse_server_url)])
     # You could also use a normal callback, but client side callbacks yield better performance.
-    app.clientside_callback(
-        "function(x){return x;}", Output("log", "children"), Input("sse", "message")
-    )
+    app.clientside_callback("function(x){return x;}", Output("log", "children"), Input("sse", "message"))
     # Run the test.
     dash_duo.start_server(app)
     time.sleep(0.01)
@@ -89,9 +83,7 @@ def test_websocket_unmount(dash_duo, server):
     # Create small example app.
     app = Dash(prevent_initial_callbacks=True, use_pages=True, pages_folder="")
     # Create a (default) page with a WS.
-    ws_example_bp(extra_children=[dcc.Link(href=f"/{pth}", id=link_id)]).register(
-        app, ""
-    )
+    ws_example_bp(extra_children=[dcc.Link(href=f"/{pth}", id=link_id)]).register(app, "")
     # Create a page without.
     bp = DashBlueprint()
     bp.layout = html.Div(msg, id=msg_id)

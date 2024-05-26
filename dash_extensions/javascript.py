@@ -37,18 +37,11 @@ class Namespace:
 
     def dump(self, assets_folder="assets"):
         os.makedirs(assets_folder, exist_ok=True)
-        content = "\n,".join(
-            [
-                _func_template.format(name=name, function=self.f_map[name])
-                for name in self.f_map
-            ]
-        )
+        content = "\n,".join([_func_template.format(name=name, function=self.f_map[name]) for name in self.f_map])
         for ns in reversed(self.args[1:]):
             content = _ns_template.format(namespace=ns, content=content)
         content = _template.format(namespace=self.args[0], content=content)
-        with open(
-            os.path.join(assets_folder, "{}.js".format("_".join(self.args))), "w"
-        ) as f:
+        with open(os.path.join(assets_folder, "{}.js".format("_".join(self.args))), "w") as f:
             f.write(jsbeautifier.beautify(content))
 
 

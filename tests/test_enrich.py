@@ -67,9 +67,7 @@ def _cssid(**kwargs):
 
 def _get_basic_dash_proxy(**kwargs) -> DashProxy:
     app = DashProxy(**kwargs)
-    app.layout = html.Div(
-        [html.Button(id="btn"), html.Div(id="log_server"), html.Div(id="log_client")]
-    )
+    app.layout = html.Div([html.Button(id="btn"), html.Div(id="log_server"), html.Div(id="log_client")])
     return app
 
 
@@ -197,17 +195,13 @@ def test_callback_blueprint():
     assert list(cbp.outputs) == [Output(my_output, "children")]
     assert list(cbp.inputs) == [Input(my_input, "n_clicks")]
     # Test kwargs.
-    cbp = CallbackBlueprint(
-        Input(my_input, "n_clicks"), Output(my_output, "children"), hello="world"
-    )
+    cbp = CallbackBlueprint(Input(my_input, "n_clicks"), Output(my_output, "children"), hello="world")
     assert cbp.kwargs == dict(hello="world")
 
 
 def test_flexible_callback_signature():
     # Test input/output/state as kwargs.
-    cbp = CallbackBlueprint(
-        output=[Output("o", "prop")], inputs=[Input("i", "prop")], hello="world"
-    )
+    cbp = CallbackBlueprint(output=[Output("o", "prop")], inputs=[Input("i", "prop")], hello="world")
     assert list(cbp.inputs) == [Input("i", "prop")]
     assert list(cbp.outputs) == [Output("o", "prop")]
     assert cbp.kwargs == dict(hello="world")
@@ -460,13 +454,9 @@ def test_multiplexer_transform_wildcard(dash_duo):
 
     dash_duo.start_server(app)
     dash_duo.find_element(_cssid(id="x", type="button0")).click()
-    assert (
-        dash_duo.find_element(_cssid(id="0", type="div")).text == "Hello from group 0"
-    )
+    assert dash_duo.find_element(_cssid(id="0", type="div")).text == "Hello from group 0"
     dash_duo.find_element(_cssid(id="y", type="button1")).click()
-    assert (
-        dash_duo.find_element(_cssid(id="1", type="div")).text == "Hello from group 1"
-    )
+    assert dash_duo.find_element(_cssid(id="1", type="div")).text == "Hello from group 1"
 
 
 @pytest.mark.parametrize("flex", [False, True])
@@ -559,9 +549,7 @@ def test_global_blueprint(dash_duo):
 )
 def test_blocking_callback_transform(dash_duo, args, kwargs, port):
     app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
-    app.layout = html.Div(
-        [html.Div(id="log"), dcc.Interval(id="trigger", interval=500)]
-    )
+    app.layout = html.Div([html.Div(id="log"), dcc.Interval(id="trigger", interval=500)])
     msg = "Hello world!"
 
     @app.callback(*args, **kwargs, blocking=True)
@@ -650,9 +638,7 @@ def test_dataclass_transform(dash_duo, args, kwargs):
     ],
 )
 def test_serverside_output_transform(dash_duo, args, kwargs):
-    app = DashProxy(
-        prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()]
-    )
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[ServersideOutputTransform()])
     app.layout = html.Div(
         [
             html.Button(id="btn"),
@@ -694,15 +680,9 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
         prevent_initial_callbacks=True,
         transforms=[ServersideOutputTransform(), MultiplexerTransform()],
     )
-    app.layout = html.Div(
-        make_block("1")
-        + make_block("2")
-        + [html.Div(id="log_all"), html.Button(id="btn_all")]
-    )
+    app.layout = html.Div(make_block("1") + make_block("2") + [html.Div(id="log_all"), html.Button(id="btn_all")])
 
-    @app.callback(
-        Output(_id("sso", MATCH), "children"), Input(_id("btn", MATCH), "n_clicks")
-    )
+    @app.callback(Output(_id("sso", MATCH), "children"), Input(_id("btn", MATCH), "n_clicks"))
     def update_default(n_clicks):
         """
         Populate serverside output ONE at a time, i.e. WRITE to SSO using MATCH.
@@ -716,9 +696,7 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
         """
         return tuple([Serverside(pd.DataFrame(columns=["B"], data=[n_clicks]))] * 2)
 
-    @app.callback(
-        Output(_id("log", MATCH), "children"), Input(_id("sso", MATCH), "children")
-    )
+    @app.callback(Output(_id("log", MATCH), "children"), Input(_id("sso", MATCH), "children"))
     def update_log(data):
         """
         Populate log elements ONE at a time, i.e. READ from SSO using MATCH.
@@ -740,12 +718,8 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
     # Click the first element.
     dash_duo.find_element(_css_selector(_id("btn", "1"))).click()
     time.sleep(0.1)  # wait for callback code to execute.
-    assert (
-        dash_duo.find_element(_css_selector(_id("sso", "2"))).text == ""
-    )  # not clicked, should be blank
-    assert (
-        dash_duo.find_element(_css_selector(_id("log", "2"))).text == ""
-    )  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("sso", "2"))).text == ""  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("log", "2"))).text == ""  # not clicked, should be blank
     assert dash_duo.find_element(_css_selector(_id("sso", "1"))).text != ""
     assert dash_duo.find_element(_css_selector(_id("log", "1"))).text == '{"A":{"0":1}}'
     assert dash_duo.find_element(_css_selector("log_all")).text == '{"A":{"0":1}}None'
@@ -754,24 +728,14 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
     time.sleep(0.1)  # wait for callback code to execute.
     dash_duo.find_element(_css_selector(_id("btn", "2"))).click()
     time.sleep(0.1)  # wait for callback code to execute.
-    assert (
-        dash_duo.find_element(_css_selector(_id("sso", "2"))).text != ""
-    )  # not clicked, should be blank
-    assert (
-        dash_duo.find_element(_css_selector(_id("log", "2"))).text == '{"A":{"0":2}}'
-    )  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("sso", "2"))).text != ""  # not clicked, should be blank
+    assert dash_duo.find_element(_css_selector(_id("log", "2"))).text == '{"A":{"0":2}}'  # not clicked, should be blank
     assert dash_duo.find_element(_css_selector(_id("log", "1"))).text == '{"A":{"0":1}}'
-    assert (
-        dash_duo.find_element(_css_selector("log_all")).text
-        == '{"A":{"0":1}}{"A":{"0":2}}'
-    )
+    assert dash_duo.find_element(_css_selector("log_all")).text == '{"A":{"0":1}}{"A":{"0":2}}'
     # Click the all element.
     dash_duo.find_element("#btn_all").click()
     time.sleep(0.1)  # wait for callback code to execute.
-    assert (
-        dash_duo.find_element(_css_selector("log_all")).text
-        == '{"B":{"0":1}}{"B":{"0":1}}'
-    )
+    assert dash_duo.find_element(_css_selector("log_all")).text == '{"B":{"0":1}}{"B":{"0":1}}'
 
 
 @pytest.mark.parametrize(
@@ -800,10 +764,7 @@ def test_log_transform(dash_duo, args, kwargs):
     # Check that stuff works.
     _basic_dash_proxy_test(dash_duo, app, ["log_server"])
     # Check that log is written to div element.
-    assert (
-        dash_duo.find_element("#log").text
-        == "INFO: info\nWARNING: warning\nERROR: error"
-    )
+    assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
 
 
 @pytest.mark.parametrize(
@@ -856,11 +817,7 @@ def test_cycle_breaker_transform(dash_duo, c_args, c_kwargs, f_args, f_kwargs): 
 
     dash_duo.start_server(app)
     time.sleep(0.1)
-    logs = [
-        entry
-        for entry in dash_duo.driver.get_log("browser")
-        if entry["timestamp"] > dash_duo._last_ts
-    ]
+    logs = [entry for entry in dash_duo.driver.get_log("browser") if entry["timestamp"] > dash_duo._last_ts]
     assert len(logs) <= int(os.environ.get("TEST_CYCLE_BREAKER_ALLOWED_ERRORS", "0"))
     f = dash_duo.find_element("#fahrenheit")
     f.send_keys("32")

@@ -13,9 +13,7 @@ app = Dash()
 app.layout = html.Div([Mermaid(id="mermaid"), html.Button("Click me", id="trigger")])
 
 
-@app.callback(
-    Output("mermaid", "chart"), Input("trigger", "n_clicks"), prevent_initial_call=True
-)
+@app.callback(Output("mermaid", "chart"), Input("trigger", "n_clicks"), prevent_initial_call=True)
 def set_chart(_):
     return chart
 

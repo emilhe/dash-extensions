@@ -13,17 +13,13 @@ options = dict(
 app = Dash(__name__)
 app.layout = html.Div(
     [
-        Lottie(
-            options=options, width="25%", height="25%", url=url, id="lottie", speed=2
-        ),
+        Lottie(options=options, width="25%", height="25%", url=url, id="lottie", speed=2),
         dcc.Slider(id="slider", value=20, min=0, max=100, step=5),
     ]
 )
 
 
-@app.callback(
-    Output("lottie", "speed"), [Input("slider", "value")], prevent_initial_call=True
-)
+@app.callback(Output("lottie", "speed"), [Input("slider", "value")], prevent_initial_call=True)
 def set_speed(value):
     if not value:
         return no_update

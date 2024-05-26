@@ -22,12 +22,8 @@ app.layout = html.Div(
         html.Div(id="sse-status"),
     ]
 )
-app.clientside_callback(
-    update_graph, Output("sse-container", "children"), Input("sse", "value")
-)
-app.clientside_callback(
-    update_graph, Output("sse-status", "children"), Input("sse", "done")
-)
+app.clientside_callback(update_graph, Output("sse-container", "children"), Input("sse", "value"))
+app.clientside_callback(update_graph, Output("sse-status", "children"), Input("sse", "done"))
 
 if __name__ == "__main__":
     app.run_server()

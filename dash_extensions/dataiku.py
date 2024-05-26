@@ -21,9 +21,7 @@ def bind_assets_folder(app: Dash, app_id: str, assets_folder: str):  # noqa: C90
     copy_tree(assets_folder, dst_assets_folder)
 
     def _walk_assets_directory(self):
-        walk_dir = os.path.join(
-            self.config.assets_folder, app_id
-        )  # EMHER: Use application sub dir
+        walk_dir = os.path.join(self.config.assets_folder, app_id)  # EMHER: Use application sub dir
         slash_splitter = re.compile(r"[\\/]+")
         ignore_str = self.config.assets_ignore
         ignore_filter = re.compile(ignore_str) if ignore_str else None
