@@ -8,11 +8,15 @@ const StreamingBuffer = ({url, withCredentials, setProps}) => {
     const [data, setData] = useState("");
 
     useEffect(() => {
+        // Reset on url change.
+        setProps({ done: false })
+        setData("")
+        // Don't do anything if url is not set.
         if(!url){return () => {};}
-
+        // Instantiate EventSource.
         const sse = new EventSource(url, { withCredentials: withCredentials });
-        
-        function parseMessage(e) {
+        // Handle messages.
+        sse.onmessage = e => {
           // Handle end of stream.
           if(e.data === "[DONE]"){
             setProps({ done: true })
@@ -22,8 +26,6 @@ const StreamingBuffer = ({url, withCredentials, setProps}) => {
           // Update value.
           setData(data => data.concat(e.data))
         }
-      
-        sse.onmessage = e => parseMessage(e);
         // Close on error.
         sse.onerror = (e) => {
           console.log("ERROR");

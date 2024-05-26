@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.16] - UNRELEASED
+
+### Added
+
+- Add new `StreamingBuffer` component, which can receive and buffer content, e.g. the output from an LLM.
+- Add new `LoadingTransform`, which makes it easy to re-use a single (full screen) loading component across the app.
+
 ## [1.0.15] - 05-04-24
 
 ### Added
