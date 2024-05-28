@@ -2,13 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.16] - UNRELEASED
+## [1.0.16] - 05-28-24
 
 ### Added
 
-- Add new `SSE` component, which can receive and buffer content, e.g. the output from an LLM.
+- Add new `SSE` component, which can receive (and buffer) server sent events such the output from an LLM.
 - Add new `LoadingTransform`, which makes it easy to re-use a single (full screen) loading component across the app.
-- Add new `BaseModelTransform`, which automates serialization/deserialization of Pydantic BaseModel objects.
+- Add new `BaseModelTransform`, which automates serialization/deserialization of Pydantic `BaseModel` objects.
 
 ## [1.0.15] - 05-04-24
 
