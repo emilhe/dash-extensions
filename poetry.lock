@@ -2227,4 +2227,4 @@ mantine = ["dash-mantine-components"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4"
-content-hash = "18cd8fc0cb9a6d8a67ca15608b8fa2288625ee91830bb2800106c6ca60b7e305"
+content-hash = "0c7ce2e8115040402778ba839ae9822c8c980bc297950ffb4b470deb4f8998fc"

@@ -21,15 +21,6 @@ import plotly
 
 # Enable enrich as drop-in replacement for dash
 # noinspection PyUnresolvedReferences
-from dash import callback_context  # noqa: F401
-from dash import ctx  # noqa: F401
-from dash import dash_table  # noqa: F401
-from dash import development  # noqa: F401
-from dash import exceptions  # noqa: F401
-from dash import page_container  # noqa: F401
-from dash import page_registry  # noqa: F401
-from dash import register_page  # noqa: F401
-from dash import resources  # noqa: F401
 from dash import (  # lgtm [py/unused-import]; noqa: F401
     ALL,
     ALLSMALLER,
@@ -38,9 +29,18 @@ from dash import (  # lgtm [py/unused-import]; noqa: F401
     Input,
     Output,
     State,
+    callback_context,  # noqa: F401
+    ctx,  # noqa: F401
+    dash_table,  # noqa: F401
     dcc,
+    development,  # noqa: F401
+    exceptions,  # noqa: F401
     html,
     no_update,
+    page_container,  # noqa: F401
+    page_registry,  # noqa: F401
+    register_page,  # noqa: F401
+    resources,  # noqa: F401
 )
 from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
@@ -49,6 +49,7 @@ from dash.development.base_component import Component
 from dataclass_wizard import asdict, fromdict
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
+from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
 
@@ -107,12 +108,18 @@ class DependencyCollection:
         self._re_index()
 
     def __getitem__(self, key: int):
+        if self._index is None:
+            raise ValueError("Index not built.")
         return self.get(self._index[key])
 
     def __setitem__(self, key: int, value):
+        if self._index is None:
+            raise ValueError("Index not built.")
         return self.set(self._index[key], value)
 
     def __len__(self):
+        if self._index is None:
+            raise ValueError("Index not built.")
         return len(self._index)
 
     def __iter__(self):
@@ -128,16 +135,18 @@ class DependencyCollection:
     def get(self, multi_index):
         e = self.structure
         for j in multi_index:
-            e = e[j]
+            e = e[j]  # type: ignore
         return e
 
     def set(self, multi_index, value):
         e = self.structure
         for i, j in enumerate(multi_index):
             if i == len(multi_index) - 1:
-                e[j] = value
+                e[j] = value  # type: ignore
 
     def append(self, value, flex_key=None, index=None):
+        if self._index is None:
+            raise ValueError("Index not built.")
         i = len(self._index)
         if isinstance(self.structure, list):
             if index is not None:
@@ -1265,6 +1274,24 @@ class DataclassTransform(SerializationTransform):
         if not dataclasses.is_dataclass(obj):
             return obj
         return asdict(obj)
+
+
+# endregion
+
+
+# region PydanticTransform
+
+
+class BaseModelTransform(SerializationTransform):
+    def _try_load(self, data: Any, ann=None) -> Any:
+        if not isinstance(ann, type(BaseModel)):
+            return data
+        return ann.model_validate_json(data)
+
+    def _try_dump(self, obj: Any) -> Any:
+        if not isinstance(obj, BaseModel):
+            return obj
+        return obj.model_dump_json()
 
 
 # endregion

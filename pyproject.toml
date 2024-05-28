@@ -30,6 +30,8 @@ jsbeautifier = "^1.14.3"
 Flask-Caching = "^2.1.0"
 dash-mantine-components = {version = "^0.14.3", optional = true}
 dataclass-wizard = "^0.22.2"
+ruff = "^0.4.5"
+pydantic = "^2.7.1"
 
 [tool.poetry.extras]
 mantine = ["dash-mantine-components"]
