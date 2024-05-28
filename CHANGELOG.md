@@ -6,8 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Add new `StreamingBuffer` component, which can receive and buffer content, e.g. the output from an LLM.
+- Add new `SSE` component, which can receive and buffer content, e.g. the output from an LLM.
 - Add new `LoadingTransform`, which makes it easy to re-use a single (full screen) loading component across the app.
+- Add new `BaseModelTransform`, which automates serialization/deserialization of Pydantic BaseModel objects.
 
 ## [1.0.15] - 05-04-24
 

@@ -8,7 +8,7 @@ from .Loading import Loading
 from .Lottie import Lottie
 from .Mermaid import Mermaid
 from .Purify import Purify
-from .StreamingBuffer import StreamingBuffer
+from .SSE import SSE
 from .WebSocket import WebSocket
 
 __all__ = [
@@ -22,6 +22,6 @@ __all__ = [
     "Lottie",
     "Mermaid",
     "Purify",
-    "StreamingBuffer",
-    "WebSocket",
+    "SSE",
+    "WebSocket"
 ]
