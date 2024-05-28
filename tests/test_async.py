@@ -1,13 +1,13 @@
 import time
+from multiprocessing import Process
+
 import pytest
 import uvicorn
+from dash import Dash, Input, Output, dcc, html
 
-from multiprocessing import Process
 from dash_extensions import EventSource, WebSocket
-from dash import Dash, Input, Output, html, dcc
-
 from dash_extensions.enrich import DashBlueprint, DashProxy
-from tests.mock_async import sse_response, async_server, ws_response
+from tests.mock_async import async_server, sse_response, ws_response
 
 # region Async mock server fixture
 
@@ -27,13 +27,14 @@ def ws_example_bp(extra_children=None) -> DashBlueprint:
             dcc.Input(id="input", autoComplete="off"),
             html.Div(id="msg"),
             WebSocket(url=ws_server_url, id="ws"),
-        ] + (extra_children if extra_children is not None else [])
+        ]
+        + (extra_children if extra_children is not None else [])
     )
     # Send input value using websocket.
     send = "function(value){return value;}"
     dbp.clientside_callback(send, Output("ws", "send"), [Input("input", "value")])
     # Update div using websocket.
-    receive = 'function(msg){return msg.data;}'
+    receive = "function(msg){return msg.data;}"
     dbp.clientside_callback(receive, Output("msg", "children"), [Input("ws", "message")])
     return dbp
 
@@ -47,6 +48,7 @@ def server():
 
 
 # endregion
+
 
 def test_server_sent_events(dash_duo, server):
     # Create small example app.

@@ -1,6 +1,6 @@
 {
   "name": "dash-extensions",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Extensions for Plotly Dash.",
   "main": "build/index.js",
   "scripts": {
@@ -29,6 +29,7 @@
     "ramda": "^0.26.1",
     "react-loadable": "^5.5.0",
     "react-lottie": "^1.2.3",
+    "sse.js": "^2.4.1",
     "ssri": "^9.0.0"
   },
   "devDependencies": {

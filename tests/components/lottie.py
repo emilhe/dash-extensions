@@ -1,9 +1,14 @@
-from dash import Dash, html, dcc, Input, Output, no_update
+from dash import Dash, Input, Output, dcc, html, no_update
+
 from dash_extensions import Lottie
 
 # Setup options.
 url = "https://assets9.lottiefiles.com/packages/lf20_YXD37q.json"
-options = dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRatio="xMidYMid slice"))
+options = dict(
+    loop=True,
+    autoplay=True,
+    rendererSettings=dict(preserveAspectRatio="xMidYMid slice"),
+)
 # Create example app.
 app = Dash(__name__)
 app.layout = html.Div(

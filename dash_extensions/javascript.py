@@ -1,4 +1,5 @@
 import os
+
 import jsbeautifier
 
 # region Templates
@@ -6,7 +7,7 @@ import jsbeautifier
 _template = """window.{namespace} = Object.assign({{}}, window.{namespace}, {{
     {content}
 }});"""
-_ns_template = """{namespace}: {{  
+_ns_template = """{namespace}: {{
         {content}
     }}"""
 _func_template = """{name}: {function}"""

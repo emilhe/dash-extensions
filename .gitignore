@@ -14,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -135,3 +134,11 @@ inst/*
 **/file_system_backend/*
 man/*
 R/*
+
+.idea/*
+pc_ex1/*
+page_components/*
+NAMESPACE
+DESCRIPTION
+jsconfig.json
+tmp**.py

@@ -1,4 +1,5 @@
-from dash import Dash, html, Output, Input
+from dash import Dash, Input, Output, html
+
 from dash_extensions import Mermaid
 
 chart = """

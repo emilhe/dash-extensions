@@ -15,7 +15,7 @@ const Loading = (props) => {
 
     useEffect(() => {
         const mounted = container && container.current;
-        const handlePreventDefault = (e) => {  
+        const handlePreventDefault = (e) => {
             e.preventDefault();
         }
         if(mounted){

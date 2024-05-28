@@ -11,47 +11,47 @@ import struct
 import sys
 import threading
 import uuid
-import plotly
+from collections import defaultdict
+from datetime import datetime
+from itertools import compress
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+
 import dash
+import plotly
 
 # Enable enrich as drop-in replacement for dash
 # noinspection PyUnresolvedReferences
-from dash import (  # lgtm [py/unused-import]
-    no_update,
-    Output,
-    State,
-    Input,
-    ClientsideFunction,
-    MATCH,
+from dash import (  # lgtm [py/unused-import]; noqa: F401
     ALL,
     ALLSMALLER,
-    development,
-    exceptions,
-    resources,
+    MATCH,
+    ClientsideFunction,
+    Input,
+    Output,
+    State,
+    callback_context,  # noqa: F401
+    ctx,  # noqa: F401
+    dash_table,  # noqa: F401
     dcc,
+    development,  # noqa: F401
+    exceptions,  # noqa: F401
     html,
-    dash_table,
-    callback_context,
-    callback,
-    clientside_callback,
-    page_container,
-    page_registry,
-    register_page,
-    ctx
+    no_update,
+    page_container,  # noqa: F401
+    page_registry,  # noqa: F401
+    register_page,  # noqa: F401
+    resources,  # noqa: F401
 )
 from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
-from dash.dependencies import _Wildcard, DashDependency  # lgtm [py/unused-import]
+from dash.dependencies import DashDependency, _Wildcard  # lgtm [py/unused-import]
 from dash.development.base_component import Component
+from dataclass_wizard import asdict, fromdict
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
-from itertools import compress
-from more_itertools import flatten
-from collections import defaultdict
-from typing import Dict, Callable, List, Union, Any, Tuple, Optional, Generic, TypeVar
-from datetime import datetime
+from pydantic import BaseModel  # type: ignore
+
 from dash_extensions import CycleBreaker
-from dataclass_wizard import fromdict, asdict
 
 T = TypeVar("T")
 
@@ -62,6 +62,7 @@ DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
 
 
 # region DependencyCollection
+
 
 def build_index(structure, entry, index):
     if isinstance(structure, list):
@@ -78,7 +79,7 @@ def build_index(structure, entry, index):
     raise ValueError(f"Unsupported structure {str(structure)}")
 
 
-def validate_structure(structure, level=0):
+def validate_structure(structure, level=0):  # noqa: C901
     if isinstance(structure, DashDependency):
         if level == 0:
             return [structure]
@@ -107,12 +108,18 @@ class DependencyCollection:
         self._re_index()
 
     def __getitem__(self, key: int):
+        if self._index is None:
+            raise ValueError("Index not built.")
         return self.get(self._index[key])
 
     def __setitem__(self, key: int, value):
+        if self._index is None:
+            raise ValueError("Index not built.")
         return self.set(self._index[key], value)
 
     def __len__(self):
+        if self._index is None:
+            raise ValueError("Index not built.")
         return len(self._index)
 
     def __iter__(self):
@@ -128,16 +135,18 @@ class DependencyCollection:
     def get(self, multi_index):
         e = self.structure
         for j in multi_index:
-            e = e[j]
+            e = e[j]  # type: ignore
         return e
 
     def set(self, multi_index, value):
         e = self.structure
         for i, j in enumerate(multi_index):
             if i == len(multi_index) - 1:
-                e[j] = value
+                e[j] = value  # type: ignore
 
     def append(self, value, flex_key=None, index=None):
+        if self._index is None:
+            raise ValueError("Index not built.")
         i = len(self._index)
         if isinstance(self.structure, list):
             if index is not None:
@@ -161,6 +170,7 @@ class DependencyCollection:
 # endregion
 
 # region Dash blueprint
+
 
 def collect_args(args: Union[Tuple[Any], List[Any]], inputs, outputs):
     for arg in args:
@@ -201,12 +211,16 @@ class CallbackBlueprint:
         # Collect dummy elements.
         if kwargs.get("background", False) and "progress" in kwargs:
             # This element represents the set_progress function.
-            self.inputs.append(DummyDependency("function", "set_progress"), index=0, flex_key="set_progress")
+            self.inputs.append(
+                DummyDependency("function", "set_progress"),
+                index=0,
+                flex_key="set_progress",
+            )
         # Collect the rest.
         self.kwargs: Dict[str, Any] = kwargs
         self.f = None
 
-    def register(self, app: dash.Dash):
+    def register(self, app: dash.Dash):  # noqa: C901
         # Collect dependencies.
         dep_args, dep_kwargs = [], {}
         for dep_col in [self.outputs, self.inputs]:
@@ -250,7 +264,11 @@ class CallbackBlueprint:
 
 
 class DashBlueprint:
-    def __init__(self, transforms: List[DashTransform] = None, include_global_callbacks: bool = False):
+    def __init__(
+        self,
+        transforms: List[DashTransform] = None,
+        include_global_callbacks: bool = False,
+    ):
         self.callbacks: List[CallbackBlueprint] = []
         self.clientside_callbacks: List[CallbackBlueprint] = []
         self.transforms = _resolve_transforms(transforms)
@@ -293,7 +311,9 @@ class DashBlueprint:
         for cbp in callbacks + clientside_callbacks:
             cbp.register(app)
 
-    def _resolve_callbacks(self) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
+    def _resolve_callbacks(
+        self,
+    ) -> Tuple[List[CallbackBlueprint], List[CallbackBlueprint]]:
         """
         This method resolves the callbacks, i.e. it applies the callback injections.
         """
@@ -308,15 +328,21 @@ class DashBlueprint:
         return callbacks, clientside_callbacks
 
     # TODO: Include or not? The plugin still seems a bit immature.
-    def register(self, app: Union[dash.Dash, DashProxy], module, prefix: Union[str, PrefixIdTransform, None]=None, **kwargs):      
+    def register(
+        self,
+        app: Union[dash.Dash, DashProxy],
+        module,
+        prefix: Union[str, PrefixIdTransform, None] = None,
+        **kwargs,
+    ):
         # Add prefix transform if supplied.
         if prefix is not None:
             prefix_transform = prefix if isinstance(prefix, PrefixIdTransform) else PrefixIdTransform(prefix)
-            self.transforms.append(prefix_transform)                                          
+            self.transforms.append(prefix_transform)
         # Register the callbacks and page.
         self.register_callbacks(app)
         dash.register_page(module, layout=self._layout_value, **kwargs)
-    
+
     def clear(self):
         self.callbacks = []
         self.clientside_callbacks = []
@@ -328,7 +354,10 @@ class DashBlueprint:
             layout = transform.layout(layout, self._layout_is_function)
         return layout
 
-    def embed(self, app: DashProxy):
+    def embed(self, app: Union[DashBlueprint, DashProxy]):
+        if isinstance(app, DashBlueprint):
+            self.register_callbacks(app)
+            return self._layout_value()
         if app.blueprint._layout_is_function and app._got_first_request["setup_server"]:
             return self._layout_value()
         self.register_callbacks(app)
@@ -356,11 +385,21 @@ class DashProxy(dash.Dash):
     work (e.g. setting a secret key on the server), and exposes convenience functions such as 'hijack'.
     """
 
-    def __init__(self, *args, transforms=None, include_global_callbacks=True, blueprint=None,
-                 prevent_initial_callbacks="initial_duplicate", **kwargs):
+    def __init__(
+        self,
+        *args,
+        transforms=None,
+        include_global_callbacks=True,
+        blueprint=None,
+        prevent_initial_callbacks="initial_duplicate",
+        **kwargs,
+    ):
         super().__init__(*args, prevent_initial_callbacks=prevent_initial_callbacks, **kwargs)
-        self.blueprint = DashBlueprint(transforms,
-                                       include_global_callbacks=include_global_callbacks) if blueprint is None else blueprint
+        self.blueprint = (
+            DashBlueprint(transforms, include_global_callbacks=include_global_callbacks)
+            if blueprint is None
+            else blueprint
+        )
         self.setup_server_lock = threading.Lock()
 
     def callback(self, *args, **kwargs):
@@ -371,7 +410,8 @@ class DashProxy(dash.Dash):
 
     def long_callback(self, *_args, **_kwargs):
         raise NotImplementedError(
-            "The 'long_callback(..)' syntax is not supported, please use 'callback(background=True, ...)' instead.")
+            "The 'long_callback(..)' syntax is not supported, please use 'callback(background=True, ...)' instead."
+        )
 
     def register_celery_tasks(self):
         if sys.argv[0].endswith("celery"):
@@ -453,6 +493,7 @@ def _extract_list_from_kwargs(kwargs: dict, key: str) -> list:
 
 # region Dash transform
 
+
 class DashTransform:
     def __init__(self):
         self.layout_initialized = False
@@ -483,7 +524,6 @@ class DashTransform:
 
 
 class StatefulDashTransform(DashTransform):
-
     def __init__(self):
         super().__init__()
         self.blueprint = DashBlueprint()
@@ -536,14 +576,16 @@ class BlockingCallbackTransform(StatefulDashTransform):
             end_client_id = f"{callback_id}_end_client"
             start_blocked_id = f"{callback_id}_start_blocked"
             end_blocked_id = f"{callback_id}_end_blocked"
-            self.components.extend([
-                dcc.Store(id=start_client_id),
-                dcc.Store(id=end_server_id),
-                dcc.Store(id=end_client_id),
-                dcc.Store(id=start_blocked_id),
-                dcc.Store(id=start_client_ctx),
-                CycleBreaker(id=end_blocked_id)
-            ])
+            self.components.extend(
+                [
+                    dcc.Store(id=start_client_id),
+                    dcc.Store(id=end_server_id),
+                    dcc.Store(id=end_client_id),
+                    dcc.Store(id=start_blocked_id),
+                    dcc.Store(id=start_client_ctx),
+                    CycleBreaker(id=end_blocked_id),
+                ]
+            )
             # Bind start signal callback.
             start_callback = f"""function()
             {{
@@ -552,7 +594,7 @@ class BlockingCallbackTransform(StatefulDashTransform):
                 let ctx = arguments[arguments.length-1];
                 const now = new Date().getTime();
                 const trigger = dash_clientside.callback_context.triggered[0];
-                const no = window.dash_clientside.no_update  
+                const no = window.dash_clientside.no_update
                 // Update context.
                 if(trigger !== undefined){{
                     if(!trigger.prop_id.startsWith('{end_blocked_id}')){{
@@ -561,7 +603,7 @@ class BlockingCallbackTransform(StatefulDashTransform):
                         for (let i = 0; i < keys.length; i++) {{
                             let key = keys[i];
                             ctx[key] = dash_clientside.callback_context[key];
-                        }}                        
+                        }}
                     }}
                 }}
                 // First run => INVOKE.
@@ -585,9 +627,17 @@ class BlockingCallbackTransform(StatefulDashTransform):
             }}"""
             self.blueprint.clientside_callback(
                 start_callback,
-                [Output(start_client_id, "data"), Output(start_blocked_id, "data"), Output(start_client_ctx, "data")],
+                [
+                    Output(start_client_id, "data"),
+                    Output(start_blocked_id, "data"),
+                    Output(start_client_ctx, "data"),
+                ],
                 [Input(end_blocked_id, "dst")] + list(callback.inputs),
-                [State(start_client_id, "data"), State(end_client_id, "data"), State(start_client_ctx, "data")],
+                [
+                    State(start_client_id, "data"),
+                    State(end_client_id, "data"),
+                    State(start_client_ctx, "data"),
+                ],
             )
             # Bind end signal callback.
             end_callback = """function(endServerId, startBlockedId)
@@ -602,7 +652,7 @@ class BlockingCallbackTransform(StatefulDashTransform):
                 end_callback,
                 [Output(end_client_id, "data"), Output(end_blocked_id, "src")],
                 Input(end_server_id, "data"),
-                State(start_blocked_id, "data")
+                State(start_blocked_id, "data"),
             )
             # Modify the original callback to send finished signal.
             num_outputs = len(callback.outputs)
@@ -628,15 +678,15 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
             cached_ctx = fltr[1]
             single_output = num_outputs <= 1
             if cached_ctx is not None and "triggered" in cached_ctx:
-                ctx = context_value.get()
-                ctx["triggered_inputs"] = cached_ctx["triggered"]
-                context_value.set(ctx)
+                local_ctx = context_value.get()
+                local_ctx["triggered_inputs"] = cached_ctx["triggered"]
+                context_value.set(local_ctx)
             try:
                 outputs = f(*args, **kwargs)
             except Exception:
                 logging.exception(f"Exception raised in blocking callback [{f.__name__}]")
-                outputs = no_update if single_output else [no_update] * num_outputs       
-            
+                outputs = no_update if single_output else [no_update] * num_outputs
+
             return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
 
         return decorated_function
@@ -650,8 +700,12 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
 
 
 class LogConfig:
-    def __init__(self, log_output, log_writer_map: Dict[int, Callable],
-                 layout_transform: Callable[[List[Component]], List[Component]]):
+    def __init__(
+        self,
+        log_output,
+        log_writer_map: Dict[int, Callable],
+        layout_transform: Callable[[List[Component]], List[Component]],
+    ):
         self.log_output = log_output
         self.log_writer_map = log_writer_map
         self.layout_transform = layout_transform
@@ -665,7 +719,11 @@ def setup_notifications_log_config():
         import dash_mantine_components as dmc
 
         layout.append(html.Div(id=log_id))
-        return [dmc.NotificationProvider(layout)]
+        if dmc.__version__ < "0.14.0":
+            layout.append(dmc.NotificationsProvider())
+        layout.append(dmc.NotificationProvider(zIndex=2000))
+
+        return layout
 
     return LogConfig(log_output, get_notification_log_writers(), notification_layout_transform)
 
@@ -693,7 +751,14 @@ def get_notification_log_writers():
     import dash_mantine_components as dmc
 
     def _default_kwargs(color, title, message):
-        return dict(color=color, title=title, message=message, id=str(uuid.uuid4()), action="show", autoClose=False)
+        return dict(
+            color=color,
+            title=title,
+            message=message,
+            id=str(uuid.uuid4()),
+            action="show",
+            autoClose=False,
+        )
 
     def log_info(message, **kwargs):
         return dmc.Notification(**{**_default_kwargs("blue", "Info", message), **kwargs})
@@ -704,7 +769,11 @@ def get_notification_log_writers():
     def log_error(message, **kwargs):
         return dmc.Notification(**{**_default_kwargs("red", "Error", message), **kwargs})
 
-    return {logging.INFO: log_info, logging.WARNING: log_warning, logging.ERROR: log_error}
+    return {
+        logging.INFO: log_info,
+        logging.WARNING: log_warning,
+        logging.ERROR: log_error,
+    }
 
 
 class DashLogger:
@@ -787,10 +856,75 @@ def bind_logger(logger, single_output, out_flex_key):
 
 # endregion
 
+# region Loading transform
+
+
+class LoadingTransform(DashTransform):
+    """
+    The loading transform makes it easy to trigger a single loading component from multiple callbacks.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        kwargs_defaults = {
+            "overlay_style": {
+                "opacity": 0.5,
+                "backgroundColor": "white",
+                "width": "100vw",
+                "height": "100vh",
+                "position": "fixed",
+                "left": 0,
+                "top": 0,
+                "zIndex": 1000,
+                "visibility": "visible",
+            },
+            "delay_show": 500,
+            "delay_hide": 1000,
+            "fullscreen": True,
+            "id": "loading_id",
+        }
+        self.kwargs = {**kwargs_defaults, **kwargs}
+
+    def transform_layout(self, layout):
+        loading = dcc.Loading(html.Div(""), **self.kwargs)
+        layout.children = _as_list(layout.children) + [loading]
+
+    def apply(self, callbacks, clientside_callbacks):
+        callbacks = self.apply_serverside(callbacks)
+        return callbacks, clientside_callbacks
+
+    def apply_serverside(self, callbacks):
+        for callback in callbacks:
+            if not callback.kwargs.get("loading", None):
+                continue
+            # Add the log component as output.
+            single_output = len(callback.outputs) <= 1
+            out_flex_key = callback.outputs.append(Output(self.kwargs["id"], "children", allow_duplicate=True))
+            # Modify the callback function accordingly.
+            f = callback.f
+            callback.f = bind_loading(single_output, out_flex_key)(f)
+
+        return callbacks
+
+
+def bind_loading(single_output, out_flex_key):
+    def wrapper(f):
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            outputs = f(*args, **kwargs)
+            return _append_output(outputs, dash.no_update, single_output, out_flex_key)
+
+        return decorated_function
+
+    return wrapper
+
+
+# endregion
+
 # region Cycle breaker transform
 
-class CycleBreakerTransform(StatefulDashTransform):
 
+class CycleBreakerTransform(StatefulDashTransform):
     def __init__(self):
         super().__init__()
 
@@ -861,24 +995,24 @@ def register(blueprint: DashBlueprint, name: str, prefix=None, **kwargs):
 class PrefixIdTransform(DashTransform):
     def __init__(self, prefix, prefix_func=None, escape=None):
         """
-        The PrefixIdTransform adds a prefix to all component ids of the DashBlueprint, including 
-        their references in callbacks. It is typically used to avoid ID collisions between 
+        The PrefixIdTransform adds a prefix to all component ids of the DashBlueprint, including
+        their references in callbacks. It is typically used to avoid ID collisions between
         blueprints when they are registered on or embedded in the main Dash application.
 
         Args:
             prefix (str): The prefix that will be added to the component_ids.
             prefix_func (callable(str, Component, callable(str)): A function used to modify
-                the ID of the components. This function must accept three arguments: the 
+                the ID of the components. This function must accept three arguments: the
                 prefix string, a Dash component, and the escape function. If not provided,
-                the `prefix_component()` function is used, which relies on `apply_prefix()` 
+                the `prefix_component()` function is used, which relies on `apply_prefix()`
                 to calculate the new ID.
-            escape (callable(str)): A function that will be called by `apply_prefix()` to 
+            escape (callable(str)): A function that will be called by `apply_prefix()` to
                 determine whether the component's ID should remain unaltered (escaped). The
-                function should accept a string (the component_id) and return a boolean. 
-                By default, `default_prefix_escape()` is used, which avoids modifying 
+                function should accept a string (the component_id) and return a boolean.
+                By default, `default_prefix_escape()` is used, which avoids modifying
                 certain IDs that start with "a-" or "anchor-".
 
-        Note: `PrefixIdTransform` is automatically registered as `transforms` by 
+        Note: `PrefixIdTransform` is automatically registered as `transforms` by
                the `DashBlueprint.register()` method when the `prefix` parameter is specified.
         """
         super().__init__()
@@ -919,7 +1053,7 @@ def apply_prefix(prefix, component_id, escape):
     if isinstance(component_id, dict):
         for key in component_id:
             # This branch handles the IDs. TODO: Can we always assume use of ints?
-            if type(component_id[key]) == int:
+            if isinstance(component_id[key], int):
                 continue
             # This branch handles the wildcard callbacks.
             if isinstance(component_id[key], _Wildcard):
@@ -957,7 +1091,12 @@ def dynamic_prefix(app: Union[DashBlueprint, DashProxy], component: Component):
     if len(prefix_transforms) == 0:
         return
     prefix_transform: PrefixIdTransform = prefix_transforms[0]
-    prefix_recursively(component, prefix_transform.prefix, prefix_transform.prefix_func, prefix_transform.escape)
+    prefix_recursively(
+        component,
+        prefix_transform.prefix,
+        prefix_transform.prefix_func,
+        prefix_transform.escape,
+    )
 
 
 # endregion
@@ -975,7 +1114,6 @@ class Trigger(Input):
 
 
 class TriggerTransform(DashTransform):
-
     def apply_serverside(self, callbacks):
         for callback in callbacks:
             is_trigger = [isinstance(item, Trigger) for item in callback.inputs]
@@ -1010,7 +1148,7 @@ def filter_args(args_filter):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args):
-            post_args = list(args[len(args_filter):])
+            post_args = list(args[len(args_filter) :])
             args = list(args[: len(args_filter)])
             filtered_args = [arg for j, arg in enumerate(args) if not args_filter[j]] + post_args
             return f(*filtered_args)
@@ -1029,6 +1167,7 @@ def trigger_filter(args):
 # endregion
 
 # region Multiplexer transform
+
 
 class MultiplexerTransform(DashTransform):
     """
@@ -1069,8 +1208,8 @@ def _output_id_without_wildcards(output: Output) -> str:
 
 # region SerializationTransform
 
-class SerializationTransform(DashTransform):
 
+class SerializationTransform(DashTransform):
     def apply_serverside(self, callbacks):
         for callback in callbacks:
             f = callback.f
@@ -1083,7 +1222,7 @@ class SerializationTransform(DashTransform):
     def _try_dump(self, obj: Any):
         raise NotImplementedError
 
-    def _unpack_pack_callback(self, callback):
+    def _unpack_pack_callback(self, callback):  # noqa: C901
         full_arg_spec = inspect.getfullargspec(callback.f)
 
         def unpack_pack_args(f):
@@ -1119,12 +1258,13 @@ class SerializationTransform(DashTransform):
     def sort_key(self):
         return 0
 
+
 # endregion
 
 # region DataclassTransform
 
-class DataclassTransform(SerializationTransform):
 
+class DataclassTransform(SerializationTransform):
     def _try_load(self, data: Any, ann=None) -> Any:
         if not dataclasses.is_dataclass(ann):
             return data
@@ -1134,6 +1274,24 @@ class DataclassTransform(SerializationTransform):
         if not dataclasses.is_dataclass(obj):
             return obj
         return asdict(obj)
+
+
+# endregion
+
+
+# region PydanticTransform
+
+
+class BaseModelTransform(SerializationTransform):
+    def _try_load(self, data: Any, ann=None) -> Any:
+        if not isinstance(ann, type(BaseModel)):
+            return data
+        return ann.model_validate_json(data)
+
+    def _try_dump(self, obj: Any) -> Any:
+        if not isinstance(obj, BaseModel):
+            return obj
+        return obj.model_dump_json()
 
 
 # endregion
@@ -1211,8 +1369,15 @@ class EnrichedOutput(Output):
     Like a normal Output, includes additional properties related to storing the data.
     """
 
-    def __init__(self, component_id, component_property, allow_duplicate=False, backend=None, session_check=None,
-                 arg_check=True):
+    def __init__(
+        self,
+        component_id,
+        component_property,
+        allow_duplicate=False,
+        backend=None,
+        session_check=None,
+        arg_check=True,
+    ):
         super().__init__(component_id, component_property, allow_duplicate)
         self.backend = backend
         self.session_check = session_check
@@ -1222,9 +1387,11 @@ class EnrichedOutput(Output):
 class ServersideOutputTransform(SerializationTransform):
     prefix: str = "SERVERSIDE_"
 
-    def __init__(self,
-                 backends: Optional[List[ServersideBackend]] = None,
-                 default_backend: Optional[ServersideBackend] = None):
+    def __init__(
+        self,
+        backends: Optional[List[ServersideBackend]] = None,
+        default_backend: Optional[ServersideBackend] = None,
+    ):
         super().__init__()
         # Per default, use file system backend.
         if backends is None:
@@ -1238,7 +1405,7 @@ class ServersideOutputTransform(SerializationTransform):
             return data
         if not data.startswith(self.prefix):
             return data
-        obj = json.loads(data[len(self.prefix):])
+        obj = json.loads(data[len(self.prefix) :])
         backend = self._backend_registry[obj["backend_uid"]]
         value = backend.get(obj["key"], ignore_expired=True)
         return value
@@ -1259,8 +1426,12 @@ class ServersideOutputTransform(SerializationTransform):
 
 
 class Serverside(Generic[T]):
-
-    def __init__(self, value: T, key: str = None, backend: Union[ServersideBackend, str, None] = None):
+    def __init__(
+        self,
+        value: T,
+        key: str = None,
+        backend: Union[ServersideBackend, str, None] = None,
+    ):
         self.value = value
         self.key: str = str(uuid.uuid4()) if key is None else key
         self.backend_uid: str = backend.uid if isinstance(backend, ServersideBackend) else backend
@@ -1321,6 +1492,7 @@ class Dash(DashProxy):
 
 # region Utils
 
+
 def _as_list(item):
     if item is None:
         return []
@@ -1377,5 +1549,6 @@ def _check_multi(item):
 
 def plotly_jsonify(data):
     return json.loads(json.dumps(data, cls=plotly.utils.PlotlyJSONEncoder))
+
 
 # endregion

@@ -1,7 +1,9 @@
 import os
-from dash import Dash
-from dash_extensions.dataiku import bind_assets_folder
 from shutil import rmtree
+
+from dash import Dash
+
+from dash_extensions.dataiku import bind_assets_folder
 
 
 def test_bind_assets_folder():
@@ -10,7 +12,7 @@ def test_bind_assets_folder():
     # Create a mock asset dir.
     tmp_dir = "/tmp/assets/"
     os.makedirs(tmp_dir, exist_ok=True)
-    with open(os.path.join(tmp_dir, asset_name), 'w') as f:
+    with open(os.path.join(tmp_dir, asset_name), "w") as f:
         f.write("const a = 0;")
     # Clear the asset dir.
     app = Dash()

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.16] - 05-28-24
+
+### Added
+
+- Add new `SSE` component, which can receive (and buffer) server sent events such the output from an LLM.
+- Add new `LoadingTransform`, which makes it easy to re-use a single (full screen) loading component across the app.
+- Add new `BaseModelTransform`, which automates serialization/deserialization of Pydantic `BaseModel` objects.
+
 ## [1.0.15] - 05-04-24
 
 ### Added
@@ -160,7 +168,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Reimplementation of the `BeforeAfter` component by @AnnMarieW adding new features and improved mobile compatibility. NB: This is a **breaking** change, please consult the docs for an example using the new syntax 
+- Reimplementation of the `BeforeAfter` component by @AnnMarieW adding new features and improved mobile compatibility. NB: This is a **breaking** change, please consult the docs for an example using the new syntax
 - Improved support for the new `callback(background=True, ...)` syntax adding support for the `set_progress` keyword
 - Added syntax sugar for Celery task registration for use with the `CeleryManager` object
 - Added explicit raise of `NotImplementedError` for the (deprecated) `long_callback` syntax
@@ -194,7 +202,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Added info on pypi (has been missing after poetry migration) 
+- Added info on pypi (has been missing after poetry migration)
 - Added `CycleBreakerInput` component, which is to be used instead of the `break_cycle` keyword in 0.1.1
 - Fixed introduced bug when mixing imports from `dash` and `dash_extensions.enrich`
 
@@ -368,7 +376,7 @@ All notable changes to this project will be documented in this file.
 
 ### Change
 
-- Bugfixes in `MultiplexerTransform`, both of dcc.Loading and of proxies firing unintentionally on load. 
+- Bugfixes in `MultiplexerTransform`, both of dcc.Loading and of proxies firing unintentionally on load.
 - Reintroduced the `TriggerTransform` based on community feedback.
 - Security fixes of underlying npm packages.
 
@@ -383,7 +391,7 @@ All notable changes to this project will be documented in this file.
 
 - Updated `Burger` component; added new properties, added new example, slight changes to interface.
 - Updated `multipage_app.py` example; removed dependency on burger menu, removed burger helper function in `multipage.py`.
-- Added a `hijack` function to the `DashProxy` object. It can be used to inject app state into other app objects, typically used in frameworks such as dataiku 9.0 where the `Dash` object is constructed outside of the user code context. 
+- Added a `hijack` function to the `DashProxy` object. It can be used to inject app state into other app objects, typically used in frameworks such as dataiku 9.0 where the `Dash` object is constructed outside of the user code context.
 
 ### Remove
 
@@ -492,7 +500,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- A new `enrich` module has been added. It exposes the functionality of previous callback blueprints (and more!) through a drop in replacement of (enriched) Dash components. 
+- A new `enrich` module has been added. It exposes the functionality of previous callback blueprints (and more!) through a drop in replacement of (enriched) Dash components.
 - Added folder of example code.
 
 ### Changed

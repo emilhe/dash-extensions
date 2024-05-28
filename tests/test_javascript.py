@@ -20,9 +20,9 @@ def test_namespace():
         os.remove(asset_path)
     # Check how the variable looks.
     ptl = assign(js_func)
-    assert ptl == {'variable': 'dashExtensions.default.function0'}
+    assert ptl == {"variable": "dashExtensions.default.function0"}
     # Check that assets are written.
-    with open(asset_path, 'r') as f:
+    with open(asset_path, "r") as f:
         assets_content = f.read()
     assert assets_content == expected
 

@@ -1,4 +1,5 @@
 from dash import Dash
+
 from dash_extensions import Keyboard
 
 app = Dash()

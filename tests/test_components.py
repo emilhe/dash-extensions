@@ -2,7 +2,15 @@ import pytest
 from dash.testing.application_runners import import_app
 
 # All custom dash components.
-components = ["before_after", "defer_script", "event_listener", "lottie", "mermaid", "purify", "keyboard"]
+components = [
+    "before_after",
+    "defer_script",
+    "event_listener",
+    "lottie",
+    "mermaid",
+    "purify",
+    "keyboard",
+]
 
 
 # Basic test for the component rendering.
