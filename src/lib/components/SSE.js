@@ -7,10 +7,13 @@ import { SSE as SSEjs } from "sse.js";
  * The SSE component makes it possible to collect data from e.g. a ResponseStream. It's a wrapper around the SSE.js library.
  * https://github.com/mpetazzoni/sse.js
  */
-const SSE = ({ url, options, concat, setProps }) => {
+const SSE = ({ url, options, concat, animate_delay, animate_chunk, setProps }) => {
   const [data, setData] = useState("");
+  const [animateData, setAnimateData] = useState("");
+  const animate = animate_delay > 0 && animate_chunk > 0;
 
   useEffect(() => {
+    console.log("INIT")
     // Reset on url change.
     setProps({ done: false })
     setData("")
@@ -22,6 +25,7 @@ const SSE = ({ url, options, concat, setProps }) => {
     sse.onmessage = e => {
       // Handle end of stream.
       if (e.data === "[DONE]") {
+        console.log("DONE")
         setProps({ done: true })
         sse.close();
         return;
@@ -41,14 +45,34 @@ const SSE = ({ url, options, concat, setProps }) => {
     };
   }, [url, options]);
 
+  // Animate data.
+  useEffect(() => {
+    if (!animate) { return () => { }; };
+    let buffer = "";
+    const interval = setInterval(() => {
+      if (buffer.length >= data.length) {
+        clearInterval(interval);
+      }
+      else {
+        const endIdx = Math.min(buffer.length + animate_chunk, data.length);
+        buffer = data.slice(animateData.length, endIdx);
+        setAnimateData(buffer);
+      }
+    }, animate_delay);
+    return () => clearInterval(interval);
+  }, [data]);
+
   // Update value.
-  setProps({ value: data })
+  setProps({ value: animate ? animateData : data });
+
   // Don't render anything.
   return <></>;
 }
 
 SSE.defaultProps = {
   concat: true,
+  animate_delay: 0,
+  animate_chunk: 1,
 };
 
 SSE.propTypes = {
@@ -87,9 +111,19 @@ SSE.propTypes = {
   concat: PropTypes.bool,
 
   /**
-  * The data value. Either the latest, or the concatenated dependenig on the `concat` property.
+  * The data value. Either the latest, or the concatenated depending on the `concat` property.
   */
   value: PropTypes.string,
+
+  /**
+  * If set, each character is delayed by some amount of time. Used to animate the stream.
+  */
+  animate_delay: PropTypes.number,
+
+  /**
+  * Chunk size (i.e. number of characters) for the animation.
+  */
+  animate_chunk: PropTypes.number,
 
   /**
   * A boolean indicating if the (current) stream has ended.
