@@ -2,10 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.17] - UNRELEASED
+## [1.0.17] - 28-06-24
 
 ### Added
 
+- Improve the stability of the serialization transforms (`BaseModelTransform`, and `DataclassTransform`) by adding support for `None`, `str` and `dict` types 
 - Add the option to send objects to the `captureKeys` property of the `Keyboard` component to enable more specific filtering
 - Add streaming capabilities to the `SSE` component
 
