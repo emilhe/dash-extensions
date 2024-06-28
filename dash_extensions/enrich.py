@@ -1268,7 +1268,13 @@ class DataclassTransform(SerializationTransform):
     def _try_load(self, data: Any, ann=None) -> Any:
         if not dataclasses.is_dataclass(ann):
             return data
-        return fromdict(ann, data)
+        if data is None:
+            return None
+        if isinstance(data, str):
+            data = json.loads(data)
+        if isinstance(data, dict):
+            return fromdict(ann, data)
+        raise ValueError(f"Unsupported data type for dataclass: {type(data)}")
 
     def _try_dump(self, obj: Any) -> Any:
         if not dataclasses.is_dataclass(obj):
@@ -1286,7 +1292,13 @@ class BaseModelTransform(SerializationTransform):
     def _try_load(self, data: Any, ann=None) -> Any:
         if not isinstance(ann, type(BaseModel)):
             return data
-        return ann.model_validate_json(data)
+        if data is None:
+            return None
+        if isinstance(data, str):
+            return ann.model_validate_json(data)
+        if isinstance(data, dict):
+            return ann.model_validate(data)
+        raise ValueError(f"Unsupported data type for Pydantic model: {type(data)}")
 
     def _try_dump(self, obj: Any) -> Any:
         if not isinstance(obj, BaseModel):
