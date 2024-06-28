@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dash-extensions"
-version = "1.0.16"
+version = "1.0.17"
 description = "Extensions for Plotly Dash."
 authors = ["emher <emil.h.eriksen@gmail.com>"]
 license = "MIT"
