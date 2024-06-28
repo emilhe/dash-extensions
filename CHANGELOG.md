@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.17] - UNRELEASED
+
+### Added
+
+- Add the option to send objects to the `captureKeys` property of the `Keyboard` component to enable more specific filtering
+- Add streaming capabilities to the `SSE` component
+
 ## [1.0.16] - 05-28-24
 
 ### Added
