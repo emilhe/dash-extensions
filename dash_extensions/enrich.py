@@ -721,7 +721,8 @@ def setup_notifications_log_config():
         layout.append(html.Div(id=log_id))
         if dmc.__version__ < "0.14.0":
             layout.append(dmc.NotificationsProvider())
-        layout.append(dmc.NotificationProvider(zIndex=2000))
+        else:
+            layout.append(dmc.NotificationProvider(zIndex=2000))
 
         return layout
 
