@@ -468,8 +468,8 @@ class DashProxy(dash.Dash):
         self.blueprint.layout = value
 
 
-def _get_session_id(session_key=None):
-    session_key = "session_id" if session_key is None else session_key
+def _get_serverside_session_id(session_key=None):
+    session_key = "serverside_session_id" if session_key is None else session_key
     # Create unique session id.
     if not session.get(session_key):
         session[session_key] = secrets.token_urlsafe(16)
@@ -1404,6 +1404,8 @@ class ServersideOutputTransform(SerializationTransform):
         self,
         backends: Optional[List[ServersideBackend]] = None,
         default_backend: Optional[ServersideBackend] = None,
+        session_check: Optional[bool] = False,
+        session_id_getter: Callable = _get_serverside_session_id, 
     ):
         super().__init__()
         # Per default, use file system backend.
@@ -1412,6 +1414,8 @@ class ServersideOutputTransform(SerializationTransform):
         self._default_backend: ServersideBackend = backends[0] if default_backend is None else default_backend
         # Setup registry for easy/fast access.
         self._backend_registry: Dict[str, ServersideBackend] = {backend.uid: backend for backend in backends}
+        self._session_check = session_check
+        self._session_id_getter = session_id_getter
 
     def _try_load(self, data: Any, ann=None) -> Any:
         if not isinstance(data, str):
@@ -1420,7 +1424,8 @@ class ServersideOutputTransform(SerializationTransform):
             return data
         obj = json.loads(data[len(self.prefix) :])
         backend = self._backend_registry[obj["backend_uid"]]
-        value = backend.get(obj["key"], ignore_expired=True)
+        cached_item_key = f"{obj["key"]}-{self._session_id_getter()}" if self._session_check else obj["key"]
+        value = backend.get(cached_item_key, ignore_expired=True)
         return value
 
     def _try_dump(self, obj: Any) -> Any:
@@ -1432,7 +1437,8 @@ class ServersideOutputTransform(SerializationTransform):
             backend_uid = self._default_backend.uid
         # Dump the data.
         backend = self._backend_registry[backend_uid]
-        backend.set(obj.key, obj.value)
+        cached_item_key = f"{obj["key"]}-{self._session_id_getter()}" if self._session_check else obj.key
+        backend.set(cached_item_key, obj.value)
         # Return lookup structure.
         data = dict(backend_uid=backend_uid, key=obj.key)
         return f"{self.prefix}{json.dumps(data)}"
