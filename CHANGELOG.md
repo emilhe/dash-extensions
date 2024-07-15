@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.18] - 15-07-24
+
+### Changed
+
+- Fix bug in `BlockingCallbackTransform` which occurred when a multi-output was targeted (i.e. using the `ALL` wildcard)
+
 ## [1.0.17] - 28-06-24
 
 ### Added

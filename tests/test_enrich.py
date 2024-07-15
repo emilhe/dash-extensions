@@ -565,6 +565,45 @@ def test_blocking_callback_transform(dash_duo, args, kwargs, port):
     assert dash_duo.find_element("#log").text == msg
 
 
+@pytest.mark.parametrize(
+    "args, kwargs, port",
+    [
+        ([Output(dict(type="log", index=ALL), "children"), Input("trigger", "n_intervals")], dict(), 4757),
+        (
+            [],
+            dict(
+                output=[Output(dict(type="log", index=ALL), "children")],
+                inputs=dict(tick=Input("trigger", "n_intervals")),
+            ),
+            4758,
+        ),
+    ],
+)
+def test_blocking_callback_wildcard(dash_duo, args, kwargs, port):
+    app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
+    app.layout = html.Div(
+        [html.Div(id=dict(type="log", index=i)) for i in range(5)] + [dcc.Interval(id="trigger", interval=500)]
+    )
+    msg = "Hello world!"
+
+    @app.callback(*args, **kwargs, blocking=True)
+    def update(tick):
+        print(tick)
+        if tick is None:
+            raise PreventUpdate
+        time.sleep(1)
+        return [msg] * 5
+
+    # Check that stuff works. It doesn't using a normal Dash object.
+    dash_duo.start_server(app, port=port)
+    selector = _css_selector(dict(type="log", index=0))
+    dash_duo.wait_for_text_to_equal(selector, msg, timeout=5)
+    assert dash_duo.find_element(selector).text == msg
+    # Check that we didn't get any errors.
+    logs = [entry for entry in dash_duo.driver.get_log("browser") if entry["timestamp"] > dash_duo._last_ts]
+    assert len([l for l in logs if "INTERNAL SERVER ERROR" in l["message"]]) == 0
+
+
 def test_blocking_callback_transform_final_invocation(dash_duo):
     app = DashProxy(transforms=[BlockingCallbackTransform(timeout=5)])
     app.layout = html.Div([html.Div(id="log"), dcc.Input(id="input")])
