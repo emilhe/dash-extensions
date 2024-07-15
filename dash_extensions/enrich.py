@@ -685,13 +685,26 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
                 outputs = f(*args, **kwargs)
             except Exception:
                 logging.exception(f"Exception raised in blocking callback [{f.__name__}]")
-                outputs = no_update if single_output else [no_update] * num_outputs
+                outputs = _determine_outputs(single_output)
 
             return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
 
         return decorated_function
 
     return wrapper
+
+
+def _determine_outputs(single_output: bool):
+    output_spec = dash.callback_context.outputs_list[:-1]
+    if single_output:
+        return [no_update] * len(output_spec[0]) if isinstance(output_spec[0], list) else no_update
+    outputs = []
+    for entry in output_spec:
+        if isinstance(entry, list):
+            outputs.append([dash.no_update] * len(entry))
+        else:
+            outputs.append(dash.no_update)
+    return outputs
 
 
 # endregion

@@ -142,3 +142,5 @@ NAMESPACE
 DESCRIPTION
 jsconfig.json
 tmp**.py
+
+nodesource_setup.sh
