@@ -115,7 +115,7 @@ SSE.propTypes = {
   options: PropTypes.shape({
     headers: PropTypes.object,
     method: PropTypes.string,
-    payload: PropTypes.object,
+    payload: PropTypes.oneOfType([PropTypes.object, PropTypes.string]),
     withCredentials: PropTypes.bool,
     start: PropTypes.bool,
     debug: PropTypes.bool,
