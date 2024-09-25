@@ -10,7 +10,10 @@ export default class DashWebSocket extends Component {
         // Create a new client.
         let {url} = this.props;
         const {protocols} = this.props;
-        url = url? url : "ws://" + location.host + location.pathname + "ws";
+        // No url - client will be created, when url will be updated
+        if (!url) {
+            return (null)
+        }
         this.client = new WebSocket(url, protocols);
         // Listen for events.
         this.client.onopen = (e) => {
@@ -63,6 +66,14 @@ export default class DashWebSocket extends Component {
     }
 
     componentDidUpdate(prevProps) {
+        const {url} = this.props;
+        // Change url.
+        if (url && url != prevProps.url) {
+            if (this.props.state.readyState === WebSocket.OPEN) {
+                this.client.close()
+            }
+            this._init_client()
+        }
         const {send} = this.props;
         // Send messages.
         if (send && send !== prevProps.send) {
@@ -70,7 +81,6 @@ export default class DashWebSocket extends Component {
                 this.client.send(send)
             }
         }
-        // TODO: Maybe add support for changing the url?
     }
 
     componentWillUnmount() {
