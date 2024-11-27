@@ -51,6 +51,6 @@ def _get_event_id(event: str) -> str:
 
 
 """
-Registry over all event that have listeners.
+Registry over all events that have dependencies.
 """
 _event_registry = set()
