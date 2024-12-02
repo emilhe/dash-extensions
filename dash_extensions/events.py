@@ -4,18 +4,32 @@ import re
 from typing import Optional, Type, TypeVar
 
 from dash import set_props, ctx
+from pydantic import BaseModel
 from dash_extensions.enrich import Input, dcc
 from dash.dependencies import DashDependency
 
 T = TypeVar("T", bound=DashDependency)
+U = TypeVar("U", bound=BaseModel)
 
-Event = str | Enum
+
+class TypedEvent(BaseModel):
+    event: str
 
 
-def build_event(event: Event, payload: Optional[dict] = None) -> dict:
+Event = str | Enum | TypedEvent
+
+
+def dump_event(event: Event, payload: Optional[dict] = None) -> dict:
     """
-    Build an event object structure.
+    Dump an event to a store.
     """
+    if isinstance(event, TypedEvent):
+        payload = event.model_dump()
+        # TODO: Is this a good idea?
+        # payload["class"] = event.__class__.__name__
+        # payload["module"] = getmodule(event.__class__).__name__
+        event = event
+
     return {
         "data": {
             "type": event,
@@ -25,13 +39,20 @@ def build_event(event: Event, payload: Optional[dict] = None) -> dict:
     }
 
 
+def load_event(data: dict, model: U) -> U:
+    """
+    Parse an event from a store.
+    """
+    return model.model_validate(data["payload"])
+
+
 def dispatch_event(event: Event, payload: Optional[dict] = None):
     """
     Dispatch an event.
     """
     set_props(
         _get_event_id(event),
-        build_event(event, payload),
+        dump_event(event, payload),
     )
 
 
