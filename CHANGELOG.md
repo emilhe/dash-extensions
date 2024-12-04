@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.20] - UNRELEASED
+
+### Added
+
+- Added `events` module
+
+
+## [1.0.19] - 26-11-24
+
+### Changed
+
+- Updated various dependencies. Added support for / change target Python version to 3.13
+
 ## [1.0.18] - 15-07-24
 
 ### Changed

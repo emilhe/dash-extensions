@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dash-extensions"
-version = "1.0.18"
+version = "1.0.20"
 description = "Extensions for Plotly Dash."
 authors = ["emher <emil.h.eriksen@gmail.com>"]
 license = "MIT"
@@ -24,30 +24,29 @@ include = [
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4"
-dash = ">=2.17.0"
+dash = ">=2.18.2"
 more-itertools = ">=10.2.0, <11.0.0"
 jsbeautifier = "^1.14.3"
 Flask-Caching = "^2.1.0"
-dash-mantine-components = {version = "^0.14.3", optional = true}
-dataclass-wizard = "^0.22.2"
-pydantic = "^2.7.1"
+dash-mantine-components = {version = ">=0.14.11", optional = true}
+dataclass-wizard = "^0.30.1"
+pydantic = "^2.10.1"
 
 [tool.poetry.extras]
 mantine = ["dash-mantine-components"]
 
 [tool.poetry.group.dev.dependencies]
-dash = {extras = ["dev", "testing"], version = "^2.17.0"}
-pytest-cov = "^4.0.0"
-pandas = ">=1.5.3"
+dash = {extras = ["dev", "testing"], version = "^2.18.2"}
+pytest-cov = "^6.0.0"
+pandas = ">=2.2.3"
 quart = "^0.18.3"
 starlette = ">=0.36.2,<0.41.0"
 requests = "^2.32.2"
 certifi = ">=2023.7.22,<2025.0.0"
-uvicorn = "^0.20.0"
+uvicorn = "^0.32.1"
 sse-starlette = "^1.2.1"
 urllib3 = "^1.26.18"
 pre-commit = "^3.7.1"
-mypy = "^1.10.0"
 ruff = "^0.4.5"
 
 [build-system]
@@ -56,4 +55,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py313"
