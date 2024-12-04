@@ -35,10 +35,7 @@ class EventModel(BaseModel):
         if self._component_id not in _event_registry:
             logger.warning(f"No listener registered for {self._uid}. Event dispatch suppressed.")
             return
-        set_props(
-            self._uid,
-            self.model_dump(),
-        )
+        set_props(self._component_id, {"data": self.model_dump()})
 
     def get_dependency(self, dependency_type: Type[T]) -> T:
         """
