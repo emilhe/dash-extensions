@@ -8,12 +8,17 @@ import PropTypes from 'prop-types';
 export default class DeferScript extends React.Component {
 
   componentDidMount () {
-    if (this.props.src) {
+    const { src, id } = this.props;
+    if (src) {
       const {src} = this.props;
       const script = document.createElement('script');
 
       script.src = src;
       script.defer = true;
+
+      if (id) {
+        script.id = id;
+      }
 
       document.body.appendChild(script);
       }
