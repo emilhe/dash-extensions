@@ -13,7 +13,7 @@ app.layout = html.Div(
             style={"maxWidth": "100%"},
             **{"data-mxgraph": unescape(mxgraph)},
         ),
-        DeferScript(src="https://viewer.diagrams.net/js/viewer-static.min.js"),
+        DeferScript(id="viewer", src="https://viewer.diagrams.net/js/viewer-static.min.js"),
     ]
 )
 
