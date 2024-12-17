@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Added `events` module
-
+- Added `id` property to `DeferScript` component. Contributed by [escobar-felipe](https://github.com/escobar-felipe)
 
 ## [1.0.19] - 26-11-24
 
