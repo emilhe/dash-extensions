@@ -1898,28 +1898,29 @@ files = [
 
 [[package]]
 name = "quart"
-version = "0.18.3"
-description = "A Python ASGI web microframework with the same API as Flask"
+version = "0.20.0"
+description = "A Python ASGI web framework with the same API as Flask"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.9"
 files = [
-    {file = "Quart-0.18.3-py3-none-any.whl", hash = "sha256:c221a7deb83a014dee040108d654b6141fe37f59e249c5caa0fdcf6506caf50b"},
-    {file = "Quart-0.18.3.tar.gz", hash = "sha256:dc4de597d5d4693627c90904b233d729531f6b27c1164f760476d3967aee2a4a"},
+    {file = "quart-0.20.0-py3-none-any.whl", hash = "sha256:003c08f551746710acb757de49d9b768986fd431517d0eb127380b656b98b8f1"},
+    {file = "quart-0.20.0.tar.gz", hash = "sha256:08793c206ff832483586f5ae47018c7e40bdd75d886fee3fabbdaa70c2cf505d"},
 ]
 
 [package.dependencies]
 aiofiles = "*"
-blinker = "*"
-click = ">=8.0.0"
+blinker = ">=1.6"
+click = ">=8.0"
+flask = ">=3.0"
 hypercorn = ">=0.11.2"
-importlib_metadata = {version = "*", markers = "python_version < \"3.10\""}
+importlib-metadata = {version = "*", markers = "python_version < \"3.10\""}
 itsdangerous = "*"
 jinja2 = "*"
 markupsafe = "*"
-werkzeug = ">=2.2.0"
+typing-extensions = {version = "*", markers = "python_version < \"3.10\""}
+werkzeug = ">=3.0"
 
 [package.extras]
-docs = ["pydata_sphinx_theme"]
 dotenv = ["python-dotenv"]
 
 [[package]]
@@ -2384,4 +2385,4 @@ mantine = ["dash-mantine-components"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4"
-content-hash = "ca5cddb5e700fcd5b31923c397ce1ad00d9e7af05b70c072d2935bfb2f5339a9"
+content-hash = "9214874a78905ab94b4de8333473afbc69a88c434408e17a745dcd7b78d64f52"
