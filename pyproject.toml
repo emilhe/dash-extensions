@@ -39,7 +39,7 @@ mantine = ["dash-mantine-components"]
 dash = {extras = ["dev", "testing"], version = "^2.18.2"}
 pytest-cov = "^6.0.0"
 pandas = ">=2.2.3"
-quart = "^0.18.3"
+quart = ">=0.18.3,<0.21.0"
 starlette = ">=0.36.2,<0.41.0"
 requests = "^2.32.2"
 certifi = ">=2023.7.22,<2025.0.0"
