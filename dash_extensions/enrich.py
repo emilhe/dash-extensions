@@ -1186,7 +1186,7 @@ def trigger_filter(args):
 class MultiplexerTransform(DashTransform):
     """
     The MultiplexerTransform was previously used to make it possible to target an output by multiple callbacks, but as
-    per Dash 2.9 this function is now included, but by default disabled. To achieve similar behaviour as before (and
+    per Dash 2.9 this function is now included, but by default disabled. To achieve similar behavior as before (and
     thus improve backwards compatibility), the MultiplexerTransform enables the functionality automagically.
     """
 
@@ -1465,37 +1465,6 @@ class Serverside(Generic[T]):
 
 # endregion
 
-# region No output transform
-
-
-class NoOutputTransform(StatefulDashTransform):
-    def __init__(self):
-        super().__init__()
-
-    def transform_layout(self, layout):
-        children = _as_list(layout.children) + self.components
-        layout.children = children
-
-    def _apply(self, callbacks):
-        for callback in callbacks:
-            if len(callback.outputs) == 0:
-                output_id = callback.uid
-                hidden_div = html.Div(id=output_id, style={"display": "none"})
-                callback.outputs.append(Output(output_id, "children"))
-                self.components.append(hidden_div)
-        return callbacks
-
-    def apply_serverside(self, callbacks):
-        return self._apply(callbacks)
-
-    def apply_clientside(self, callbacks):
-        return self._apply(callbacks)
-
-    def sort_key(self):
-        return 0
-
-
-# endregion
 
 # region Batteries included dash proxy object
 
@@ -1506,7 +1475,6 @@ class Dash(DashProxy):
             TriggerTransform(),
             LogTransform(),
             MultiplexerTransform(),
-            NoOutputTransform(),
             CycleBreakerTransform(),
             BlockingCallbackTransform(),
             ServersideOutputTransform(),
@@ -1555,22 +1523,6 @@ def _append_output(outputs, value, single_output, out_idx):
         return [outputs, value]
     # Finally, the "normal" case.
     return _as_list(outputs) + [value]
-
-
-def _create_callback_id(item):
-    cid = item.component_id
-    if isinstance(cid, dict):
-        cid = {key: cid[key] for key in cid if cid[key] not in _wildcard_mappings}
-        cid = json.dumps(cid)
-    return "{}.{}".format(cid, item.component_property)
-
-
-def _check_multi(item):
-    cid = item.component_id
-    if not isinstance(cid, dict):
-        return False
-    vs = cid.values()
-    return ALL in vs or ALLSMALLER in vs
 
 
 def plotly_jsonify(data):

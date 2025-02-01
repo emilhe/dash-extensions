@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 02-01-25
+
+### Changed
+
+- Update to Dash 3.0.0 [BREAKING CHANGE]
+
+### Removed
+
+- Dropped `dataiku` module (targeted old Dataiku vesion, not maintained for years)
+- Dropped `NoOutputTransform` as the functionality (no output) has been available in "pure" Dash since 2.17.0
+
 ## [1.0.20] - 02-01-25
 
 ### Added
