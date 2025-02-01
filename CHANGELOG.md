@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added support for changing the `url` property of the `Websocket` component. Contributed by [lgln-kmi](https://github.com/lgln-kmi)
+- Added new `timeout` property to the `Websocket` component to control how long to wait for the websocket to (re)connect
 - Added `events` module
 - Added `id` property to `DeferScript` component. Contributed by [escobar-felipe](https://github.com/escobar-felipe)
 
