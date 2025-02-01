@@ -108,7 +108,7 @@ export default class DashWebSocket extends Component {
         }
         // If the connection is still not open, wait for a while and try again.
         if (this.props.state.readyState === WebSocket.CONNECTING) {
-            console.log('Websocket CONNECTING. Sleeping...');
+            console.log('Websocket CONNECTING. Delaying sending message...');
             await new Promise(r => setTimeout(r, this.props.timeout));
         }
         // Wuhu! The connection is open. Send the message.
