@@ -12,6 +12,7 @@ export default class EventListener extends Component {
         this.myRef = React.createRef();  // create reference to enable looping children later
         this.eventHandler = this.eventHandler.bind(this);
         this.getSources = this.getSources.bind(this);
+        this.sources = [];
     }
 
     getSources(){
@@ -35,12 +36,16 @@ export default class EventListener extends Component {
 
     componentDidMount() {
         const events = this.props.events.map(o => o["event"]);
-        this.getSources().forEach(s => events.forEach(e => s.addEventListener(e, this.eventHandler, this.props.useCapture)));
+        this.sources = this.getSources();
+        this.sources.forEach(s => events.forEach(e => s.addEventListener(e, this.eventHandler, this.props.useCapture)));
     }
 
     componentWillUnmount() {
         const events = this.props.events.map(o => o["event"]);
-        this.getSources().forEach(s => events.forEach(e => s.removeEventListener(e, this.eventHandler, this.props.useCapture)));
+        if(this.sources){
+            this.sources.forEach(s => events.forEach(e => s.removeEventListener(e, this.eventHandler, this.props.useCapture)));
+        }
+        this.sources = [];
     }
 
     render() {

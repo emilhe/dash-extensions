@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.20] - UNRELEASED
+## [1.0.20] - 02-01-25
 
 ### Added
 
@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - Added new `timeout` property to the `Websocket` component to control how long to wait for the websocket to (re)connect
 - Added `events` module
 - Added `id` property to `DeferScript` component. Contributed by [escobar-felipe](https://github.com/escobar-felipe)
+
+### Changed
+
+- Improved stability of `EventListener` for dynamic use cases
 
 ## [1.0.19] - 26-11-24
 
