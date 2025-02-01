@@ -10,7 +10,10 @@ export default class DashWebSocket extends Component {
         // Create a new client.
         let {url} = this.props;
         const {protocols} = this.props;
-        url = url? url : "ws://" + location.host + location.pathname + "ws";
+        // No url - client will be created, when url will be updated
+        if (!url) {
+            return (null)
+        }
         this.client = new WebSocket(url, protocols);
         // Listen for events.
         this.client.onopen = (e) => {
@@ -62,15 +65,40 @@ export default class DashWebSocket extends Component {
         this._init_client()
     }
 
-    componentDidUpdate(prevProps) {
+    async componentDidUpdate(prevProps) {
+        const {url} = this.props;
+        // Change url.
+        if (url && url != prevProps.url) {
+            if (this.props.state.readyState === WebSocket.OPEN) {
+                this.client.close()
+            }
+            this._init_client()
+        }
         const {send} = this.props;
         // Send messages.
         if (send && send !== prevProps.send) {
+            if (this.props.state.readyState === WebSocket.CLOSED) {
+                console.log('Websocket is closed. Trying to reconnect')
+                this._init_client()
+            }
+            if (this.props.state.readyState !== WebSocket.OPEN) {
+                console.log('Websocket is connecting. Waiting one second...')
+                await new Promise(r => setTimeout(r, 1000))
+            }
+            if (this.props.state.readyState === WebSocket.CONNECTING) {
+                console.log('Websocket is still connecting. Waiting five seconds...')
+                await new Promise(r => setTimeout(r, 5000))
+            }
+            if (this.props.state.readyState !== WebSocket.OPEN) {
+                console.log('Websocket connection failed. Abort.')
+                return
+            }
+
+            console.log('Socket state: ' + this.props.state.readyState )
             if (this.props.state.readyState === WebSocket.OPEN) {
                 this.client.send(send)
             }
         }
-        // TODO: Maybe add support for changing the url?
     }
 
     componentWillUnmount() {
