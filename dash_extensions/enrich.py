@@ -40,7 +40,7 @@ from dash import (  # lgtm [py/unused-import]; noqa: F401
     page_container,  # noqa: F401
     page_registry,  # noqa: F401
     register_page,  # noqa: F401
-    resources,  # noqa: F401
+    set_props,  # noqa: F401
 )
 from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
@@ -52,6 +52,7 @@ from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
+from dash_extensions.utils import as_list
 
 T = TypeVar("T")
 
@@ -555,7 +556,7 @@ class BlockingCallbackTransform(StatefulDashTransform):
         self.timeout = timeout
 
     def transform_layout(self, layout):
-        children = _as_list(layout.children) + self.components
+        children = as_list(layout.children) + self.components
         layout.children = children
 
     def apply(self, callbacks, clientside_callbacks):
@@ -709,166 +710,6 @@ def _determine_outputs(single_output: bool):
 
 # endregion
 
-# region Log transform
-
-
-class LogConfig:
-    def __init__(
-        self,
-        log_output,
-        log_writer_map: Dict[int, Callable],
-        layout_transform: Callable[[List[Component]], List[Component]],
-    ):
-        self.log_output = log_output
-        self.log_writer_map = log_writer_map
-        self.layout_transform = layout_transform
-
-
-def setup_notifications_log_config():
-    log_id = "notifications_provider"
-    log_output = Output(log_id, "children", allow_duplicate=True)
-
-    def notification_layout_transform(layout: List[Component]):
-        import dash_mantine_components as dmc
-
-        layout.append(html.Div(id=log_id))
-        if dmc.__version__ < "0.14.0":
-            layout.append(dmc.NotificationsProvider())
-        else:
-            layout.append(dmc.NotificationProvider(zIndex=2000))
-
-        return layout
-
-    return LogConfig(log_output, get_notification_log_writers(), notification_layout_transform)
-
-
-def setup_div_log_config():
-    log_id = "log"
-
-    def div_layout_transform(layout: List[Component]):
-        layout.append(html.Div(id=log_id))
-        return layout
-
-    log_output = Output(log_id, "children", allow_duplicate=True)
-    return LogConfig(log_output, get_default_log_writers(), div_layout_transform)
-
-
-def get_default_log_writers():
-    return {
-        logging.INFO: lambda x, **kwargs: html.Div(f"INFO: {x}", **kwargs),
-        logging.WARNING: lambda x, **kwargs: html.Div(f"WARNING: {x}", **kwargs),
-        logging.ERROR: lambda x, **kwargs: html.Div(f"ERROR: {x}", **kwargs),
-    }
-
-
-def get_notification_log_writers():
-    import dash_mantine_components as dmc
-
-    def _default_kwargs(color, title, message):
-        return dict(
-            color=color,
-            title=title,
-            message=message,
-            id=str(uuid.uuid4()),
-            action="show",
-            autoClose=False,
-        )
-
-    def log_info(message, **kwargs):
-        return dmc.Notification(**{**_default_kwargs("blue", "Info", message), **kwargs})
-
-    def log_warning(message, **kwargs):
-        return dmc.Notification(**{**_default_kwargs("yellow", "Warning", message), **kwargs})
-
-    def log_error(message, **kwargs):
-        return dmc.Notification(**{**_default_kwargs("red", "Error", message), **kwargs})
-
-    return {
-        logging.INFO: log_info,
-        logging.WARNING: log_warning,
-        logging.ERROR: log_error,
-    }
-
-
-class DashLogger:
-    def __init__(self, log_writers: Dict[int, Callable]):
-        self.log_writers = log_writers
-        self.output = []
-
-    def clear(self):
-        self.output.clear()
-
-    def info(self, message, **kwargs):
-        self.log(logging.INFO, message, **kwargs)
-
-    def warning(self, message, **kwargs):
-        self.log(logging.WARNING, message, **kwargs)
-
-    def error(self, message, **kwargs):
-        self.log(logging.ERROR, message, **kwargs)
-
-    def log(self, level, message, **kwargs):
-        self.output.append(self.log_writers[level](message, **kwargs))
-
-    def get_output(self):
-        return self.output if self.output else dash.no_update
-
-
-class LogTransform(DashTransform):
-    def __init__(self, log_config=None, try_use_mantine=True):
-        super().__init__()
-        # Per default, try to use dmc notification system.
-        if log_config is None and try_use_mantine:
-            try:
-                log_config = setup_notifications_log_config()
-            except ImportError:
-                msg = "Failed to import dash-mantine-components, falling back to simple div for log output."
-                logging.warning(msg)
-        # Otherwise, use simple div.
-        if log_config is None:
-            log_config = setup_div_log_config()
-        # Bind the resulting log config.
-        self.log_config = log_config
-
-    def transform_layout(self, layout):
-        layout.children = self.log_config.layout_transform(_as_list(layout.children))
-
-    def apply(self, callbacks, clientside_callbacks):
-        callbacks = self.apply_serverside(callbacks)
-        return callbacks, clientside_callbacks
-
-    def apply_serverside(self, callbacks):
-        for callback in callbacks:
-            if not callback.kwargs.get("log", None):
-                continue
-            # Add the log component as output.
-            single_output = len(callback.outputs) <= 1
-            out_flex_key = callback.outputs.append(self.log_config.log_output)
-            # Modify the callback function accordingly.
-            f = callback.f
-            logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback.f = bind_logger(logger, single_output, out_flex_key)(f)
-
-        return callbacks
-
-    def get_dependent_transforms(self):
-        return [MultiplexerTransform()]
-
-
-def bind_logger(logger, single_output, out_flex_key):
-    def wrapper(f):
-        @functools.wraps(f)
-        def decorated_function(*args, **kwargs):
-            logger.clear()
-            outputs = f(*args, **kwargs, dash_logger=logger)
-            return _append_output(outputs, logger.get_output(), single_output, out_flex_key)
-
-        return decorated_function
-
-    return wrapper
-
-
-# endregion
 
 # region Loading transform
 
@@ -901,7 +742,7 @@ class LoadingTransform(DashTransform):
 
     def transform_layout(self, layout):
         loading = dcc.Loading(html.Div(""), **self.kwargs)
-        layout.children = _as_list(layout.children) + [loading]
+        layout.children = as_list(layout.children) + [loading]
 
     def apply(self, callbacks, clientside_callbacks):
         callbacks = self.apply_serverside(callbacks)
@@ -943,7 +784,7 @@ class CycleBreakerTransform(StatefulDashTransform):
         super().__init__()
 
     def transform_layout(self, layout):
-        children = _as_list(layout.children) + self.components
+        children = as_list(layout.children) + self.components
         layout.children = children
 
     def apply(self, callbacks, clientside_callbacks):
@@ -1081,7 +922,7 @@ def apply_prefix(prefix, component_id, escape):
 def prefix_recursively(item, key, prefix_func, escape):
     prefix_func(key, item, escape)
     if hasattr(item, "children"):
-        children = _as_list(item.children)
+        children = as_list(item.children)
         for child in children:
             prefix_recursively(child, key, prefix_func, escape)
 
@@ -1487,16 +1328,6 @@ class Dash(DashProxy):
 # region Utils
 
 
-def _as_list(item):
-    if item is None:
-        return []
-    if isinstance(item, tuple):
-        return list(item)
-    if isinstance(item, list):
-        return item
-    return [item]
-
-
 def _skip_inputs(args, kwargs, keys: List[Any]):
     fltr = []
     str_keys = [key for key in keys if isinstance(key, str)]
@@ -1522,7 +1353,7 @@ def _append_output(outputs, value, single_output, out_idx):
     if single_output:
         return [outputs, value]
     # Finally, the "normal" case.
-    return _as_list(outputs) + [value]
+    return as_list(outputs) + [value]
 
 
 def plotly_jsonify(data):
