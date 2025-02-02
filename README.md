@@ -16,7 +16,7 @@ The `enrich` module enables a number of _transforms_ that add functionality and/
 
 * Making it possible to avoid invoking a callback _if it is already running_ via the `BlockingCallbackTransform`
 * Improving app performance via the `ServersideOutputTransform`
-* Automated serialization/deserialization of Pydantic models via the `BaseModelTransform`
+* Automated serialization/deserialization of  [Pydantic](https://docs.pydantic.dev/latest/) models via the `BaseModelTransform`
 
 to name a few. To enable interactivity, the documentation has been moved to a [separate page](http://dash-extensions.com).
 
