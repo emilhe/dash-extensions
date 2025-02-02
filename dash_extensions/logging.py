@@ -12,7 +12,7 @@ from dash import (
 from dash._callback_context import _get_context_value, has_context
 from dash._utils import stringify_id
 
-from dash_extensions.utils import DashNode, as_list
+from dash_extensions.utils import Component, DashNode, as_list
 
 
 @has_context
@@ -44,7 +44,11 @@ class DashLogHandler(logging.Handler):
     """
 
     def __init__(
-        self, output: Output, log_writers: Dict[int, Callable], layout: DashNode | None = None, level=logging.DEBUG
+        self,
+        output: Output,
+        log_writers: Dict[int, Callable],
+        layout: Component | list[Component] | None = None,
+        level=logging.DEBUG,
     ):
         self.output = output
         self.log_writers = log_writers
@@ -65,13 +69,13 @@ class DashLogHandler(logging.Handler):
         except dash.exceptions.MissingCallbackContextException:
             pass
 
-    def embed(self) -> DashNode | None:
+    def embed(self) -> list[Component]:
         """
         Return any components that should be embedded in the app layout.
         """
         if self.layout is None:
             return []
-        return self.layout
+        return as_list(self.layout)
 
     def setup_logger(self, logger_name: str = "dash_extensions", level: int = logging.DEBUG) -> logging.Logger:
         """
@@ -100,7 +104,7 @@ class DivLogHandler(DashLogHandler):
     """
 
     def __init__(self, log_div: DashNode | None = None) -> None:
-        log_div = html.Div(id="log_id") if log_div is None else log_div
+        log_div = html.Div(id="div_log_handler") if log_div is None else log_div
         super().__init__(output=Output(log_div, "children"), log_writers=get_default_log_writers(), layout=log_div)
 
 
@@ -142,7 +146,7 @@ class NotificationsLogHandler(DashLogHandler):
     """
 
     def __init__(self, log_div: DashNode | None = None, notifications_provider: DashNode | None = None) -> None:
-        log_div = html.Div(id="log_id") if log_div is None else log_div
+        log_div = html.Div(id="notifications_log_handler") if log_div is None else log_div
         if notifications_provider is None:
             import dash_mantine_components as dmc
 
