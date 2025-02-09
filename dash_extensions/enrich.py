@@ -842,12 +842,18 @@ class LogTransform(DashTransform):
             if not callback.kwargs.get("log", None):
                 continue
             # Add the log component as output.
-            single_output = len(callback.outputs) <= 1
+            len_outputs = len(callback.outputs)
+            if len_outputs == 0:
+                outputs_conf = 'none'
+            elif len_outputs == 1:
+                outputs_conf = 'single'
+            else:
+                outputs_conf = 'multiple'
             out_flex_key = callback.outputs.append(self.log_config.log_output)
             # Modify the callback function accordingly.
             f = callback.f
             logger = DashLogger(self.log_config.log_writer_map)  # TODO: What about scope?
-            callback.f = bind_logger(logger, single_output, out_flex_key)(f)
+            callback.f = bind_logger(logger, outputs_conf, out_flex_key)(f)
 
         return callbacks
 
@@ -855,13 +861,13 @@ class LogTransform(DashTransform):
         return [MultiplexerTransform()]
 
 
-def bind_logger(logger, single_output, out_flex_key):
+def bind_logger(logger, outputs_conf, out_flex_key):
     def wrapper(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
             logger.clear()
             outputs = f(*args, **kwargs, dash_logger=logger)
-            return _append_output(outputs, logger.get_output(), single_output, out_flex_key)
+            return _append_output(outputs, logger.get_output(), outputs_conf, out_flex_key)
 
         return decorated_function
 
@@ -1545,15 +1551,18 @@ def _skip_inputs(args, kwargs, keys: List[Any]):
     return args, kwargs, fltr
 
 
-def _append_output(outputs, value, single_output, out_idx):
+def _append_output(outputs, value, outputs_conf, out_idx):
     # Handle flex signature.
     if isinstance(outputs, dict):
         outputs[out_idx] = value
         return outputs
-    # Handle single output.
-    if single_output:
+    if outputs_conf == 'none':
+        # Handle no output
+        return value
+    elif outputs_conf == 'single':
+        # Handle single output.
         return [outputs, value]
-    # Finally, the "normal" case.
+    # Finally, the "normal" (multiple) case.
     return _as_list(outputs) + [value]
 
 
