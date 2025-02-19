@@ -7,6 +7,7 @@ from .Keyboard import Keyboard
 from .Loading import Loading
 from .Lottie import Lottie
 from .Mermaid import Mermaid
+from .PassComponentDemo import PassComponentDemo
 from .Purify import Purify
 from .SSE import SSE
 from .WebSocket import WebSocket
@@ -21,6 +22,7 @@ __all__ = [
     "Loading",
     "Lottie",
     "Mermaid",
+    "PassComponentDemo",
     "Purify",
     "SSE",
     "WebSocket"
