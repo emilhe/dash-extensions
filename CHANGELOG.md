@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Update Dash dependency to 3.0.0 [BREAKING CHANGE]
+- Fixed bug in SSE component (only observed in Dash 3)
 
 ### Removed
 
