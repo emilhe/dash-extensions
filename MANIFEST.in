@@ -6,6 +6,7 @@ include dash_extensions/async-mermaid.js
 include dash_extensions/async-mermaid.js.map
 include dash_extensions/metadata.json
 include dash_extensions/package-info.json
+include dash_extensions/*.py
 include README.md
 include LICENSE
 include package.json

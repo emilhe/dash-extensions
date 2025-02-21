@@ -559,22 +559,22 @@ testing = ["beautifulsoup4 (>=4.8.2)", "cryptography", "dash-testing-stub (>=0.0
 
 [[package]]
 name = "dash-mantine-components"
-version = "0.15.2"
+version = "1.0.0rc1"
 description = "Plotly Dash Components based on Mantine"
 optional = true
 python-versions = "*"
 groups = ["main"]
 markers = "python_version <= \"3.11\" and extra == \"mantine\" or python_version >= \"3.12\" and extra == \"mantine\""
 files = [
-    {file = "dash_mantine_components-0.15.2-py3-none-any.whl", hash = "sha256:1a73456037e5f691143d3ca6e9afda23bb1b35148393322deeefb3eb78db0f92"},
-    {file = "dash_mantine_components-0.15.2.tar.gz", hash = "sha256:28a700aa67240cc8c8c23900912d449a0a636b9cb693a23f8bea23cadde511ef"},
+    {file = "dash_mantine_components-1.0.0rc1-py3-none-any.whl", hash = "sha256:260a3750eb035c21bc7e6806dcafb8d5c2061ce50551ff6ff7d4a1878b34f17d"},
+    {file = "dash_mantine_components-1.0.0rc1.tar.gz", hash = "sha256:a97d4ca78c90d37b63709439529d64de79e23047b4d8c97640625fb1cfcf4a22"},
 ]
 
 [package.dependencies]
 dash = ">=2"
 
 [package.extras]
-dev = ["black", "build", "dash[ci,dev,testing] (>=2.0)", "pytest (<8.1.0)", "pyyaml (>=5.0)", "selenium (<4.3.0)", "wheel"]
+dev = ["black", "build", "dash[ci,dev,testing] (>=2)", "pytest (<8.1.0)", "pyyaml (>=5.0)", "selenium (<4.3.0)", "wheel"]
 
 [[package]]
 name = "dash-testing-stub"
@@ -2564,4 +2564,4 @@ mantine = ["dash-mantine-components"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4"
-content-hash = "254cb8ebb74530cd6f909ebb26846dec8795ffe56805d5b0354fd0ca1cefc9cd"
+content-hash = "78761c26e874ec115cd5547842f475b691201f80513e1247f95de5954501d3eb"
