@@ -29,8 +29,8 @@ module.exports = (env, argv) => {
 
     let filename = (overrides.output || {}).filename;
     if(!filename) {
-        const modeSuffix = mode === 'development' ? 'dev' : 'min';
-        filename = `${dashLibraryName}.${modeSuffix}.js`;
+        const modeSuffix = mode === 'development' ? '.dev' : '';
+        filename = `${dashLibraryName}${modeSuffix}.js`;
     }
 
     const entry = overrides.entry || {main: './src/lib/index.js'};
@@ -56,6 +56,12 @@ module.exports = (env, argv) => {
         },
         devtool,
         externals,
+        resolve: {
+            fallback: {
+              assert: false,
+              // You can disable others if needed
+            },
+        },
         module: {
             rules: [
                 {
@@ -83,21 +89,30 @@ module.exports = (env, argv) => {
         },
         optimization: {
             splitChunks: {
-                name: '[name].js',
                 cacheGroups: {
+                    shared: {
+                        priority: 5,
+                        chunks: 'all',
+                        minSize: 0,
+                        minChunks: 2,
+                        name: 'dash_core_components-shared'
+                    },
                     async: {
                         chunks: 'async',
                         minSize: 0,
                         name(module, chunks, cacheGroupKey) {
                             return `${cacheGroupKey}-${chunks[0].name}`;
-                        }
+                        },
+                        priority: 1,
                     },
-                    // shared: {
-                    //     chunks: 'all',
-                    //     minSize: 0,
-                    //     minChunks: 2,
-                    //     name: 'dash_core_components-shared'
-                    // }
+                    mermaid: {
+                        test: /[\\/]node_modules[\\/](mermaid|@braintree\/sanitize-url|cytoscape|cytoscape-cose-bilkent|cytoscape-fcose|d3|dagre-d3-es|dayjs|elkjs|khroma|lodash-es|non-layered-tidy-tree-layout|stylis|ts-dedent|uuid|web-worker|cose-base|layout-base)[\\/]/,
+                        name: 'async-mermaid',
+                        chunks: 'all',
+                        priority: 10,
+                        enforce: true,  // We FORCE all mermaid content into this chunk
+                        reuseExistingChunk: true
+                    }
                 }
             }
         },

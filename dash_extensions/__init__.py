@@ -32,54 +32,43 @@ _current_path = _os.path.dirname(_os.path.abspath(__file__))
 _this_module = _sys.modules[__name__]
 
 async_resources = ["lottie", "mermaid"]
+async_chunks = [f"async-{async_resource}" for async_resource in async_resources]
 
+# Add shared chunks here.
+shared_chunks = [
+    f"{__name__}-shared",
+]
+
+# Collect all chunks (main, async, shared).
+chunks = [__name__] + async_chunks + shared_chunks
+
+# Add all chunks to the js_dist list.
 _js_dist = []
-
 _js_dist.extend(
     [
         {
-            "relative_package_path": "async-{}.js".format(async_resource),
-            "external_url": ("https://unpkg.com/{0}@{2}" "/{1}/async-{3}.js").format(
-                package_name, __name__, __version__, async_resource
-            ),
+            "relative_package_path": f"{chunk}.js",
+            "external_url": f"https://unpkg.com/{package_name}@{__version__}/{__name__}/{chunk}.js",
             "namespace": package_name,
-            "async": True,
+            "async": chunk != __name__,  # don't make the main bundle async
         }
-        for async_resource in async_resources
+        for chunk in chunks
     ]
 )
-
-# TODO: Figure out if unpkg link works
 _js_dist.extend(
     [
         {
-            "relative_package_path": "async-{}.js.map".format(async_resource),
-            "external_url": ("https://unpkg.com/{0}@{2}" "/{1}/async-{3}.js.map").format(
-                package_name, __name__, __version__, async_resource
-            ),
+            "relative_package_path": f"{chunk}.js.map",
+            "external_url": f"https://unpkg.com/{package_name}@{__version__}/{__name__}/{chunk}.js.map",
             "namespace": package_name,
             "dynamic": True,
         }
-        for async_resource in async_resources
+        for chunk in chunks
     ]
 )
 
-_js_dist.extend(
-    [
-        {
-            "relative_package_path": "dash_extensions.min.js",
-            "external_url": "https://unpkg.com/{0}@{2}/{1}/{1}.min.js".format(package_name, __name__, __version__),
-            "namespace": package_name,
-        },
-        {
-            "relative_package_path": "dash_extensions.min.js.map",
-            "external_url": "https://unpkg.com/{0}@{2}/{1}/{1}.min.js.map".format(package_name, __name__, __version__),
-            "namespace": package_name,
-            "dynamic": True,
-        },
-    ]
-)
 
+# Similarly, collect CSS.
 _css_dist = []
 
 for _component in __all__:

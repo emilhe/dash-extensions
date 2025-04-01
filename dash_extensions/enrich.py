@@ -1314,7 +1314,6 @@ class Dash(DashProxy):
     def __init__(self, *args, **kwargs):
         transforms = [
             TriggerTransform(),
-            LogTransform(),
             MultiplexerTransform(),
             CycleBreakerTransform(),
             BlockingCallbackTransform(),
