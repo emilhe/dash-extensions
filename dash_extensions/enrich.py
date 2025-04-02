@@ -46,6 +46,7 @@ from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
 from dash.dependencies import DashDependency, _Wildcard  # lgtm [py/unused-import]
 from dash.development.base_component import Component
+from dash.exceptions import PreventUpdate
 from dataclass_wizard import asdict, fromdict
 from flask import session
 from flask_caching.backends import FileSystemCache, RedisCache
@@ -684,8 +685,9 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
                 context_value.set(local_ctx)
             try:
                 outputs = f(*args, **kwargs)
-            except Exception:
-                logging.exception(f"Exception raised in blocking callback [{f.__name__}]")
+            except Exception as e:
+                if not isinstance(e, PreventUpdate):
+                    logging.exception(f"Exception raised in blocking callback [{f.__name__}]")
                 outputs = _determine_outputs(single_output)
 
             return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
