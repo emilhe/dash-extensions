@@ -8,7 +8,7 @@
     "build:js": "webpack --mode production",
     "build:backends": "dash-generate-components ./src/ts/components dash_extensions -p package-info.json --r-prefix '' --jl-prefix '' --ignore \\.test\\.",
     "build": "npm run build:js && npm run build:backends && npm run update:pyproject",
-    "update:pyproject": "uv python pyproject.py",
+    "update:pyproject": "uv run python pyproject.py",
     "watch": "npm run build:js::dev -- --watch"
   },
   "devDependencies": {

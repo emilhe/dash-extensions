@@ -2,7 +2,9 @@
 name = "dash-extensions"
 version = "1.1.1rc2"
 description = "Extensions for Plotly Dash."
-authors = ["emher <emil.h.eriksen@gmail.com>"]
+authors = [
+    "emher <emil.h.eriksen@gmail.com>",
+]
 license = "MIT"
 readme = "README.md"
 homepage = "https://dash-extensions.com"
