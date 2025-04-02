@@ -1,5 +1,5 @@
 {
-  "name": "dash_extensions",
+  "name": "dash-extensions",
   "version": "1.1.1rc4",
   "description": "Extensions for Plotly Dash.",
   "main": "index.ts",
