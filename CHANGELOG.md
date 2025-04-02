@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.0.0] - [UNRELEASED]
+## [1.1.0] - [UNRELEASED]
 
 ### Added
 
@@ -10,14 +10,21 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
--   Update Dash dependency to 3.0.0 [BREAKING CHANGE]
+-   All components rewritten in TypeScript
+-   Refactor all but the tiniest component to be async, thereby reducing (main) bundle size to 11.7 kB
+-   Update to React 18, update dependencies accordingly fixing various security bugs
+-   Change the `Lottie` component to be based on `lottie-react` instead of `react-lottie` (not maintained) [BREAKING CHANGE]
+-   Update the `Mermaid` component to the most recent version, thereby fixing [#362](https://github.com/emilhe/dash-extensions/issues/362)
+-   Change build/dependency management system to uv
+-   Update Dash dependency to 3.0.0 [BREAKING CHANGE], thereby fixing [#378](https://github.com/emilhe/dash-extensions/issues/280).
 -   Fixed bug in SSE component (only observed in Dash 3)
+-   Fixed bug in `fix_page_load_anchor_issue` function
 
 ### Removed
 
--   Dropped `dataiku` module (targeted old Dataiku vesion, not maintained for years)
--   Dropped `NoOutputTransform` as the functionality (no output) has been available in "pure" Dash since 2.17.0
--   Dropped `LogTransform`. New Dash functionality allows a leaner implementation, now found in the `logging` module
+-   Dropped `dataiku` module (targeted old Dataiku vesion, not maintained for years) [BREAKING CHANGE]
+-   Dropped `NoOutputTransform` as the functionality (no output) has been available in "pure" Dash since 2.17.0 [BREAKING CHANGE]
+-   Dropped `LogTransform`. New Dash functionality allows a leaner implementation, now found in the `logging` module [BREAKING CHANGE]
 
 ## [1.0.20] - 02-01-25
 
