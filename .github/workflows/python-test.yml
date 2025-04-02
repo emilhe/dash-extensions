@@ -4,53 +4,50 @@
 name: Unit tests
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    env:
-      TEST_CYCLE_BREAKER_ALLOWED_ERRORS: 7
-    steps:
-    - uses: actions/checkout@v3
-    - uses: nanasess/setup-chromedriver@v2
-    - uses: actions/setup-node@v3
-      with:
-        node-version: 16
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    - name: Install poetry
-      uses: Gr1N/setup-poetry@v8
-      with:
-        poetry-version: "1.3.2"
-    - name: Cache poetry
-      id: cached-poetry-dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pypoetry/virtualenvs
-        key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}-python-${{ matrix.python-version }}
-    - run: poetry --version
-    - name: Install dependencies
-      run: poetry install
-    - name: Build components
-      run: |
-        poetry run npm install | echo "Ignore npm install error"
-        poetry run npm run build_no_r
-    - name: Test with pytest
-      run: |
-        poetry run pytest --cov=dash_extensions --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov-report=xml tests
-    - name: Upload pytest test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: pytest-results-${{ matrix.python-version }}
-        path: junit/test-results-${{ matrix.python-version }}.xml
-        # Use always() to always run this step to publish test results when there are test failures
-      if: ${{ always() }}
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1
+    build:
+        runs-on: ubuntu-latest
+        env:
+            TEST_CYCLE_BREAKER_ALLOWED_ERRORS: 7
+        steps:
+            - uses: actions/checkout@v4
+            - uses: nanasess/setup-chromedriver@v2
+            - uses: actions/setup-node@v3
+              with:
+                  node-version: 18
+                  registry-url: https://registry.npmjs.org/
+            # - name: Set up Python
+            #   uses: actions/setup-python@v4
+            #   with:
+            #       python-version: '3.12'
+            - name: Install uv
+              uses: astral-sh/setup-uv@v5
+              with:
+                  python-version: '3.12'
+            - name: Enable uv cache
+              uses: astral-sh/setup-uv@v5
+              with:
+                  enable-cache: true
+            - name: Install the project
+              run: uv sync --all-extras --dev
+            - name: Build components
+              run: |
+                  uv run npm install | echo "Ignore npm install error"
+                  uv run npm run build
+            - name: Test with pytest
+              run: |
+                  uv run pytest --cov=dash_extensions --junitxml=junit/test-results.xml --cov-report=xml tests
+            - name: Upload pytest test results
+              uses: actions/upload-artifact@v4
+              with:
+                  name: pytest-results
+                  path: junit/test-results.xml
+                  # Use always() to always run this step to publish test results when there are test failures
+              if: ${{ always() }}
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@v1
