@@ -1,7 +1,4 @@
 {
-    "python.linting.pylintEnabled": true,
-    "python.pythonPath": "/home/emher/dash/dash-extensions/venv/bin/python3",
-    "python.linting.enabled": true,
     "python.testing.pytestArgs": [
         "tests"
     ],

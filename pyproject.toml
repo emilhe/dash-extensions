@@ -1,57 +1,37 @@
-[tool.poetry]
+[project]
 name = "dash-extensions"
-version = "1.1.0rc12"
+version = "1.1.1rc2"
 description = "Extensions for Plotly Dash."
-authors = ["emher <emil.h.eriksen@gmail.com>"]
-license = "MIT"
 readme = "README.md"
-homepage = "https://dash-extensions.com"
-repository = "https://github.com/thedirtyfew/dash-extensions"
-include = [
-    "dash_extensions/*.py",
-    "dash_extensions/dash_extensions.min.js",
-    "dash_extensions/dash_extensions.min.js.map",
-    "dash_extensions/async-lottie.js",
-    "dash_extensions/async-lottie.js.map",
-    "dash_extensions/async-mermaid.js",
-    "dash_extensions/async-mermaid.js.map",
-    "dash_extensions/metadata.json",
-    "dash_extensions/package-info.json",
-    "README.md",
-    "LICENSE",
-    "package.json"
+requires-python = ">=3.12"
+dependencies = [
+    "dash>=3.0.0",
+    "more-itertools>=10.6.0",
+    "jsbeautifier>=1.15.4",
+    "Flask-Caching>=2.3.1",
+    "dataclass-wizard>=0.35.0",
+    "pydantic>=2.10.6",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<4"
-dash = ">=3.0.0rc2"
-more-itertools = ">=10.2.0, <11.0.0"
-jsbeautifier = "^1.14.3"
-Flask-Caching = "^2.1.0"
-dash-mantine-components = {version = "1.0.0rc1", optional = true}
-dataclass-wizard = "^0.30.1"
-pydantic = "^2.10.1"
+[dependency-groups]
+dev = [
+    "dash[dev, testing]>=3.0.0",
+    "pytest-cov>=6.0.0",
+    "pandas>=2.2.3",
+    "requests>=2.32.2",
+    "ruff>=0.11.0",
+    "tomli>=2.2.1",
+    "tomli-w>=1.2.0",
+    "sse-starlette>=2.2.1",
+    "uvicorn>=0.34.0",
+    "selenium>=4.2.0",
+    "wheel>=0.45.1",
+]
 
-[tool.poetry.extras]
-mantine = ["dash-mantine-components"]
-
-[tool.poetry.group.dev.dependencies]
-dash = {extras = ["dev", "testing"], version = "3.0.0rc2"}
-pytest-cov = "^6.0.0"
-pandas = ">=2.2.3"
-quart = "^0.20.0"
-starlette = ">=0.36.2,<0.41.0"
-requests = "^2.32.2"
-certifi = ">=2023.7.22,<2025.0.0"
-uvicorn = "^0.32.1"
-sse-starlette = "^1.2.1"
-urllib3 = "^1.26.18"
-pre-commit = "^3.7.1"
-ruff = "^0.4.5"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.uv]
+default-groups = [
+    "dev",
+]
 
 [tool.ruff]
 line-length = 120

@@ -7,8 +7,8 @@ import sys as _sys
 import dash as _dash
 
 # noinspection PyUnresolvedReferences
-from ._imports_ import *  # noqa: F401, F403
-from ._imports_ import __all__
+from ._imports_ import *  # type: ignore # noqa: F401, F403
+from ._imports_ import __all__  # type: ignore
 
 if not hasattr(_dash, "__plotly_dash") and not hasattr(_dash, "development"):
     print(
@@ -31,13 +31,19 @@ _current_path = _os.path.dirname(_os.path.abspath(__file__))
 
 _this_module = _sys.modules[__name__]
 
-async_resources = ["lottie", "mermaid"]
+# Add async components here.
+async_resources = [
+    "BeforeAfter",
+    "Lottie",
+    "Mermaid",
+    "Purify",
+    "SSE",
+    "null",  # part of Mermaid
+]
 async_chunks = [f"async-{async_resource}" for async_resource in async_resources]
 
 # Add shared chunks here.
-shared_chunks = [
-    f"{__name__}-shared",
-]
+shared_chunks = []
 
 # Collect all chunks (main, async, shared).
 chunks = [__name__] + async_chunks + shared_chunks
@@ -67,9 +73,11 @@ _js_dist.extend(
     ]
 )
 
+# Enable runtime prop types validation with tsx components.
+# _js_dist.append(dict(dev_package_path="proptypes.js", namespace="dash_extensions"))
 
-# Similarly, collect CSS.
 _css_dist = []
+
 
 for _component in __all__:
     setattr(locals()[_component], "_js_dist", _js_dist)

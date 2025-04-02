@@ -1,12 +1,5 @@
-include dash_extensions/*.py
-include dash_extensions/dash_extensions.min.js
-include dash_extensions/dash_extensions.min.js.map
-include dash_extensions/async-lottie.js
-include dash_extensions/async-lottie.js.map
-include dash_extensions/async-mermaid.js
-include dash_extensions/async-mermaid.js.map
-include dash_extensions/metadata.json
-include dash_extensions/package-info.json
+recursive-include dash_extensions/** *.js *.css *.json *.html
 include README.md
 include LICENSE
 include package.json
+prune tests

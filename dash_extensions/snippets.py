@@ -1,5 +1,5 @@
 import json
-from typing import List, Union
+from typing import List, Sequence, Union
 
 from dash import Input, Output, callback_context, html
 from dash.development.base_component import Component
@@ -35,7 +35,7 @@ def get_triggered() -> Triggered:  # noqa: C901
         triggered_values[current_prop] = entry["value"]
     # Now, create an object.
     try:
-        triggered_id = json.loads(triggered_id)
+        triggered_id = json.loads(triggered_id) if triggered_id is not None else None
     except ValueError:
         pass
     return Triggered(triggered_id, **triggered_values)
@@ -50,10 +50,10 @@ Node = Union[str, float, int, Component]
 
 def generate_html_table(
     columns: List[Node],
-    rows: List[List[Node]] = None,
-    footers: List[Node] = None,
-    caption: Node = None,
-) -> List[Component]:
+    rows: List[List[Node]] | None = None,
+    footers: List[Node] | None = None,
+    caption: Node | None = None,
+) -> Sequence[Component]:
     rows = [] if rows is None else rows
     # Create table structure.
     html_header = [html.Tr([html.Th(col) for col in columns])]
@@ -92,7 +92,9 @@ def fix_page_load_anchor_issue(app, delay, input_id=None, output_id=None):
         function(dummy_value) {{
             setTimeout(function(){{
                 const match = document.getElementById(window.location.hash.substring(1))
-                match.scrollIntoView();
+                if (match) {{
+                    match.scrollIntoView();
+                }}
             }}, {});
         }}
         """.format(delay),
