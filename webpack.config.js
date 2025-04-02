@@ -1,69 +1,51 @@
 const path = require('path');
-const webpack = require('webpack');
 const packagejson = require('./package.json');
-const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
-const WebpackDashDynamicImport = require('@plotly/webpack-dash-dynamic-import');
-
+const WebpackDashDynamicImport = require("@plotly/webpack-dash-dynamic-import");
 const dashLibraryName = packagejson.name.replace(/-/g, '_');
 
-module.exports = (env, argv) => {
-
-    let mode;
-
-    const overrides = module.exports || {};
-
-    // if user specified mode flag take that value
-    if (argv && argv.mode) {
-        mode = argv.mode;
+module.exports = function (env, argv) {
+    const mode = (argv && argv.mode) || 'production';
+    const entry = [path.join(__dirname, 'src/ts/index.ts')];
+    const output = {
+        path: path.join(__dirname, dashLibraryName),
+        chunkFilename: "[name].js",
+        filename: `${dashLibraryName}.js`,
+        library: dashLibraryName,
+        libraryTarget: 'umd',
     }
 
-    // else if configuration object is already set (module.exports) use that value
-    else if (overrides.mode) {
-        mode = overrides.mode;
-    }
-
-    // else take webpack default (production)
-    else {
-        mode = 'production';
-    }
-
-    let filename = (overrides.output || {}).filename;
-    if(!filename) {
-        const modeSuffix = mode === 'development' ? 'dev' : 'min';
-        filename = `${dashLibraryName}.${modeSuffix}.js`;
-    }
-
-    const entry = overrides.entry || {main: './src/lib/index.js'};
-
-    const devtool = overrides.devtool || 'source-map';
-
-    const externals = ('externals' in overrides) ? overrides.externals : ({
-        react: 'React',
-        'react-dom': 'ReactDOM',
-        'plotly.js': 'Plotly',
-        'prop-types': 'PropTypes',
-    });
+    const externals = {
+        react: {
+            commonjs: 'react',
+            commonjs2: 'react',
+            amd: 'react',
+            umd: 'react',
+            root: 'React',
+        },
+        'react-dom': {
+            commonjs: 'react-dom',
+            commonjs2: 'react-dom',
+            amd: 'react-dom',
+            umd: 'react-dom',
+            root: 'ReactDOM',
+        },
+    };
 
     return {
+        output,
         mode,
         entry,
-        output: {
-            path: path.resolve(__dirname, dashLibraryName),
-            chunkFilename: '[name].js',
-            filename,
-            library: dashLibraryName,
-            libraryTarget: 'window',
-        },
-        devtool,
+        target: 'web',
         externals,
+        resolve: {
+            extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+        },
         module: {
             rules: [
                 {
-                    test: /\.jsx?$/,
+                    test: /\.tsx?$/,
+                    use: 'ts-loader',
                     exclude: /node_modules/,
-                    use: {
-                        loader: 'babel-loader',
-                    },
                 },
                 {
                     test: /\.css$/,
@@ -71,43 +53,52 @@ module.exports = (env, argv) => {
                         {
                             loader: 'style-loader',
                             options: {
-                                insertAt: 'top'
-                            }
+                                insert: function insertAtTop(element) {
+                                    var parent = document.querySelector("head");
+                                    var lastInsertedElement =
+                                        window._lastElementInsertedByStyleLoader;
+
+                                    if (!lastInsertedElement) {
+                                        parent.insertBefore(element, parent.firstChild);
+                                    } else if (lastInsertedElement.nextSibling) {
+                                        parent.insertBefore(element, lastInsertedElement.nextSibling);
+                                    } else {
+                                        parent.appendChild(element);
+                                    }
+
+                                    window._lastElementInsertedByStyleLoader = element;
+                                },
+                            },
                         },
                         {
                             loader: 'css-loader',
                         },
                     ],
                 },
-            ],
+            ]
         },
         optimization: {
             splitChunks: {
-                name: '[name].js',
                 cacheGroups: {
+                    // shared: {
+                    //     priority: 5,
+                    //     chunks: 'all',
+                    //     minSize: 0,
+                    //     minChunks: 2,
+                    //     name: 'dash_extensions-shared'
+                    // },
                     async: {
                         chunks: 'async',
                         minSize: 0,
                         name(module, chunks, cacheGroupKey) {
                             return `${cacheGroupKey}-${chunks[0].name}`;
-                        }
+                        },
+                        priority: 1,
                     },
-                    // shared: {
-                    //     chunks: 'all',
-                    //     minSize: 0,
-                    //     minChunks: 2,
-                    //     name: 'dash_core_components-shared'
-                    // }
                 }
             }
         },
-        plugins: [
-            new WebpackDashDynamicImport(),
-            new webpack.SourceMapDevToolPlugin({
-                filename: '[file].map',
-                exclude: ['async-plotlyjs']
-            }),
-            new NodePolyfillPlugin()
-        ]
-    };
-};
+        plugins: [new WebpackDashDynamicImport()],
+    }
+}
+

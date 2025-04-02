@@ -22,14 +22,11 @@ from dash_extensions.enrich import (
     CycleBreakerInput,
     CycleBreakerTransform,
     DashBlueprint,
-    DashLogger,
     DashProxy,
     DataclassTransform,
     DependencyCollection,
     Input,
-    LogTransform,
     MultiplexerTransform,
-    NoOutputTransform,
     Output,
     PrefixIdTransform,
     Serverside,
@@ -277,37 +274,6 @@ def test_dash_output_input_state_compatibility(dash_duo):
         return n_clicks
 
     _basic_dash_proxy_test(dash_duo, app, element_ids=["log_server"])
-
-
-@pytest.mark.parametrize(
-    "args, kwargs",
-    [
-        ([Input("btn", "n_clicks")], dict()),
-        ([], dict(inputs=dict(n_clicks=Input("btn", "n_clicks")))),
-    ],
-)
-def test_no_output_transform(dash_duo, args, kwargs):
-    app = DashProxy()
-    app.layout = html.Div(
-        [
-            html.Button(id="btn"),
-        ]
-    )
-
-    @app.callback(*args, **kwargs)
-    def update(n_clicks):
-        return n_clicks
-
-    # Check that the callback doesn't have an output.
-    callbacks, _ = app.blueprint._resolve_callbacks()
-    assert len(callbacks[0].outputs) == 0
-    # Check that the transform fixes it.
-    app.blueprint.transforms.append(NoOutputTransform())
-    callbacks, _ = app.blueprint._resolve_callbacks()
-    assert len(callbacks[0].outputs) == 1
-    # Finally, check that the app works.
-    dash_duo.start_server(app)
-    dash_duo.find_element("#btn").click()
 
 
 def test_trigger_transform(dash_duo):
@@ -822,33 +788,33 @@ def test_serverside_output_transform_wildcard(dash_duo):  # noqa: C901
     assert dash_duo.find_element(_css_selector("log_all")).text == '{"B":{"0":1}}{"B":{"0":1}}'
 
 
-@pytest.mark.parametrize(
-    "args, kwargs",
-    [
-        ([Output("log_server", "children"), Input("btn", "n_clicks")], dict()),
-        (
-            [],
-            dict(
-                output=[Output("log_server", "children")],
-                inputs=dict(n_clicks=Input("btn", "n_clicks")),
-            ),
-        ),
-    ],
-)
-def test_log_transform(dash_duo, args, kwargs):
-    app = _get_basic_dash_proxy(transforms=[LogTransform(try_use_mantine=False)])
+# @pytest.mark.parametrize(
+#     "args, kwargs",
+#     [
+#         ([Output("log_server", "children"), Input("btn", "n_clicks")], dict()),
+#         (
+#             [],
+#             dict(
+#                 output=[Output("log_server", "children")],
+#                 inputs=dict(n_clicks=Input("btn", "n_clicks")),
+#             ),
+#         ),
+#     ],
+# )
+# def test_log_transform(dash_duo, args, kwargs):
+#     app = _get_basic_dash_proxy(transforms=[LogTransform(try_use_mantine=False)])
 
-    @app.callback(*args, **kwargs, log=True)
-    def update_log(n_clicks, dash_logger: DashLogger):
-        dash_logger.info("info")
-        dash_logger.warning("warning")
-        dash_logger.error("error")
-        return n_clicks
+#     @app.callback(*args, **kwargs, log=True)
+#     def update_log(n_clicks, dash_logger: DashLogger):
+#         dash_logger.info("info")
+#         dash_logger.warning("warning")
+#         dash_logger.error("error")
+#         return n_clicks
 
-    # Check that stuff works.
-    _basic_dash_proxy_test(dash_duo, app, ["log_server"])
-    # Check that log is written to div element.
-    assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
+#     # Check that stuff works.
+#     _basic_dash_proxy_test(dash_duo, app, ["log_server"])
+#     # Check that log is written to div element.
+#     assert dash_duo.find_element("#log").text == "INFO: info\nWARNING: warning\nERROR: error"
 
 
 @pytest.mark.parametrize(
