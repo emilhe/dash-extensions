@@ -4,16 +4,12 @@ from dash_extensions import Lottie
 
 # Setup options.
 url = "https://assets9.lottiefiles.com/packages/lf20_YXD37q.json"
-options = dict(
-    loop=True,
-    autoplay=True,
-    rendererSettings=dict(preserveAspectRatio="xMidYMid slice"),
-)
+options = dict(loop=True, autoplay=True)
 # Create example app.
 app = Dash(__name__)
 app.layout = html.Div(
     [
-        Lottie(options=options, width="25%", height="25%", url=url, id="lottie", speed=2),
+        Lottie(options=options, url=url, id="lottie", speed=2),
         dcc.Slider(id="slider", value=20, min=0, max=100, step=5),
     ]
 )
