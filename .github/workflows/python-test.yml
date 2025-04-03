@@ -1,3 +1,5 @@
+# This workflow will run unit tests and upload test results to Codecov
+
 name: Unit tests
 
 on:
