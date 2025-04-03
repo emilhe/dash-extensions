@@ -1,4 +1,4 @@
-# This workflow will publish the package to npm andPyPI when a new release is created
+# This workflow will publish the package to npm and PyPI when a new release is created
 
 name: Upload Python Package
 
