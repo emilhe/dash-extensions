@@ -12,6 +12,7 @@ import sys
 import threading
 import uuid
 from collections import defaultdict
+from contextlib import suppress
 from datetime import datetime
 from itertools import compress
 from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
@@ -1280,6 +1281,9 @@ class SerializationTransform(DashTransform):
 
 class DataclassTransform(SerializationTransform):
     def _try_load(self, data: Any, ann=None) -> Any:
+        with suppress(AttributeError):
+            if ann.__origin__ is list:
+                return self._try_load(data, ann.__args__[0])
         if not dataclasses.is_dataclass(ann):
             return data
         if data is None:
@@ -1291,6 +1295,10 @@ class DataclassTransform(SerializationTransform):
         raise ValueError(f"Unsupported data type for dataclass: {type(data)}")
 
     def _try_dump(self, obj: Any) -> Any:
+        with suppress(AttributeError):
+            if isinstance(obj, list):
+                if all(map(dataclasses.is_dataclass, obj)):
+                    return list(map(self._try_dump, obj))
         if not dataclasses.is_dataclass(obj):
             return obj
         return asdict(obj)

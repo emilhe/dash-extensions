@@ -665,6 +665,43 @@ def test_dataclass_transform(dash_duo, args, kwargs):
     assert dash_duo.find_element("#log").text == "2000-01-01T00:00:00: [1, 2, 3, 4, 5]"
 
 
+def test_dataclass_transform_list(dash_duo):
+    @dataclass
+    class StateModel:
+        value: datetime
+        list_of_values: list[int]
+
+    app = DashProxy(prevent_initial_callbacks=True, transforms=[DataclassTransform()])
+    app.layout = html.Div(
+        [
+            html.Button(id="btn"),
+            dcc.Store(id="store"),
+            html.Div(id="log"),
+        ]
+    )
+
+    @app.callback(Output("store", "data"), Input("btn", "n_clicks"))
+    def update_default(n_clicks: str) -> list[StateModel]:
+        return [
+            StateModel(value=datetime(2000, 1, 1), list_of_values=[1, 2, 3, 4, 5]),
+            StateModel(value=datetime(2000, 1, 2), list_of_values=[6, 7, 8, 9, 10]),
+        ]
+
+    @app.callback(Output("log", "children"), Input("store", "data"))
+    def update_log(states: list[StateModel]) -> str:
+        return r" - ".join(f"{state.value.isoformat()}: {state.list_of_values}" for state in states)
+
+    # Check that stuff works. It doesn't using a normal Dash object.
+    dash_duo.start_server(app)
+    assert dash_duo.find_element("#log").text == ""
+    dash_duo.find_element("#btn").click()
+    time.sleep(0.1)  # wait for callback code to execute.
+    assert (
+        dash_duo.find_element("#log").text
+        == "2000-01-01T00:00:00: [1, 2, 3, 4, 5] - 2000-01-02T00:00:00: [6, 7, 8, 9, 10]"
+    )
+
+
 @pytest.mark.parametrize(
     "args, kwargs",
     [
