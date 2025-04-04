@@ -9,8 +9,9 @@ The `dash-extensions` package is a collection of utility functions, syntax exten
 -   A number of custom components, e.g. the `Websocket` component, which enables real-time communication and push notifications
 -   The `javascript` module, which contains functionality to ease the interplay between Dash and JavaScript
 -   The `logging` module, which makes it a breeze to route logs to your Dash UI
+-   The `events` module, which facilitates event flows in Dash
 -   The `pages` module, which extends the functionality of [Dash Pages](https://dash.plotly.com/urls)
--   The `snippets/validation/streaming` modules, which contain a collection of utility functions (documentation limited to source code comments)
+-   The `snippets/utils/validation/streaming` modules, which contain a collection of utility functions (documentation limited to source code comments)
 
 The `enrich` module enables a number of _transforms_ that add functionality and/or syntactic sugar to Dash. Examples include
 
