@@ -1,6 +1,6 @@
 [project]
 name = "dash-extensions"
-version = "2.0.0"
+version = "2.0.1"
 description = "Extensions for Plotly Dash."
 authors = [
     { name = "emher", email = "emil.h.eriksen@gmail.com" },
@@ -19,7 +19,7 @@ dependencies = [
 
 [project.urls]
 homepage = "https://dash-extensions.com"
-repository = "https://github.com/thedirtyfew/dash-extensions"
+repository = "https://github.com/emilhe/dash-extensions"
 
 [dependency-groups]
 dev = [

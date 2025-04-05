@@ -14,7 +14,8 @@ import uuid
 from collections import defaultdict
 from datetime import datetime
 from itertools import compress
-from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from types import UnionType
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union, get_args
 
 import dash
 import plotly
@@ -1066,6 +1067,14 @@ def _output_id_without_wildcards(output: Output) -> str:
 # region SerializationTransform
 
 
+def extract_non_optional(annotation):
+    if isinstance(annotation, UnionType):
+        # Get the individual types and filter out NoneType
+        non_optional_types = [arg for arg in get_args(annotation) if arg is not type(None)]
+        return non_optional_types[0] if non_optional_types else None
+    return annotation
+
+
 class SerializationTransform(DashTransform):
     def apply_serverside(self, callbacks):
         for callback in callbacks:
@@ -1123,6 +1132,7 @@ class SerializationTransform(DashTransform):
 
 class DataclassTransform(SerializationTransform):
     def _try_load(self, data: Any, ann=None) -> Any:
+        ann = extract_non_optional(ann)
         if not dataclasses.is_dataclass(ann):
             return data
         if data is None:
@@ -1147,6 +1157,7 @@ class DataclassTransform(SerializationTransform):
 
 class BaseModelTransform(SerializationTransform):
     def _try_load(self, data: Any, ann=None) -> Any:
+        ann = extract_non_optional(ann)
         if not isinstance(ann, type(BaseModel)):
             return data
         if data is None:
