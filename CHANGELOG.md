@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 02-05-25
+
+### Changed
+
+-   A few improvements in the `events` module
+-   Added support for optional types in serialization transforms, thereby fixing [#345](https://github.com/emilhe/dash-extensions/issues/345)
+
 ## [2.0.0] - 02-04-25
 
 ### Added
