@@ -1,13 +1,14 @@
 import datetime
-from enum import Enum
 import re
-from typing import Optional, Type, TypeVar
+from enum import Enum
 from logging import getLogger
-from dash import set_props, ctx
+from typing import Optional, Type, TypeVar
 
-from pydantic import BaseModel, Field
-from dash_extensions.enrich import Input, dcc
+from dash import ctx, set_props
 from dash.dependencies import DashDependency
+from pydantic import BaseModel, Field
+
+from dash_extensions.enrich import Input, dcc
 
 logger = getLogger(__name__)
 
@@ -20,7 +21,7 @@ class EventModel(BaseModel):
     The EventModel class provides the main interface for creating and dispatching events.
     """
 
-    timestamp: float = Field(default_factory=datetime.datetime.now().timestamp)
+    timestamp: float = Field(default_factory=lambda: datetime.datetime.now().timestamp())
 
     def add_listener(self) -> Input:
         """
@@ -64,7 +65,16 @@ class SimpleEvent(EventModel):
     Wrapper class for simple events.
     """
 
-    type: str | Enum
+    type: str | Enum | None = None
+
+    def __init__(self, **data):
+        if "type" not in data:
+            data["type"] = self.__class__.__name__
+        super().__init__(**data)
+
+    @classmethod
+    def add_listener(cls) -> Input:
+        return add_event_listener(cls.__name__)
 
     @property
     def _uid(self) -> str:
