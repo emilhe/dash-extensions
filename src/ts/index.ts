@@ -9,6 +9,7 @@ import SSE from './components/SSE';
 import WebSocket from './components/WebSocket';
 import Lottie from './components/Lottie';
 import Mermaid from './components/Mermaid';
+import Loading from './components/Loading';
 
 export {
     BeforeAfter,
@@ -21,5 +22,6 @@ export {
     SSE,
     WebSocket,
     Lottie,
-    Mermaid
+    Mermaid,
+    Loading
 }

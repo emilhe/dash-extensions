@@ -2,11 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.0.2] - 10-05-25
+## [2.0.3] - 10-05-25
 
 ### Changed
 
 -   Relax Python version constraint
+-   Fixed bug in `Loading` component build process
 
 ## [2.0.1] - 02-05-25
 
