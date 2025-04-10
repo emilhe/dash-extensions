@@ -431,15 +431,14 @@ class DashProxy(dash.Dash):
                 if self.blueprint._layout_is_function:
                     _ = self.blueprint.layout()
                 self.register_callbacks()
-            # Proceed as normally.
-            super()._setup_server()
-            if first_request:
                 # Remap callback bindings to enable callback registration via the 'before_first_request' hook.
                 self.callback = super().callback
                 self.clientside_callback = super().clientside_callback
                 # Set session secret. Used by some subclasses.
                 if not self.server.secret_key:
                     self.server.secret_key = secrets.token_urlsafe(16)
+            # Proceed as normally.
+            super()._setup_server()
 
     def hijack(self, app: dash.Dash):
         """
