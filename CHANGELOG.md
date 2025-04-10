@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.2] - 10-05-25
+
+### Changed
+
+-   Relax Python version constraint
+
 ## [2.0.1] - 02-05-25
 
 ### Changed
