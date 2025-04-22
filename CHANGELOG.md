@@ -2,14 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.0.3] - 10-05-25
+## [2.0.4] - 22-04-25
+
+### Changed
+
+-   Fixed bug with background callback registration [#312](https://github.com/emilhe/dash-extensions/issues/312). Contributed by [MartinSA04](https://github.com/MartinSA04)
+
+## [2.0.3] - 10-04-25
 
 ### Changed
 
 -   Relax Python version constraint
 -   Fixed bug in `Loading` component build process
 
-## [2.0.1] - 02-05-25
+## [2.0.1] - 02-04-25
 
 ### Changed
 
