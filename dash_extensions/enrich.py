@@ -12,7 +12,7 @@ import sys
 import threading
 import uuid
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import compress
 from types import UnionType
 from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union, get_args
@@ -690,7 +690,7 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
                     logging.exception(f"Exception raised in blocking callback [{f.__name__}]")
                 outputs = _determine_outputs(single_output)
 
-            return _append_output(outputs, datetime.utcnow().timestamp(), single_output, out_flex_key)
+            return _append_output(outputs, datetime.now(timezone.utc).timestamp(), single_output, out_flex_key)
 
         return decorated_function
 
