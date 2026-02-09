@@ -1,40 +1,46 @@
 from __future__ import annotations
 
 import logging
+import importlib
 import uuid
 from typing import Callable, Dict
 
 import dash
 from dash import (
     Output,
+    set_props as dash_set_props,
     html,
 )
-from dash._callback_context import _get_context_value, has_context
-from dash._utils import stringify_id
 
 from dash_extensions.utils import Component, DashNode, as_list
 
 
-@has_context
 def set_props(component_id: str | dict, props: dict, append: bool = False) -> None:
     """
     In the current (upstream) implementation of Dash, the "set_props" function overrides the value on each call,
     effectively leaving only the last value in the updated_props dictionary. This implementation allows for *appending*.
     """
-    ctx_value = _get_context_value()
-    _id = stringify_id(component_id)
-    if not append or _id not in ctx_value.updated_props:
-        ctx_value.updated_props[_id] = props
-        return
-    updated_props = dict(ctx_value.updated_props[_id]) if _id in ctx_value.updated_props else {}
-    for key in props:
-        if key not in updated_props:
-            updated_props[key] = props[key]
-            continue
-        updated = as_list(updated_props[key])
-        updated.append(props[key])
-        updated_props[key] = updated
-    ctx_value.updated_props[_id] = updated_props
+    try:
+        callback_ctx = importlib.import_module("dash._callback_context")
+        dash_utils = importlib.import_module("dash._utils")
+        ctx_value = callback_ctx._get_context_value()
+        _id = dash_utils.stringify_id(component_id)
+        if not append or _id not in ctx_value.updated_props:
+            ctx_value.updated_props[_id] = props
+            return
+        updated_props = dict(ctx_value.updated_props[_id]) if _id in ctx_value.updated_props else {}
+        for key in props:
+            if key not in updated_props:
+                updated_props[key] = props[key]
+                continue
+            updated = as_list(updated_props[key])
+            updated.append(props[key])
+            updated_props[key] = updated
+        ctx_value.updated_props[_id] = updated_props
+    except Exception:
+        # Fallback for future Dash versions where context internals may move.
+        # This preserves functionality (without append semantics) via public API.
+        dash_set_props(component_id, props)
 
 
 class DashLogHandler(logging.Handler):

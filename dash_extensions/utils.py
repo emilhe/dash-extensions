@@ -1,7 +1,6 @@
-from typing import TypeVar
+from typing import Any, TypeVar
 
-from dash.development.base_component import Component
-
+Component = Any
 ComponentIdentifier = str | dict | Component
 DashNode = Component | list[Component] | str | list[str]
 
@@ -9,8 +8,8 @@ T = TypeVar("T")
 
 
 def get_id(component: ComponentIdentifier) -> str | dict:
-    if isinstance(component, Component):
-        return component._set_random_id()
+    if hasattr(component, "_set_random_id"):
+        return component._set_random_id()  # type: ignore[union-attr]
     return component
 
 

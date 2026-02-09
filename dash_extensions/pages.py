@@ -1,10 +1,12 @@
 import json
+import uuid
 from collections import OrderedDict
 from typing import Any, Optional
 
 import dash
 from dash import Input, Output, State, clientside_callback, html, page_container
-from dash.development.base_component import Component
+
+Component = Any
 
 """
 This module holds utilities related to the [Dash pages](https://dash.plotly.com/urls).
@@ -128,19 +130,39 @@ def _prepare_container(container: Optional[Component] = None):
     return container
 
 
+def _resolve_pages_ids() -> tuple[str, str]:
+    """
+    Resolve IDs of the internal pages Store/Location components.
+    Falls back to the default IDs used by Dash pages.
+    """
+    store, location = "_pages_store", "_pages_location"
+    for child in getattr(page_container, "children", []) or []:
+        cid = getattr(child, "id", None)
+        if cid == "_pages_store":
+            store = cid
+        if cid == "_pages_location":
+            location = cid
+    return store, location
+
+
+def _wrapper_id(component: Component) -> str:
+    component_id = getattr(component, "id", None)
+    if component_id is not None:
+        return f"{str(component_id)}_wrapper"
+    return f"{uuid.uuid4().hex}_wrapper"
+
+
 def _setup_callbacks():
-    store = dash.dash._ID_STORE
-    location = dash.dash._ID_LOCATION
+    store, location = _resolve_pages_ids()
     # Setup callbacks for page components.
     components = list(_COMPONENT_PATH_REGISTRY.keys())
     for component in components:
         # Wrap in div container, so we can hide it.
-        cid = component._set_random_id()
         wrapper = html.Div(
             component,
             disable_n_clicks=True,
             style=dict(display="none"),
-            id=f"{cid}_wrapper",
+            id=_wrapper_id(component),
         )
         # Add to container.
         container = _prepare_container(_CONTAINER_REGISTRY.get(component, _COMPONENT_CONTAINER))

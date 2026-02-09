@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import hashlib
+import importlib
 import inspect
 import json
 import logging
@@ -43,10 +44,7 @@ from dash import (  # lgtm [py/unused-import]; noqa: F401
     register_page,  # noqa: F401
     set_props,  # noqa: F401
 )
-from dash._callback_context import context_value
-from dash._utils import patch_collections_abc
-from dash.dependencies import DashDependency, _Wildcard  # lgtm [py/unused-import]
-from dash.development.base_component import Component
+from dash.dependencies import DashDependency
 from dash.exceptions import PreventUpdate
 from dataclass_wizard import asdict, fromdict
 from flask import session
@@ -62,6 +60,30 @@ _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"
 _wildcard_values = list(_wildcard_mappings.values())
 
 DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
+
+
+def _get_component_class():
+    try:
+        return importlib.import_module("dash.development.base_component").Component
+    except Exception:
+        return Any
+
+
+Component = _get_component_class()
+
+
+def _set_cached_triggered_inputs(triggered_inputs):
+    """
+    Backward-compatible context injection used by the blocking transform.
+    Falls back to no-op if Dash internals are unavailable.
+    """
+    try:
+        context_value = importlib.import_module("dash._callback_context").context_value
+        local_ctx = context_value.get()
+        local_ctx["triggered_inputs"] = triggered_inputs
+        context_value.set(local_ctx)
+    except Exception:
+        return
 
 
 # region DependencyCollection
@@ -320,11 +342,11 @@ class DashBlueprint:
         """
         This method resolves the callbacks, i.e. it applies the callback injections.
         """
-        callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
+        callbacks, clientside_callbacks = list(self.callbacks), list(self.clientside_callbacks)
         # Add any global callbacks.
         if self.include_global_callbacks:
-            callbacks += GLOBAL_BLUEPRINT.callbacks
-            clientside_callbacks += GLOBAL_BLUEPRINT.clientside_callbacks
+            callbacks += list(GLOBAL_BLUEPRINT.callbacks)
+            clientside_callbacks += list(GLOBAL_BLUEPRINT.clientside_callbacks)
         # Proceed as before.
         for transform in self.transforms:
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)
@@ -372,7 +394,7 @@ class DashBlueprint:
 
     @layout.setter
     def layout(self, value):
-        self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
+        self._layout_is_function = callable(value)
         self._layout = value
 
 
@@ -680,9 +702,7 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
             cached_ctx = fltr[1]
             single_output = num_outputs <= 1
             if cached_ctx is not None and "triggered" in cached_ctx:
-                local_ctx = context_value.get()
-                local_ctx["triggered_inputs"] = cached_ctx["triggered"]
-                context_value.set(local_ctx)
+                _set_cached_triggered_inputs(cached_ctx["triggered"])
             try:
                 outputs = f(*args, **kwargs)
             except Exception as e:
@@ -913,7 +933,7 @@ def apply_prefix(prefix, component_id, escape):
             if isinstance(component_id[key], int):
                 continue
             # This branch handles the wildcard callbacks.
-            if isinstance(component_id[key], _Wildcard):
+            if component_id[key] in [ALL, MATCH, ALLSMALLER]:
                 continue
             # All "normal" props are prefixed.
             component_id[key] = "{}-{}".format(prefix, component_id[key])
