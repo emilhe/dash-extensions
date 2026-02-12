@@ -1,7 +1,5 @@
 from typing import Any, Protocol, TypeAlias
 
-from dash import ALL, ALLSMALLER, MATCH
-
 
 class ComponentProtocol(Protocol):
     id: Any
@@ -21,10 +19,6 @@ except (ImportError, AttributeError):
     Wildcard: TypeAlias = object
 else:
     Wildcard: TypeAlias = _DashWildcard
-
-
-def is_wildcard(value: object) -> bool:
-    return value in (ALL, MATCH, ALLSMALLER)
 
 
 # Compat shims for Dash internals that may move across major versions.
