@@ -21,6 +21,10 @@ else:
     Wildcard: TypeAlias = _DashWildcard
 
 
+# Dash component ids support string ids and dict ids with JSON-like values.
+ComponentId: TypeAlias = str | dict[str, Any]
+
+
 # Compat shims for Dash internals that may move across major versions.
 
 try:
