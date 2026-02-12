@@ -1,0 +1,34 @@
+name: Create GitHub Release From Tag
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate release notes from CHANGELOG
+        run: |
+          python scripts/release.py release-notes --version "${GITHUB_REF_NAME}" --output RELEASE_NOTES.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
