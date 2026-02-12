@@ -281,6 +281,7 @@ JuliaManifest.toml
 
 # Generated files
 dash_extensions/*
+!dash_extensions/_typing.py
 **/file_system_backend/*
 
 # R

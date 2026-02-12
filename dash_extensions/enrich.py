@@ -52,6 +52,7 @@ from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
+from dash_extensions._typing import Component
 from dash_extensions.utils import as_list
 
 T = TypeVar("T")
@@ -60,17 +61,6 @@ _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"
 _wildcard_values = list(_wildcard_mappings.values())
 
 DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
-
-
-def _get_component_class():
-    try:
-        return importlib.import_module("dash.development.base_component").Component
-    except Exception:
-        return Any
-
-
-Component = _get_component_class()
-
 
 def _set_cached_triggered_inputs(triggered_inputs):
     """

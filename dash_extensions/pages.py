@@ -6,7 +6,7 @@ from typing import Any, Optional
 import dash
 from dash import Input, Output, State, clientside_callback, html, page_container
 
-Component = Any
+from dash_extensions._typing import Component
 
 """
 This module holds utilities related to the [Dash pages](https://dash.plotly.com/urls).

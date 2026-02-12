@@ -1,9 +1,9 @@
 import json
-from typing import Any, List, Sequence, Union
+from typing import List, Sequence, Union
 
 from dash import Input, Output, callback_context, html
 
-Component = Any
+from dash_extensions._typing import Component
 
 # region Get triggered
 

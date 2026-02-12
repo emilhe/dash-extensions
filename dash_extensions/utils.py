@@ -1,6 +1,6 @@
-from typing import Any, TypeVar
+from typing import TypeVar
 
-Component = Any
+from dash_extensions._typing import Component
 ComponentIdentifier = str | dict | Component
 DashNode = Component | list[Component] | str | list[str]
 
