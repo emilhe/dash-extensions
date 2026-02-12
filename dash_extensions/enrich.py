@@ -335,8 +335,8 @@ class DashBlueprint:
         callbacks, clientside_callbacks = list(self.callbacks), list(self.clientside_callbacks)
         # Add any global callbacks.
         if self.include_global_callbacks:
-            callbacks += list(GLOBAL_BLUEPRINT.callbacks)
-            clientside_callbacks += list(GLOBAL_BLUEPRINT.clientside_callbacks)
+            callbacks += GLOBAL_BLUEPRINT.callbacks
+            clientside_callbacks += GLOBAL_BLUEPRINT.clientside_callbacks
         # Proceed as before.
         for transform in self.transforms:
             callbacks, clientside_callbacks = transform.apply(callbacks, clientside_callbacks)

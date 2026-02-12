@@ -131,18 +131,7 @@ def _prepare_container(container: Optional[Component] = None):
 
 
 def _resolve_pages_ids() -> tuple[str, str]:
-    """
-    Resolve IDs of the internal pages Store/Location components.
-    Falls back to the default IDs used by Dash pages.
-    """
-    store, location = "_pages_store", "_pages_location"
-    for child in getattr(page_container, "children", []) or []:
-        cid = getattr(child, "id", None)
-        if cid == "_pages_store":
-            store = cid
-        if cid == "_pages_location":
-            location = cid
-    return store, location
+    return "_pages_store", "_pages_location"
 
 
 def _wrapper_id(component: Component) -> str:
