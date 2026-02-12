@@ -138,6 +138,7 @@ def _setup_callbacks():
     for component in components:
         # Wrap in div container, so we can hide it.
         component_id = getattr(component, "id", None)
+        # TODO: UUID fallback is non-deterministic across restarts; fine since the original _set_random_id was too.
         wrapper_id = f"{component_id}_wrapper" if component_id is not None else f"{uuid.uuid4().hex}_wrapper"
         wrapper = html.Div(
             component,

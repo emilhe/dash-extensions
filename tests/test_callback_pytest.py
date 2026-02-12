@@ -14,6 +14,9 @@ except ImportError:  # pragma: no cover - tiny local fallback for tests only.
         def __getattr__(self, item):
             return self[item]
 
+        def __setattr__(self, key, value):
+            self[key] = value
+
 from tests.mock_app import display, update
 
 

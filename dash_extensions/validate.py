@@ -8,7 +8,7 @@ _set_random_id = None
 try:
     _component_class = importlib.import_module("dash.development.base_component").Component
     _set_random_id = _component_class._set_random_id
-except Exception:
+except (ImportError, AttributeError):
     _component_class = None
 
 
