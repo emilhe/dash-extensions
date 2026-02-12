@@ -7,20 +7,23 @@ from typing import Callable, Dict
 import dash
 from dash import (
     Output,
+    set_props as dash_set_props,
     html,
 )
-from dash._callback_context import _get_context_value, has_context
-from dash._utils import stringify_id
 
+from dash_extensions._typing import _get_context_value, stringify_id
 from dash_extensions.utils import Component, DashNode, as_list
 
 
-@has_context
 def set_props(component_id: str | dict, props: dict, append: bool = False) -> None:
     """
     In the current (upstream) implementation of Dash, the "set_props" function overrides the value on each call,
     effectively leaving only the last value in the updated_props dictionary. This implementation allows for *appending*.
     """
+    if _get_context_value is None or stringify_id is None:
+        dash_set_props(component_id, props)
+        return
+
     ctx_value = _get_context_value()
     _id = stringify_id(component_id)
     if not append or _id not in ctx_value.updated_props:

@@ -11,6 +11,13 @@ on:
 jobs:
     build:
         runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                include:
+                    - dash-major: "3"
+                      dash-version: "3.0.*"
+                    - dash-major: "4"
+                      dash-version: "4.0.*"
         env:
             TEST_CYCLE_BREAKER_ALLOWED_ERRORS: 7
         steps:
@@ -36,11 +43,11 @@ jobs:
                   uv run npm run build
             - name: Test with pytest
               run: |
-                  uv run pytest --cov=dash_extensions --junitxml=junit/test-results.xml --cov-report=xml tests
+                  uv run --with "dash==${{ matrix.dash-version }}" pytest --cov=dash_extensions --junitxml=junit/test-results.xml --cov-report=xml tests
             - name: Upload pytest test results
               uses: actions/upload-artifact@v4
               with:
-                  name: pytest-results
+                  name: pytest-results-dash-${{ matrix.dash-major }}
                   path: junit/test-results.xml
                   # Use always() to always run this step to publish test results when there are test failures
               if: ${{ always() }}

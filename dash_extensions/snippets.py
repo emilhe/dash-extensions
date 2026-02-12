@@ -2,7 +2,8 @@ import json
 from typing import List, Sequence, Union
 
 from dash import Input, Output, callback_context, html
-from dash.development.base_component import Component
+
+from dash_extensions._typing import Component
 
 # region Get triggered
 

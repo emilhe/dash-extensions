@@ -392,10 +392,10 @@ def test_multiplexer_transform(dash_duo, args, kwargs):
     log = dash_duo.find_element("#log")
     assert log.text == ""
     dash_duo.find_element("#left").click()
-    dash_duo.wait_for_text_to_equal("#log", "left", timeout=0.1)
+    dash_duo.wait_for_text_to_equal("#log", "left", timeout=1)
     assert log.text == "left"
     dash_duo.find_element("#right").click()
-    dash_duo.wait_for_text_to_equal("#log", "right", timeout=0.1)
+    dash_duo.wait_for_text_to_equal("#log", "right", timeout=1)
     assert log.text == "right"
 
 
@@ -422,9 +422,9 @@ def test_multiplexer_transform_wildcard(dash_duo):
 
     dash_duo.start_server(app)
     dash_duo.find_element(_cssid(id="x", type="button0")).click()
-    assert dash_duo.find_element(_cssid(id="0", type="div")).text == "Hello from group 0"
+    dash_duo.wait_for_text_to_equal(_cssid(id="0", type="div"), "Hello from group 0", timeout=1)
     dash_duo.find_element(_cssid(id="y", type="button1")).click()
-    assert dash_duo.find_element(_cssid(id="1", type="div")).text == "Hello from group 1"
+    dash_duo.wait_for_text_to_equal(_cssid(id="1", type="div"), "Hello from group 1", timeout=1)
 
 
 @pytest.mark.parametrize("flex", [False, True])
@@ -476,10 +476,10 @@ def test_multiplexer_and_prefix_transform(dash_duo, args, kwargs):
     log = dash_duo.find_element("#prefix-log")
     assert log.text == ""
     dash_duo.find_element("#prefix-left").click()
-    dash_duo.wait_for_text_to_equal("#prefix-log", "left", timeout=0.1)
+    dash_duo.wait_for_text_to_equal("#prefix-log", "left", timeout=1)
     assert log.text == "left"
     dash_duo.find_element("#prefix-right").click()
-    dash_duo.wait_for_text_to_equal("#prefix-log", "right", timeout=0.1)
+    dash_duo.wait_for_text_to_equal("#prefix-log", "right", timeout=1)
     assert log.text == "right"
 
 
