@@ -68,7 +68,7 @@ typing-extensions==4.13.0
     #   dataclass-wizard
     #   pydantic
     #   pydantic-core
-urllib3==2.3.0
+urllib3==2.6.3
     # via requests
 werkzeug==3.1.5
     # via
