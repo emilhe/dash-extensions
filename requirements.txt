@@ -56,7 +56,7 @@ requests==2.32.4
     # via dash
 retrying==1.3.4
     # via dash
-setuptools==78.1.0
+setuptools==78.1.1
     # via dash
 six==1.17.0
     # via
