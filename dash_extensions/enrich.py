@@ -43,10 +43,7 @@ from dash import (  # lgtm [py/unused-import]; noqa: F401
     register_page,  # noqa: F401
     set_props,  # noqa: F401
 )
-from dash._callback_context import context_value
-from dash._utils import patch_collections_abc
-from dash.dependencies import DashDependency  # lgtm [py/unused-import]
-from dash.development.base_component import Component
+from dash.dependencies import DashDependency
 from dash.exceptions import PreventUpdate
 from dataclass_wizard import asdict, fromdict
 from flask import session
@@ -54,13 +51,14 @@ from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
+from dash_extensions._typing import Component, context_value
 from dash_extensions.utils import as_list
 
 try:
     # Dash 3.4.0 moved _Wildcard to a public class. Try importing both before failing to support backwards compatibility
     from dash.dependencies import Wildcard  # lgtm [py/unused-import]
 except ImportError:
-    from dash.dependencies import _Wildcard as Wildcard # lgtm [py/unused-import]
+    from dash.dependencies import _Wildcard as Wildcard  # lgtm [py/unused-import]
 
 
 T = TypeVar("T")
@@ -270,7 +268,7 @@ class CallbackBlueprint:
         if not isinstance(component_id, dict):
             return False
         # The ALL and ALLSMALLER flags indicate multi output.
-        return any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
+        return any([component_id[k] in (ALLSMALLER, ALL) for k in component_id])
 
 
 class DashBlueprint:
@@ -327,7 +325,7 @@ class DashBlueprint:
         """
         This method resolves the callbacks, i.e. it applies the callback injections.
         """
-        callbacks, clientside_callbacks = self.callbacks, self.clientside_callbacks
+        callbacks, clientside_callbacks = list(self.callbacks), list(self.clientside_callbacks)
         # Add any global callbacks.
         if self.include_global_callbacks:
             callbacks += GLOBAL_BLUEPRINT.callbacks
@@ -379,7 +377,7 @@ class DashBlueprint:
 
     @layout.setter
     def layout(self, value):
-        self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
+        self._layout_is_function = callable(value)
         self._layout = value
 
 
@@ -686,10 +684,13 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
             args, kwargs, fltr = _skip_inputs(args, kwargs, [in_flex_key, st_flex_key])
             cached_ctx = fltr[1]
             single_output = num_outputs <= 1
-            if cached_ctx is not None and "triggered" in cached_ctx:
-                local_ctx = context_value.get()
-                local_ctx["triggered_inputs"] = cached_ctx["triggered"]
-                context_value.set(local_ctx)
+            if cached_ctx is not None and "triggered" in cached_ctx and context_value is not None:
+                try:
+                    local_ctx = context_value.get()
+                    local_ctx["triggered_inputs"] = cached_ctx["triggered"]
+                    context_value.set(local_ctx)
+                except (LookupError, TypeError, AttributeError, KeyError):
+                    pass
             try:
                 outputs = f(*args, **kwargs)
             except Exception as e:
@@ -911,7 +912,7 @@ def default_prefix_escape(component_id: str):
     return False
 
 
-def apply_prefix(prefix, component_id, escape):
+def apply_prefix(prefix, component_id: str | dict[str, int | str | Wildcard], escape):
     if escape(component_id):
         return component_id
     if isinstance(component_id, dict):
@@ -1064,7 +1065,7 @@ class MultiplexerTransform(DashTransform):
 def _output_id_without_wildcards(output: Output) -> str:
     i, p = output.component_id, output.component_property
     if isinstance(i, dict):
-        i = json.dumps({k: i[k] for k in sorted(i) if i[k] not in [ALL, MATCH, ALLSMALLER]})
+        i = json.dumps({k: i[k] for k in sorted(i) if not isinstance(i[k], Wildcard)})
     return f"{i}_{p}"
 
 
