@@ -1,11 +1,10 @@
 from contextvars import copy_context
 
-import importlib
 import pytest
 
-try:
-    context_value = importlib.import_module("dash._callback_context").context_value
-except ImportError:  # pragma: no cover - fallback for potential module moves.
+from dash_extensions._typing import context_value
+
+if context_value is None:  # pragma: no cover
     pytest.skip("Dash callback context internals unavailable for direct unit test.", allow_module_level=True)
 
 try:
