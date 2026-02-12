@@ -51,7 +51,7 @@ from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
-from dash_extensions._typing import Component, context_value
+from dash_extensions._typing import Component, ComponentId, context_value
 from dash_extensions.utils import as_list
 
 try:
@@ -914,7 +914,7 @@ def default_prefix_escape(component_id: str):
     return False
 
 
-def apply_prefix(prefix, component_id: str | dict[str, int | str | Wildcard], escape):
+def apply_prefix(prefix, component_id: ComponentId, escape):
     if escape(component_id):
         return component_id
     if isinstance(component_id, dict):
