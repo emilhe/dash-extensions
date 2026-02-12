@@ -9,6 +9,9 @@
     "build:backends": "dash-generate-components ./src/ts/components dash_extensions -p package-info.json --r-prefix '' --jl-prefix '' --ignore \\.test\\.",
     "build": "npm run build:js && npm run build:backends && npm run update:pyproject",
     "update:pyproject": "uv run python pyproject.py",
+    "release:prepare": "uv run python scripts/release.py prepare",
+    "release:verify": "uv run python scripts/release.py verify",
+    "release:notes": "uv run python scripts/release.py release-notes",
     "watch": "npm run build:js::dev -- --watch"
   },
   "devDependencies": {

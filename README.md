@@ -23,6 +23,16 @@ to name a few. To enable interactivity, the documentation has been moved to a [s
 
 NB: The 2.0.0 version introduces a number of breaking changes, see documentation for details.
 
+## Release flow
+
+Release metadata is managed with `scripts/release.py`:
+
+-   `npm run release:prepare -- --version X.Y.Z` updates `package.json`, syncs `pyproject.toml`, and creates a changelog template section if missing.
+-   `npm run release:verify -- --version X.Y.Z` validates versions and changelog content before tagging.
+-   `npm run release:notes -- --version X.Y.Z` prints the matching changelog section.
+
+When a tag like `2.0.6` is pushed, the `Create GitHub Release From Tag` workflow creates the GitHub release message from `CHANGELOG.md`. The publish workflow then runs on the release event.
+
 ## Donation
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=Z9RXT5HVPK3B8&currency_code=DKK&source=url)
