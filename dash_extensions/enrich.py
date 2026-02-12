@@ -51,7 +51,7 @@ from dash import (
 )
 from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
-from dash.dependencies import DashDependency, _Wildcard  # lgtm [py/unused-import]
+from dash.dependencies import DashDependency  # lgtm [py/unused-import]
 from dash.development.base_component import Component
 from dash.exceptions import PreventUpdate
 from dataclass_wizard import asdict, fromdict
@@ -62,6 +62,13 @@ from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
 from dash_extensions.utils import as_list
+
+try:
+    # Dash 3.4.0 moved _Wildcard to a public class. Try importing both before failing to support backwards compatibility
+    from dash.dependencies import Wildcard  # lgtm [py/unused-import]
+except ImportError:
+    from dash.dependencies import _Wildcard as Wildcard # lgtm [py/unused-import]
+
 
 T = TypeVar("T")
 
@@ -946,7 +953,7 @@ def apply_prefix(prefix: str, component_id: str | dict, escape: Callable[[str | 
             if isinstance(component_id[key], int):
                 continue
             # This branch handles the wildcard callbacks.
-            if isinstance(component_id[key], _Wildcard):
+            if isinstance(component_id[key], Wildcard):
                 continue
             # All "normal" props are prefixed.
             component_id[key] = "{}-{}".format(prefix, component_id[key])
