@@ -43,12 +43,6 @@ from dash import (  # lgtm [py/unused-import]; noqa: F401
     register_page,  # noqa: F401
     set_props,  # noqa: F401
 )
-from dash import (
-    callback as _dash_callback,  # Import for type reuse
-)
-from dash import (
-    clientside_callback as _dash_clientside_callback,  # Import for type reuse
-)
 from dash._callback_context import context_value
 from dash._utils import patch_collections_abc
 from dash.dependencies import DashDependency  # lgtm [py/unused-import]
@@ -56,8 +50,7 @@ from dash.development.base_component import Component
 from dash.exceptions import PreventUpdate
 from dataclass_wizard import asdict, fromdict
 from flask import session
-from flask_caching.backends.filesystemcache import FileSystemCache
-from flask_caching.backends.rediscache import RedisCache
+from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
@@ -322,16 +315,13 @@ class DashBlueprint:
         """
         callbacks, clientside_callbacks = self._resolve_callbacks()
         # Move callbacks from one blueprint to another.
-        if isinstance(app, DashBlueprint):
-            app.callbacks += callbacks
-            app.clientside_callbacks += clientside_callbacks
-        elif isinstance(app, DashProxy):
+        if isinstance(app, DashProxy):
             app.blueprint.callbacks += callbacks
             app.blueprint.clientside_callbacks += clientside_callbacks
-        else:
-            # Register callbacks on a regular Dash app object.
-            for cbp in callbacks + clientside_callbacks:
-                cbp.register(app)
+            return
+        # Register callbacks on the "real" app object.
+        for cbp in callbacks + clientside_callbacks:
+            cbp.register(app)
 
     def _resolve_callbacks(
         self,
@@ -393,13 +383,6 @@ class DashBlueprint:
     def layout(self, value):
         self._layout_is_function = isinstance(value, patch_collections_abc("Callable"))
         self._layout = value
-
-
-# Copy signatures from original Dash functions to DashBlueprint methods
-DashBlueprint.callback.__signature__ = inspect.signature(_dash_callback)  # type: ignore[attr-defined]
-DashBlueprint.callback.__annotations__ = getattr(_dash_callback, "__annotations__", {})
-DashBlueprint.clientside_callback.__signature__ = inspect.signature(_dash_clientside_callback)  # type: ignore[attr-defined]
-DashBlueprint.clientside_callback.__annotations__ = getattr(_dash_clientside_callback, "__annotations__", {})
 
 
 # endregion
@@ -476,8 +459,8 @@ class DashProxy(dash.Dash):
         app.title = self.title
         app.index_string = self.index_string
         # Inject layout.
-        app.layout = html.Div()  # fool layout validator  # type: ignore[misc]
-        app._layout_value = self._layout_value  # type: ignore[method-assign]
+        app.layout = html.Div()  # fool layout validator
+        app._layout_value = self._layout_value
         # Register callbacks.
         self.blueprint.register_callbacks(app)
         # Setup secret.
@@ -494,13 +477,6 @@ class DashProxy(dash.Dash):
     @layout.setter
     def layout(self, value):
         self.blueprint.layout = value
-
-
-# Copy signatures from original Dash functions to DashProxy methods
-DashProxy.callback.__signature__ = inspect.signature(_dash_callback)  # type: ignore[attr-defined]
-DashProxy.callback.__annotations__ = getattr(_dash_callback, "__annotations__", {})
-DashProxy.clientside_callback.__signature__ = inspect.signature(_dash_clientside_callback)  # type: ignore[attr-defined]
-DashProxy.clientside_callback.__annotations__ = getattr(_dash_clientside_callback, "__annotations__", {})
 
 
 def _get_session_id(session_key=None):
@@ -866,13 +842,6 @@ def callback(*args, **kwargs):
 
 def clientside_callback(clientside_function, *args, **kwargs):
     return GLOBAL_BLUEPRINT.clientside_callback(clientside_function, *args, **kwargs)
-
-
-# Copy the signature and annotations from the original Dash functions to the global callback functions
-callback.__signature__ = inspect.signature(_dash_callback)  # type: ignore[attr-defined]
-callback.__annotations__ = getattr(_dash_callback, "__annotations__", {})
-clientside_callback.__signature__ = inspect.signature(_dash_clientside_callback)  # type: ignore[attr-defined]
-clientside_callback.__annotations__ = getattr(_dash_clientside_callback, "__annotations__", {})
 
 
 # TODO: Include or not? The plugin still seems a bit immature.
