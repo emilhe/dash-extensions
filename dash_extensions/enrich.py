@@ -52,7 +52,7 @@ from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
-from dash_extensions._typing import Component
+from dash_extensions._typing import Component, Wildcard, is_wildcard
 from dash_extensions.utils import as_list
 
 T = TypeVar("T")
@@ -275,7 +275,7 @@ class CallbackBlueprint:
         if not isinstance(component_id, dict):
             return False
         # The ALL and ALLSMALLER flags indicate multi output.
-        return any([component_id[k] in [ALLSMALLER, ALL] for k in component_id])
+        return any([component_id[k] in (ALLSMALLER, ALL) for k in component_id])
 
 
 class DashBlueprint:
@@ -914,7 +914,7 @@ def default_prefix_escape(component_id: str):
     return False
 
 
-def apply_prefix(prefix, component_id, escape):
+def apply_prefix(prefix, component_id: str | dict[str, int | str | Wildcard], escape):
     if escape(component_id):
         return component_id
     if isinstance(component_id, dict):
@@ -923,7 +923,7 @@ def apply_prefix(prefix, component_id, escape):
             if isinstance(component_id[key], int):
                 continue
             # This branch handles the wildcard callbacks.
-            if component_id[key] in [ALL, MATCH, ALLSMALLER]:
+            if is_wildcard(component_id[key]):
                 continue
             # All "normal" props are prefixed.
             component_id[key] = "{}-{}".format(prefix, component_id[key])
@@ -1067,7 +1067,7 @@ class MultiplexerTransform(DashTransform):
 def _output_id_without_wildcards(output: Output) -> str:
     i, p = output.component_id, output.component_property
     if isinstance(i, dict):
-        i = json.dumps({k: i[k] for k in sorted(i) if i[k] not in [ALL, MATCH, ALLSMALLER]})
+        i = json.dumps({k: i[k] for k in sorted(i) if not is_wildcard(i[k])})
     return f"{i}_{p}"
 
 
