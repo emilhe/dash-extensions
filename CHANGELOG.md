@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.5] - 12-02-26
+
+### Changed
+
+-   Various Dash 3/4 compatibility fixes
+-   Fixed bug with Wildcard import [#400](https://github.com/emilhe/dash-extensions/issues/400). Contributed by [Aaron-Wrote-This](https://github.com/Aaron-Wrote-This)
+
 ## [2.0.4] - 22-04-25
 
 ### Changed
