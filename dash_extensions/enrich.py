@@ -51,8 +51,15 @@ from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
-from dash_extensions._typing import Component, Wildcard, context_value, is_wildcard
+from dash_extensions._typing import Component, context_value
 from dash_extensions.utils import as_list
+
+try:
+    # Dash 3.4.0 moved _Wildcard to a public class. Try importing both before failing to support backwards compatibility
+    from dash.dependencies import Wildcard  # lgtm [py/unused-import]
+except ImportError:
+    from dash.dependencies import _Wildcard as Wildcard  # lgtm [py/unused-import]
+
 
 T = TypeVar("T")
 
@@ -914,7 +921,7 @@ def apply_prefix(prefix, component_id: str | dict[str, int | str | Wildcard], es
             if isinstance(component_id[key], int):
                 continue
             # This branch handles the wildcard callbacks.
-            if is_wildcard(component_id[key]):
+            if isinstance(component_id[key], Wildcard):
                 continue
             # All "normal" props are prefixed.
             component_id[key] = "{}-{}".format(prefix, component_id[key])
@@ -1058,7 +1065,7 @@ class MultiplexerTransform(DashTransform):
 def _output_id_without_wildcards(output: Output) -> str:
     i, p = output.component_id, output.component_property
     if isinstance(i, dict):
-        i = json.dumps({k: i[k] for k in sorted(i) if not is_wildcard(i[k])})
+        i = json.dumps({k: i[k] for k in sorted(i) if not isinstance(i[k], Wildcard)})
     return f"{i}_{p}"
 
 
