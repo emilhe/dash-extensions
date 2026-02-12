@@ -8,6 +8,7 @@ from dash import Input, Output, State, clientside_callback, html, page_container
 
 from dash_extensions._typing import Component
 
+
 """
 This module holds utilities related to the [Dash pages](https://dash.plotly.com/urls).
 """
@@ -130,28 +131,19 @@ def _prepare_container(container: Optional[Component] = None):
     return container
 
 
-def _resolve_pages_ids() -> tuple[str, str]:
-    return "_pages_store", "_pages_location"
-
-
-def _wrapper_id(component: Component) -> str:
-    component_id = getattr(component, "id", None)
-    if component_id is not None:
-        return f"{str(component_id)}_wrapper"
-    return f"{uuid.uuid4().hex}_wrapper"
-
-
 def _setup_callbacks():
-    store, location = _resolve_pages_ids()
+    store, location = "_pages_store", "_pages_location"
     # Setup callbacks for page components.
     components = list(_COMPONENT_PATH_REGISTRY.keys())
     for component in components:
         # Wrap in div container, so we can hide it.
+        component_id = getattr(component, "id", None)
+        wrapper_id = f"{component_id}_wrapper" if component_id is not None else f"{uuid.uuid4().hex}_wrapper"
         wrapper = html.Div(
             component,
             disable_n_clicks=True,
             style=dict(display="none"),
-            id=_wrapper_id(component),
+            id=wrapper_id,
         )
         # Add to container.
         container = _prepare_container(_CONTAINER_REGISTRY.get(component, _COMPONENT_CONTAINER))

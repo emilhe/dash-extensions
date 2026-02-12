@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 import functools
 import hashlib
-import importlib
 import inspect
 import json
 import logging
@@ -52,7 +51,7 @@ from flask_caching.backends import FileSystemCache, RedisCache
 from pydantic import BaseModel  # type: ignore
 
 from dash_extensions import CycleBreaker
-from dash_extensions._typing import Component, Wildcard, is_wildcard
+from dash_extensions._typing import Component, Wildcard, context_value, is_wildcard
 from dash_extensions.utils import as_list
 
 T = TypeVar("T")
@@ -61,19 +60,6 @@ _wildcard_mappings = {ALL: "<ALL>", MATCH: "<MATCH>", ALLSMALLER: "<ALLSMALLER>"
 _wildcard_values = list(_wildcard_mappings.values())
 
 DEPENDENCY_APPEND_PREFIX = "dash_extensions_"
-
-def _set_cached_triggered_inputs(triggered_inputs):
-    """
-    Backward-compatible context injection used by the blocking transform.
-    Falls back to no-op if Dash internals are unavailable.
-    """
-    try:
-        context_value = importlib.import_module("dash._callback_context").context_value
-        local_ctx = context_value.get()
-        local_ctx["triggered_inputs"] = triggered_inputs
-        context_value.set(local_ctx)
-    except Exception:
-        return
 
 
 # region DependencyCollection
@@ -691,8 +677,10 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
             args, kwargs, fltr = _skip_inputs(args, kwargs, [in_flex_key, st_flex_key])
             cached_ctx = fltr[1]
             single_output = num_outputs <= 1
-            if cached_ctx is not None and "triggered" in cached_ctx:
-                _set_cached_triggered_inputs(cached_ctx["triggered"])
+            if cached_ctx is not None and "triggered" in cached_ctx and context_value is not None:
+                local_ctx = context_value.get()
+                local_ctx["triggered_inputs"] = cached_ctx["triggered"]
+                context_value.set(local_ctx)
             try:
                 outputs = f(*args, **kwargs)
             except Exception as e:

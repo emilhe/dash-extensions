@@ -25,3 +25,21 @@ else:
 
 def is_wildcard(value: object) -> bool:
     return value in (ALL, MATCH, ALLSMALLER)
+
+
+# Compat shims for Dash internals that may move across major versions.
+
+try:
+    from dash._callback_context import context_value
+except Exception:
+    context_value = None
+
+try:
+    from dash._callback_context import _get_context_value
+except Exception:
+    _get_context_value = None
+
+try:
+    from dash._utils import stringify_id
+except Exception:
+    stringify_id = None
