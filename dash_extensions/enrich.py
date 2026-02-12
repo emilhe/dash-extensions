@@ -678,9 +678,12 @@ def skip_input_signal_add_output_signal(num_outputs, out_flex_key, in_flex_key, 
             cached_ctx = fltr[1]
             single_output = num_outputs <= 1
             if cached_ctx is not None and "triggered" in cached_ctx and context_value is not None:
-                local_ctx = context_value.get()
-                local_ctx["triggered_inputs"] = cached_ctx["triggered"]
-                context_value.set(local_ctx)
+                try:
+                    local_ctx = context_value.get()
+                    local_ctx["triggered_inputs"] = cached_ctx["triggered"]
+                    context_value.set(local_ctx)
+                except (LookupError, TypeError, AttributeError, KeyError):
+                    pass
             try:
                 outputs = f(*args, **kwargs)
             except Exception as e:
