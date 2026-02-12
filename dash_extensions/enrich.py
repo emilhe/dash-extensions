@@ -914,11 +914,7 @@ def default_prefix_escape(component_id: str):
     return False
 
 
-<<<<<<< HEAD
 def apply_prefix(prefix, component_id: str | dict[str, int | str | Wildcard], escape):
-=======
-def apply_prefix(prefix, component_id: str | dict[str, int | str | Wildcard], escape):
->>>>>>> origin/master
     if escape(component_id):
         return component_id
     if isinstance(component_id, dict):
