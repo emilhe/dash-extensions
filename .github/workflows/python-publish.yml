@@ -1,41 +1,56 @@
-# This workflow will publish the package to npm and PyPI when a new release is created
-
 name: Upload Python Package
 
 on:
-    release:
-        types: [created]
-    workflow_dispatch: {}
+  release:
+    types: [published]
+  workflow_dispatch: {}
 
 jobs:
-    deploy:
-        runs-on: ubuntu-latest
-        permissions:
-          contents: read
-          id-token: write   # required for trusted publishing
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm Trusted Publishing (OIDC) and PyPI trusted publishing
 
-        steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v3
-              with:
-                  node-version: 18
-                  registry-url: https://registry.npmjs.org/
-            - name: Install uv
-              uses: astral-sh/setup-uv@v5
-              with:
-                  python-version: '3.12'
-            - name: Enable uv cache
-              uses: astral-sh/setup-uv@v5
-              with:
-                  enable-cache: true
-            - name: Install the project
-              run: uv sync --all-extras --dev
-            - name: Build and publish to npm
-              run: |
-                  uv run npm install | echo "Ignore npm install error"
-                  uv run npm run build
-                  uv run npm publish
-            - name: Build and publish to pypi
-              run: |
-                  uv build
-                  uv publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # npm Trusted Publishing currently requires npm CLI >= 11.5.1 and Node >= 22.14.0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      # If you have a repo/org secret like NPM_TOKEN (even if unused), do NOT export it here.
+      # If a stale token is present in an .npmrc, npm may try token auth and fail instead of using OIDC.
+      - name: Ensure npm auth is not coming from a token
+        shell: bash
+        run: |
+          rm -f ~/.npmrc .npmrc || true
+
+      - name: Build
+        run: |
+          uv run npm ci
+          uv run npm run build
+
+      # Publish to npm using Trusted Publishing (OIDC)
+      # Do NOT set NODE_AUTH_TOKEN here.
+      - name: Publish to npm (OIDC)
+        run: |
+          uv run npm publish --provenance
+
+      # Publish to PyPI (kept as username/password like your original)
+      # Optional: you can later switch to PyPI Trusted Publishing (OIDC) and remove username/password.
+      - name: Build and publish to PyPI
+        run: |
+          uv build
+          uv publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}
