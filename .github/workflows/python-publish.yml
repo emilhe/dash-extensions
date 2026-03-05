@@ -1,4 +1,3 @@
-# Publishes to npm + PyPI on GitHub Release creation, and can be run manually.
 name: Upload Python Package
 
 on:
@@ -11,16 +10,39 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for npm + (optional) PyPI trusted publishing (OIDC)
+      id-token: write  # required for npm trusted publishing (OIDC)
 
     steps:
       - uses: actions/checkout@v4
 
-      # npm Trusted Publishing requires Node >= 22.14.0 and npm >= 11.5.1
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22.14.0
+          registry-url: https://registry.npmjs.org/
+
+      # Ensure npm is new enough for trusted publishing behavior
+      - name: Upgrade npm
+        run: |
+          node --version
+          npm --version
+          npm i -g npm@latest
+          npm --version
+
+      # Guardrail: remove any token-based config that could interfere
+      - name: Remove npm token config
+        shell: bash
+        run: |
+          rm -f ~/.npmrc .npmrc || true
+
+      - name: Build (JS)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish to npm (Trusted Publishing / OIDC)
+        run: |
+          npm publish --provenance
 
       - name: Install uv (with cache)
         uses: astral-sh/setup-uv@v5
@@ -31,23 +53,6 @@ jobs:
       - name: Install the project
         run: uv sync --all-extras --dev
 
-      # Prevent npm from accidentally using token-based auth from any .npmrc
-      # (which can cause "token expired/revoked" instead of using OIDC trusted publishing)
-      - name: Ensure npm uses OIDC (no token auth)
-        shell: bash
-        run: |
-          rm -f ~/.npmrc .npmrc || true
-
-      - name: Build
-        run: |
-          uv run npm ci
-          uv run npm run build
-
-      - name: Publish to npm (OIDC trusted publishing)
-        run: |
-          uv run npm publish --provenance
-
-      # Keep your existing PyPI username/password approach
       - name: Build and publish to PyPI
         run: |
           uv build
