@@ -33,6 +33,14 @@
   },
   "author": "Emil Haldrup Eriksen <emil.h.eriksen@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emilhe/dash-extensions"
+  },
+  "bugs": {
+    "url": "https://github.com/emilhe/dash-extensions/issues"
+  },
+  "homepage": "https://github.com/emilhe/dash-extensions#readme",
   "dependencies": {
     "@img-comparison-slider/react": "^8.0.2",
     "dompurify": "^3.2.4",
