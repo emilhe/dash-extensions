@@ -1,41 +1,54 @@
-# This workflow will publish the package to npm and PyPI when a new release is created
-
+# Publishes to npm + PyPI on GitHub Release creation, and can be run manually.
 name: Upload Python Package
 
 on:
-    release:
-        types: [created]
-    workflow_dispatch: {}
+  release:
+    types: [created]
+  workflow_dispatch: {}
 
 jobs:
-    deploy:
-        runs-on: ubuntu-latest
-        permissions:
-          contents: read
-          id-token: write   # required for trusted publishing
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm + (optional) PyPI trusted publishing (OIDC)
 
-        steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v3
-              with:
-                  node-version: 18
-                  registry-url: https://registry.npmjs.org/
-            - name: Install uv
-              uses: astral-sh/setup-uv@v5
-              with:
-                  python-version: '3.12'
-            - name: Enable uv cache
-              uses: astral-sh/setup-uv@v5
-              with:
-                  enable-cache: true
-            - name: Install the project
-              run: uv sync --all-extras --dev
-            - name: Build and publish to npm
-              run: |
-                  uv run npm install | echo "Ignore npm install error"
-                  uv run npm run build
-                  uv run npm publish
-            - name: Build and publish to pypi
-              run: |
-                  uv build
-                  uv publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # npm Trusted Publishing requires Node >= 22.14.0 and npm >= 11.5.1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      # Prevent npm from accidentally using token-based auth from any .npmrc
+      # (which can cause "token expired/revoked" instead of using OIDC trusted publishing)
+      - name: Ensure npm uses OIDC (no token auth)
+        shell: bash
+        run: |
+          rm -f ~/.npmrc .npmrc || true
+
+      - name: Build
+        run: |
+          uv run npm ci
+          uv run npm run build
+
+      - name: Publish to npm (OIDC trusted publishing)
+        run: |
+          uv run npm publish --provenance
+
+      # Keep your existing PyPI username/password approach
+      - name: Build and publish to PyPI
+        run: |
+          uv build
+          uv publish --username=${{ secrets.PYPI_USERNAME }} --password=${{ secrets.PYPI_PASSWORD }}
