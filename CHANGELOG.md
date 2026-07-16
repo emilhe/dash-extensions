@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.6] - 16-07-26
+
+### Changed
+
+-   Replaced links to the expired dash-extensions.com domain (no longer under project control) with https://dash-extensions-docs.onrender.com/
+
 ## [2.0.5] - 12-02-26
 
 ### Changed
